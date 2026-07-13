@@ -238,13 +238,13 @@ function prepareImage(settings) {
     }
   }
 
+  const threadTarget = buildThreadTarget(gray, mask, WORK_SIZE);
   for (let y = 0; y < WORK_SIZE; y++) {
     for (let x = 0; x < WORK_SIZE; x++) {
       const idx = y * WORK_SIZE + x;
       const offset = idx * 4;
       const inside = mask[idx] === 1;
-      const value = inside ? 1 - gray[idx] / 255 : 0;
-      target[idx] = value;
+      target[idx] = inside ? threadTarget[idx] : 0;
       if (!inside) {
         data[offset] = 18;
         data[offset + 1] = 18;
@@ -256,6 +256,99 @@ function prepareImage(settings) {
 
   ctx.putImageData(imageData, 0, 0);
   return { canvas: temp, target };
+}
+
+function buildThreadTarget(gray, mask, size) {
+  const normalized = normalizeByPercentiles(gray, mask);
+  const smooth = boxBlurValues(normalized, mask, size, 3);
+  const local = new Float32Array(gray.length);
+  const edges = sobelMagnitude(normalized, mask, size);
+  const target = new Float32Array(gray.length);
+
+  for (let i = 0; i < gray.length; i++) {
+    if (!mask[i]) continue;
+    const highPass = normalized[i] - smooth[i];
+    local[i] = clamp01(normalized[i] + highPass * 0.75);
+  }
+
+  for (let i = 0; i < gray.length; i++) {
+    if (!mask[i]) continue;
+    let darkness = 1 - local[i];
+    darkness = Math.pow(clamp01(darkness), 0.82);
+    const detail = Math.pow(edges[i], 0.7) * 0.22;
+    target[i] = clamp01(darkness * 0.92 + detail);
+  }
+
+  return target;
+}
+
+function normalizeByPercentiles(gray, mask) {
+  const values = [];
+  for (let i = 0; i < gray.length; i++) {
+    if (mask[i]) values.push(gray[i]);
+  }
+  values.sort((a, b) => a - b);
+  const low = values[Math.floor(values.length * 0.01)] ?? 0;
+  const high = values[Math.floor(values.length * 0.995)] ?? 255;
+  const range = Math.max(24, high - low);
+  const out = new Float32Array(gray.length);
+  for (let i = 0; i < gray.length; i++) {
+    out[i] = mask[i] ? clamp01((gray[i] - low) / range) : 1;
+  }
+  return out;
+}
+
+function boxBlurValues(values, mask, size, radius) {
+  const out = new Float32Array(values.length);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = y * size + x;
+      if (!mask[idx]) {
+        out[idx] = 1;
+        continue;
+      }
+      let sum = 0;
+      let count = 0;
+      for (let yy = Math.max(0, y - radius); yy <= Math.min(size - 1, y + radius); yy++) {
+        for (let xx = Math.max(0, x - radius); xx <= Math.min(size - 1, x + radius); xx++) {
+          const sample = yy * size + xx;
+          if (!mask[sample]) continue;
+          sum += values[sample];
+          count++;
+        }
+      }
+      out[idx] = count ? sum / count : values[idx];
+    }
+  }
+  return out;
+}
+
+function sobelMagnitude(values, mask, size) {
+  const out = new Float32Array(values.length);
+  let max = 0;
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      const idx = y * size + x;
+      if (!mask[idx]) continue;
+      const tl = values[(y - 1) * size + x - 1];
+      const tc = values[(y - 1) * size + x];
+      const tr = values[(y - 1) * size + x + 1];
+      const ml = values[y * size + x - 1];
+      const mr = values[y * size + x + 1];
+      const bl = values[(y + 1) * size + x - 1];
+      const bc = values[(y + 1) * size + x];
+      const br = values[(y + 1) * size + x + 1];
+      const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+      const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+      const edge = Math.sqrt(gx * gx + gy * gy);
+      out[idx] = edge;
+      if (edge > max) max = edge;
+    }
+  }
+  if (max > 0) {
+    for (let i = 0; i < out.length; i++) out[i] = clamp01(out[i] / max);
+  }
+  return out;
 }
 
 function findBestNextPoint(current, residual, drawn, settings, lineCache) {
@@ -593,6 +686,10 @@ function clampInt(value, min, max) {
 
 function clampNumber(value, min, max) {
   return Math.max(min, Math.min(max, Number.parseFloat(value) || min));
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
 }
 
 function waitFrame() {
