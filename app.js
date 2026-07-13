@@ -8,10 +8,10 @@ const pointsInput = document.getElementById("pointsInput");
 const linesInput = document.getElementById("linesInput");
 const sizeInput = document.getElementById("sizeInput");
 const threadInput = document.getElementById("threadInput");
-const contrastInput = document.getElementById("contrastInput");
-const detailInput = document.getElementById("detailInput");
 const opacityInput = document.getElementById("opacityInput");
 const skipInput = document.getElementById("skipInput");
+const zoomInput = document.getElementById("zoomInput");
+const resetCropButton = document.getElementById("resetCropButton");
 const buildButton = document.getElementById("buildButton");
 const stopButton = document.getElementById("stopButton");
 const pngButton = document.getElementById("pngButton");
@@ -32,6 +32,14 @@ const state = {
   sequence: [],
   cancelled: false,
   running: false,
+  crop: {
+    zoom: 1,
+    offsetX: 0,
+    offsetY: 0,
+    dragging: false,
+    lastX: 0,
+    lastY: 0,
+  },
 };
 
 const WORK_SIZE = 560;
@@ -45,9 +53,10 @@ imageInput.addEventListener("change", async (event) => {
   const image = await loadImage(file);
   state.image = image;
   state.sequence = [];
+  resetCrop();
   drawPreparedPreview();
   drawInitialResult();
-  setStatus("Фото загружено. Можно строить последовательность.");
+  setStatus("Фото загружено. Перетащите подготовленное фото для кадра или измените зум.");
   setExportEnabled(false);
 });
 
@@ -65,13 +74,62 @@ pngButton.addEventListener("click", () => downloadDataUrl("string-art-preview.pn
 txtButton.addEventListener("click", () => downloadText("string-art-instruction.txt", makeInstructionText()));
 csvButton.addEventListener("click", () => downloadText("string-art-steps.csv", makeCsvText()));
 
-for (const input of [pointsInput, sizeInput, contrastInput, detailInput]) {
+for (const input of [pointsInput, sizeInput, zoomInput]) {
   input.addEventListener("input", () => {
     if (!state.image || state.running) return;
+    if (input === zoomInput) state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
+    clampCropToImage();
+    invalidateResult();
     drawPreparedPreview();
-    drawInitialResult();
   });
 }
+
+resetCropButton.addEventListener("click", () => {
+  if (!state.image || state.running) return;
+  resetCrop();
+  invalidateResult();
+  drawPreparedPreview();
+});
+
+sourceCanvas.addEventListener("pointerdown", (event) => {
+  if (!state.image || state.running) return;
+  sourceCanvas.setPointerCapture(event.pointerId);
+  state.crop.dragging = true;
+  state.crop.lastX = event.clientX;
+  state.crop.lastY = event.clientY;
+});
+
+sourceCanvas.addEventListener("pointermove", (event) => {
+  if (!state.crop.dragging || !state.image || state.running) return;
+  const rect = sourceCanvas.getBoundingClientRect();
+  const scale = WORK_SIZE / rect.width;
+  state.crop.offsetX += (event.clientX - state.crop.lastX) * scale;
+  state.crop.offsetY += (event.clientY - state.crop.lastY) * scale;
+  clampCropToImage();
+  state.crop.lastX = event.clientX;
+  state.crop.lastY = event.clientY;
+  drawPreparedPreview();
+});
+
+sourceCanvas.addEventListener("pointerup", stopDragging);
+sourceCanvas.addEventListener("pointercancel", stopDragging);
+
+sourceCanvas.addEventListener("wheel", (event) => {
+  if (!state.image || state.running) return;
+  event.preventDefault();
+  const rect = sourceCanvas.getBoundingClientRect();
+  const before = canvasPointToWorkPoint(event, rect);
+  const previousZoom = state.crop.zoom;
+  const nextZoom = clampNumber(previousZoom * (event.deltaY < 0 ? 1.08 : 0.92), 1, 4);
+  if (nextZoom === previousZoom) return;
+  state.crop.zoom = nextZoom;
+  zoomInput.value = nextZoom.toFixed(2);
+  state.crop.offsetX = before.x - WORK_SIZE / 2 - ((before.x - WORK_SIZE / 2 - state.crop.offsetX) * nextZoom) / previousZoom;
+  state.crop.offsetY = before.y - WORK_SIZE / 2 - ((before.y - WORK_SIZE / 2 - state.crop.offsetY) * nextZoom) / previousZoom;
+  clampCropToImage();
+  invalidateResult();
+  drawPreparedPreview();
+}, { passive: false });
 
 async function generate() {
   state.cancelled = false;
@@ -140,8 +198,9 @@ function readSettings() {
     lines: clampInt(linesInput.value, 100, 8000),
     sizeCm: clampNumber(sizeInput.value, 10, 200),
     threadMm: clampNumber(threadInput.value, 0.05, 1),
-    contrast: clampNumber(contrastInput.value, 0.7, 2.6),
-    detailBoost: clampNumber(detailInput.value, 0, 1.8),
+    zoom: state.crop.zoom,
+    offsetX: state.crop.offsetX,
+    offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
   };
@@ -155,10 +214,8 @@ function prepareImage(settings) {
   ctx.fillStyle = "white";
   ctx.fillRect(0, 0, WORK_SIZE, WORK_SIZE);
 
-  const side = Math.min(state.image.width, state.image.height);
-  const sx = (state.image.width - side) / 2;
-  const sy = (state.image.height - side) / 2;
-  ctx.drawImage(state.image, sx, sy, side, side, 0, 0, WORK_SIZE, WORK_SIZE);
+  const fit = getImageFit(state.image, WORK_SIZE, settings);
+  ctx.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
 
   const imageData = ctx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
   const data = imageData.data;
@@ -181,33 +238,19 @@ function prepareImage(settings) {
     }
   }
 
-  const levels = getAutoLevels(gray, mask);
-  const normalized = new Float32Array(WORK_SIZE * WORK_SIZE);
-  for (let i = 0; i < gray.length; i++) {
-    normalized[i] = mask[i] ? clamp01((gray[i] - levels.black) / (levels.white - levels.black)) : 1;
-  }
-
-  const blurred = boxBlur(normalized, mask, WORK_SIZE, 2);
-  const sharp = new Float32Array(WORK_SIZE * WORK_SIZE);
-  for (let i = 0; i < normalized.length; i++) {
-    sharp[i] = mask[i] ? clamp01(normalized[i] + (normalized[i] - blurred[i]) * 0.95) : 1;
-  }
-
-  const edges = sobelEdges(sharp, mask, WORK_SIZE);
   for (let y = 0; y < WORK_SIZE; y++) {
     for (let x = 0; x < WORK_SIZE; x++) {
       const idx = y * WORK_SIZE + x;
       const offset = idx * 4;
       const inside = mask[idx] === 1;
-      let value = inside ? 1 - sharp[idx] : 0;
-      value = Math.pow(clamp01(value), 0.9 / settings.contrast);
-      value = clamp01(value * 0.95 + edges[idx] * settings.detailBoost * 0.55);
+      const value = inside ? 1 - gray[idx] / 255 : 0;
       target[idx] = value;
-      const preview = inside ? Math.round((1 - value) * 255) : 18;
-      data[offset] = preview;
-      data[offset + 1] = preview;
-      data[offset + 2] = preview;
-      data[offset + 3] = 255;
+      if (!inside) {
+        data[offset] = 18;
+        data[offset + 1] = 18;
+        data[offset + 2] = 18;
+        data[offset + 3] = 255;
+      }
     }
   }
 
@@ -289,6 +332,64 @@ function drawPreparedPreview() {
   const settings = readSettings();
   const prepared = prepareImage(settings);
   drawSourceFromPrepared(prepared, settings);
+}
+
+function resetCrop() {
+  state.crop.zoom = 1;
+  state.crop.offsetX = 0;
+  state.crop.offsetY = 0;
+  state.crop.dragging = false;
+  zoomInput.value = "1";
+}
+
+function stopDragging() {
+  if (!state.crop.dragging) return;
+  state.crop.dragging = false;
+  invalidateResult();
+}
+
+function canvasPointToWorkPoint(event, rect) {
+  return {
+    x: ((event.clientX - rect.left) / rect.width) * WORK_SIZE,
+    y: ((event.clientY - rect.top) / rect.height) * WORK_SIZE,
+  };
+}
+
+function getImageFit(image, size, settings) {
+  const baseScale = Math.max(size / image.width, size / image.height);
+  const scale = baseScale * settings.zoom;
+  const width = image.width * scale;
+  const height = image.height * scale;
+  return {
+    x: size / 2 - width / 2 + settings.offsetX,
+    y: size / 2 - height / 2 + settings.offsetY,
+    width,
+    height,
+  };
+}
+
+function clampCropToImage() {
+  if (!state.image) return;
+  const baseScale = Math.max(WORK_SIZE / state.image.width, WORK_SIZE / state.image.height);
+  const width = state.image.width * baseScale * state.crop.zoom;
+  const height = state.image.height * baseScale * state.crop.zoom;
+  const maxX = Math.max(0, (width - WORK_SIZE) / 2);
+  const maxY = Math.max(0, (height - WORK_SIZE) / 2);
+  state.crop.offsetX = Math.max(-maxX, Math.min(maxX, state.crop.offsetX));
+  state.crop.offsetY = Math.max(-maxY, Math.min(maxY, state.crop.offsetY));
+}
+
+function invalidateResult() {
+  state.sequence = [];
+  setExportEnabled(false);
+  sequenceOutput.value = "";
+  pointsOut.textContent = "-";
+  linesOut.textContent = "-";
+  stepOut.textContent = "-";
+  lengthOut.textContent = "-";
+  progress.value = 0;
+  setStatus("Кадр изменён. Нажмите «Построить», чтобы пересчитать инструкцию.");
+  if (state.image) drawInitialResult();
 }
 
 function drawSourceFromPrepared(prepared, settings) {
@@ -484,76 +585,6 @@ function downloadUrl(filename, url) {
 function circularDistance(a, b, count) {
   const direct = Math.abs(a - b);
   return Math.min(direct, count - direct);
-}
-
-function getAutoLevels(gray, mask) {
-  const values = [];
-  for (let i = 0; i < gray.length; i++) {
-    if (mask[i]) values.push(gray[i]);
-  }
-  values.sort((a, b) => a - b);
-  const black = values[Math.floor(values.length * 0.025)] ?? 0;
-  const white = values[Math.floor(values.length * 0.985)] ?? 255;
-  return { black, white: Math.max(black + 16, white) };
-}
-
-function boxBlur(values, mask, size, radius) {
-  const out = new Float32Array(values.length);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const idx = y * size + x;
-      if (!mask[idx]) {
-        out[idx] = 1;
-        continue;
-      }
-      let sum = 0;
-      let count = 0;
-      for (let yy = Math.max(0, y - radius); yy <= Math.min(size - 1, y + radius); yy++) {
-        for (let xx = Math.max(0, x - radius); xx <= Math.min(size - 1, x + radius); xx++) {
-          const sample = yy * size + xx;
-          if (!mask[sample]) continue;
-          sum += values[sample];
-          count++;
-        }
-      }
-      out[idx] = count ? sum / count : values[idx];
-    }
-  }
-  return out;
-}
-
-function sobelEdges(values, mask, size) {
-  const out = new Float32Array(values.length);
-  let max = 0;
-  for (let y = 1; y < size - 1; y++) {
-    for (let x = 1; x < size - 1; x++) {
-      const idx = y * size + x;
-      if (!mask[idx]) continue;
-      const tl = values[(y - 1) * size + x - 1];
-      const tc = values[(y - 1) * size + x];
-      const tr = values[(y - 1) * size + x + 1];
-      const ml = values[y * size + x - 1];
-      const mr = values[y * size + x + 1];
-      const bl = values[(y + 1) * size + x - 1];
-      const bc = values[(y + 1) * size + x];
-      const br = values[(y + 1) * size + x + 1];
-      const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
-      const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
-      const edge = Math.sqrt(gx * gx + gy * gy);
-      out[idx] = edge;
-      if (edge > max) max = edge;
-    }
-  }
-  if (max > 0) {
-    for (let i = 0; i < out.length; i++) {
-      out[i] = clamp01(out[i] / max);
-    }
-  }
-  return out;
-}
-
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
 }
 
 function clampInt(value, min, max) {
