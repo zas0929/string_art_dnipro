@@ -9,6 +9,7 @@ const linesInput = document.getElementById("linesInput");
 const sizeInput = document.getElementById("sizeInput");
 const threadInput = document.getElementById("threadInput");
 const contrastInput = document.getElementById("contrastInput");
+const detailInput = document.getElementById("detailInput");
 const opacityInput = document.getElementById("opacityInput");
 const skipInput = document.getElementById("skipInput");
 const buildButton = document.getElementById("buildButton");
@@ -33,7 +34,7 @@ const state = {
   running: false,
 };
 
-const WORK_SIZE = 420;
+const WORK_SIZE = 560;
 
 drawEmpty();
 
@@ -64,7 +65,7 @@ pngButton.addEventListener("click", () => downloadDataUrl("string-art-preview.pn
 txtButton.addEventListener("click", () => downloadText("string-art-instruction.txt", makeInstructionText()));
 csvButton.addEventListener("click", () => downloadText("string-art-steps.csv", makeCsvText()));
 
-for (const input of [pointsInput, sizeInput, contrastInput]) {
+for (const input of [pointsInput, sizeInput, contrastInput, detailInput]) {
   input.addEventListener("input", () => {
     if (!state.image || state.running) return;
     drawPreparedPreview();
@@ -86,7 +87,8 @@ async function generate() {
   state.points = buildCirclePoints(settings.points, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
   state.sequence = [0];
 
-  const residual = new Float32Array(prepared.darkness);
+  const residual = new Float32Array(prepared.target);
+  const drawn = new Float32Array(prepared.target.length);
   const lineCache = new Map();
   let current = 0;
   let renderedLines = [];
@@ -97,12 +99,13 @@ async function generate() {
   for (let line = 0; line < settings.lines; line++) {
     if (state.cancelled) break;
 
-    const next = findBestNextPoint(current, residual, settings, lineCache);
+    const next = findBestNextPoint(current, residual, drawn, settings, lineCache);
     if (next === -1) break;
 
     const samples = getLineSamples(current, next, settings, lineCache);
     for (let i = 0; i < samples.length; i++) {
       residual[samples[i]] = Math.max(0, residual[samples[i]] - settings.lineStrength);
+      drawn[samples[i]] += settings.lineStrength;
     }
 
     renderedLines.push([current, next]);
@@ -137,7 +140,8 @@ function readSettings() {
     lines: clampInt(linesInput.value, 100, 8000),
     sizeCm: clampNumber(sizeInput.value, 10, 200),
     threadMm: clampNumber(threadInput.value, 0.05, 1),
-    contrast: clampNumber(contrastInput.value, 0.7, 2.2),
+    contrast: clampNumber(contrastInput.value, 0.7, 2.6),
+    detailBoost: clampNumber(detailInput.value, 0, 1.8),
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
   };
@@ -158,7 +162,9 @@ function prepareImage(settings) {
 
   const imageData = ctx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
   const data = imageData.data;
-  const darkness = new Float32Array(WORK_SIZE * WORK_SIZE);
+  const gray = new Float32Array(WORK_SIZE * WORK_SIZE);
+  const mask = new Uint8Array(WORK_SIZE * WORK_SIZE);
+  const target = new Float32Array(WORK_SIZE * WORK_SIZE);
   const radius = WORK_SIZE / 2 - 8;
   const cx = WORK_SIZE / 2;
   const cy = WORK_SIZE / 2;
@@ -170,10 +176,33 @@ function prepareImage(settings) {
       const dx = x - cx;
       const dy = y - cy;
       const inside = dx * dx + dy * dy <= radius * radius;
-      const gray = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
-      let value = inside ? 1 - gray / 255 : 0;
-      value = Math.pow(Math.max(0, Math.min(1, value)), 1 / settings.contrast);
-      darkness[idx] = value;
+      mask[idx] = inside ? 1 : 0;
+      gray[idx] = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+    }
+  }
+
+  const levels = getAutoLevels(gray, mask);
+  const normalized = new Float32Array(WORK_SIZE * WORK_SIZE);
+  for (let i = 0; i < gray.length; i++) {
+    normalized[i] = mask[i] ? clamp01((gray[i] - levels.black) / (levels.white - levels.black)) : 1;
+  }
+
+  const blurred = boxBlur(normalized, mask, WORK_SIZE, 2);
+  const sharp = new Float32Array(WORK_SIZE * WORK_SIZE);
+  for (let i = 0; i < normalized.length; i++) {
+    sharp[i] = mask[i] ? clamp01(normalized[i] + (normalized[i] - blurred[i]) * 0.95) : 1;
+  }
+
+  const edges = sobelEdges(sharp, mask, WORK_SIZE);
+  for (let y = 0; y < WORK_SIZE; y++) {
+    for (let x = 0; x < WORK_SIZE; x++) {
+      const idx = y * WORK_SIZE + x;
+      const offset = idx * 4;
+      const inside = mask[idx] === 1;
+      let value = inside ? 1 - sharp[idx] : 0;
+      value = Math.pow(clamp01(value), 0.9 / settings.contrast);
+      value = clamp01(value * 0.95 + edges[idx] * settings.detailBoost * 0.55);
+      target[idx] = value;
       const preview = inside ? Math.round((1 - value) * 255) : 18;
       data[offset] = preview;
       data[offset + 1] = preview;
@@ -183,10 +212,10 @@ function prepareImage(settings) {
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return { canvas: temp, darkness };
+  return { canvas: temp, target };
 }
 
-function findBestNextPoint(current, residual, settings, lineCache) {
+function findBestNextPoint(current, residual, drawn, settings, lineCache) {
   let best = -1;
   let bestScore = -Infinity;
 
@@ -197,10 +226,15 @@ function findBestNextPoint(current, residual, settings, lineCache) {
 
     const samples = getLineSamples(current, candidate, settings, lineCache);
     let score = 0;
+    let overdraw = 0;
     for (let i = 0; i < samples.length; i++) {
-      score += residual[samples[i]];
+      const idx = samples[i];
+      score += residual[idx] * residual[idx];
+      if (drawn[idx] > residual[idx] + settings.lineStrength) {
+        overdraw += drawn[idx] - residual[idx];
+      }
     }
-    score /= samples.length || 1;
+    score = score / Math.sqrt(samples.length || 1) - overdraw * 0.018;
 
     if (score > bestScore) {
       bestScore = score;
@@ -297,9 +331,9 @@ function drawThreadLines(lines, settings) {
   resultCtx.beginPath();
   resultCtx.arc(resultCanvas.width / 2, resultCanvas.height / 2, resultCanvas.width / 2 - 20, 0, Math.PI * 2);
   resultCtx.clip();
-  resultCtx.globalAlpha = 0.12 + Number(threadInput.value) * 0.25;
+  resultCtx.globalAlpha = 0.075 + settings.threadMm * 0.32;
   resultCtx.strokeStyle = "#050506";
-  resultCtx.lineWidth = Math.max(0.35, settings.threadMm * 3.2);
+  resultCtx.lineWidth = Math.max(0.42, settings.threadMm * 3.6);
   for (const [a, b] of lines) {
     const p1 = state.points[a];
     const p2 = state.points[b];
@@ -450,6 +484,76 @@ function downloadUrl(filename, url) {
 function circularDistance(a, b, count) {
   const direct = Math.abs(a - b);
   return Math.min(direct, count - direct);
+}
+
+function getAutoLevels(gray, mask) {
+  const values = [];
+  for (let i = 0; i < gray.length; i++) {
+    if (mask[i]) values.push(gray[i]);
+  }
+  values.sort((a, b) => a - b);
+  const black = values[Math.floor(values.length * 0.025)] ?? 0;
+  const white = values[Math.floor(values.length * 0.985)] ?? 255;
+  return { black, white: Math.max(black + 16, white) };
+}
+
+function boxBlur(values, mask, size, radius) {
+  const out = new Float32Array(values.length);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = y * size + x;
+      if (!mask[idx]) {
+        out[idx] = 1;
+        continue;
+      }
+      let sum = 0;
+      let count = 0;
+      for (let yy = Math.max(0, y - radius); yy <= Math.min(size - 1, y + radius); yy++) {
+        for (let xx = Math.max(0, x - radius); xx <= Math.min(size - 1, x + radius); xx++) {
+          const sample = yy * size + xx;
+          if (!mask[sample]) continue;
+          sum += values[sample];
+          count++;
+        }
+      }
+      out[idx] = count ? sum / count : values[idx];
+    }
+  }
+  return out;
+}
+
+function sobelEdges(values, mask, size) {
+  const out = new Float32Array(values.length);
+  let max = 0;
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      const idx = y * size + x;
+      if (!mask[idx]) continue;
+      const tl = values[(y - 1) * size + x - 1];
+      const tc = values[(y - 1) * size + x];
+      const tr = values[(y - 1) * size + x + 1];
+      const ml = values[y * size + x - 1];
+      const mr = values[y * size + x + 1];
+      const bl = values[(y + 1) * size + x - 1];
+      const bc = values[(y + 1) * size + x];
+      const br = values[(y + 1) * size + x + 1];
+      const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+      const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+      const edge = Math.sqrt(gx * gx + gy * gy);
+      out[idx] = edge;
+      if (edge > max) max = edge;
+    }
+  }
+  if (max > 0) {
+    for (let i = 0; i < out.length; i++) {
+      out[i] = clamp01(out[i] / max);
+    }
+  }
+  return out;
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
 }
 
 function clampInt(value, min, max) {
