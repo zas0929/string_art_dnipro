@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>String Art Generator</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="app">
+      <section class="workspace">
+        <div class="topbar">
+          <div>
+            <h1>String Art Generator</h1>
+            <p>Фото в последовательность натяжения нити между пронумерованными точками.</p>
+          </div>
+          <label class="file-button">
+            <input id="imageInput" type="file" accept="image/*">
+            Загрузить фото
+          </label>
+        </div>
+
+        <div class="stage">
+          <canvas id="resultCanvas" width="760" height="760" aria-label="String art preview"></canvas>
+          <canvas id="sourceCanvas" width="760" height="760" aria-label="Prepared source image"></canvas>
+        </div>
+
+        <div class="status-row">
+          <span id="status">Загрузите фото, затем нажмите «Построить».</span>
+          <progress id="progress" value="0" max="1"></progress>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <div class="control-group">
+          <h2>Параметры</h2>
+          <label>
+            Точек
+            <input id="pointsInput" type="number" min="60" max="600" step="10" value="300">
+          </label>
+          <label>
+            Линий
+            <input id="linesInput" type="number" min="100" max="8000" step="100" value="1800">
+          </label>
+          <label>
+            Размер картины, см
+            <input id="sizeInput" type="number" min="10" max="200" step="1" value="58">
+          </label>
+          <label>
+            Толщина нити, мм
+            <select id="threadInput">
+              <option value="0.11">0.11 - тонкая</option>
+              <option value="0.16" selected>0.16 - средняя</option>
+              <option value="0.19">0.19 - обычная</option>
+            </select>
+          </label>
+          <label>
+            Контраст
+            <input id="contrastInput" type="range" min="0.7" max="2.2" step="0.05" value="1.25">
+          </label>
+          <label>
+            Сила линии
+            <input id="opacityInput" type="range" min="4" max="36" step="1" value="18">
+          </label>
+          <label>
+            Минимальный пропуск точек
+            <input id="skipInput" type="number" min="2" max="80" step="1" value="18">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="buildButton" type="button">Построить</button>
+          <button id="stopButton" type="button" disabled>Стоп</button>
+        </div>
+
+        <div class="actions">
+          <button id="pngButton" type="button" disabled>PNG</button>
+          <button id="txtButton" type="button" disabled>TXT</button>
+          <button id="csvButton" type="button" disabled>CSV</button>
+        </div>
+
+        <div class="summary">
+          <h2>Инструкция</h2>
+          <dl>
+            <div><dt>Точек</dt><dd id="pointsOut">-</dd></div>
+            <div><dt>Линий</dt><dd id="linesOut">-</dd></div>
+            <div><dt>Шаг</dt><dd id="stepOut">-</dd></div>
+            <div><dt>Длина нити</dt><dd id="lengthOut">-</dd></div>
+          </dl>
+          <textarea id="sequenceOutput" readonly spellcheck="false" placeholder="Здесь появится последовательность точек."></textarea>
+        </div>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
