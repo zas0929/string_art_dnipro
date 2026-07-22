@@ -15,6 +15,14 @@ export class OpticalRoutePlanner {
     targetNailDistance = 76,
     distancePenaltyStrength = 0.00004,
     distanceFeedbackStrength = 0.002,
+    nailBalanceMultiplier = 1,
+    directionBalanceStrength = 0.0005,
+    directionBalanceLimit = 0.015,
+    parallelPenaltyImmediate = 0.025,
+    parallelPenaltyHistory = 0.003,
+    parallelPenaltyLimit = 0.055,
+    repeatBiasStep = 0.085,
+    repeatBiasLimit = 0.28,
   }) {
     this.points = points;
     this.pointCount = points.length;
@@ -27,6 +35,14 @@ export class OpticalRoutePlanner {
     this.targetNailDistance = targetNailDistance;
     this.distancePenaltyStrength = distancePenaltyStrength;
     this.distanceFeedbackStrength = distanceFeedbackStrength;
+    this.nailBalanceMultiplier = nailBalanceMultiplier;
+    this.directionBalanceStrength = directionBalanceStrength;
+    this.directionBalanceLimit = directionBalanceLimit;
+    this.parallelPenaltyImmediate = parallelPenaltyImmediate;
+    this.parallelPenaltyHistory = parallelPenaltyHistory;
+    this.parallelPenaltyLimit = parallelPenaltyLimit;
+    this.repeatBiasStep = repeatBiasStep;
+    this.repeatBiasLimit = repeatBiasLimit;
     this.scales = buildResidualPyramid(target, importance, size, scaleFactors);
     this.scaledLineCache = new Map();
     this.nailUsage = new Uint16Array(this.pointCount);
@@ -182,16 +198,17 @@ export class OpticalRoutePlanner {
   adjustRouteScore(score, from, candidate, recentDistanceMean, progressRatio) {
     const magnitude = Math.max(1, Math.abs(score));
     const averageVisits = (progressRatio * this.lineCount + 1) / this.pointCount;
-    const balanceStrength = 0.008
+    const balanceStrength = (0.008
       + smoothStep(0.15, 0.68, progressRatio) * 0.04
-      + smoothStep(0.65, 1, progressRatio) * 0.12;
+      + smoothStep(0.65, 1, progressRatio) * 0.12)
+      * this.nailBalanceMultiplier;
     const visitDelta = averageVisits - this.nailUsage[candidate];
     const maxVisitBias = 0.18 + progressRatio * 0.32;
     const visitBias = clamp(visitDelta * balanceStrength, -maxVisitBias, maxVisitBias);
     const newNailBias = progressRatio < 0.14 && this.nailUsage[candidate] === 0 ? 0.055 : 0;
 
     const repeats = this.chordUsage.get(getChordKey(from, candidate)) || 0;
-    const repeatBias = Math.min(0.28, repeats * 0.085);
+    const repeatBias = Math.min(this.repeatBiasLimit, repeats * this.repeatBiasStep);
     const nailDistance = circularDistance(from, candidate, this.pointCount);
     const distanceDelta = nailDistance - this.targetNailDistance;
     const distancePenalty = Math.min(
@@ -210,14 +227,20 @@ export class OpticalRoutePlanner {
     const directionBin = getDirectionBin(direction, this.directionUsage.length);
     const averageDirectionUsage = (progressRatio * this.lineCount + 1) / this.directionUsage.length;
     const directionDelta = averageDirectionUsage - this.directionUsage[directionBin];
-    const directionBalanceBias = clamp(directionDelta * 0.0005, -0.015, 0.015);
+    const directionBalanceBias = clamp(
+      directionDelta * this.directionBalanceStrength,
+      -this.directionBalanceLimit,
+      this.directionBalanceLimit,
+    );
     let parallelPenalty = 0;
 
     for (let i = this.recentDirections.length - 1; i >= 0; i--) {
       const recency = this.recentDirections.length - i;
       const angleDelta = getAngleDistance(direction, this.recentDirections[i]);
       const closeness = Math.exp(-(angleDelta * angleDelta) / 0.012);
-      parallelPenalty += closeness * (recency === 1 ? 0.025 : 0.003);
+      parallelPenalty += closeness * (
+        recency === 1 ? this.parallelPenaltyImmediate : this.parallelPenaltyHistory
+      );
     }
 
     return score + magnitude * (
@@ -227,7 +250,7 @@ export class OpticalRoutePlanner {
       + directionBalanceBias
       + distanceFeedback
       - distancePenalty
-      - Math.min(0.055, parallelPenalty)
+      - Math.min(this.parallelPenaltyLimit, parallelPenalty)
     );
   }
 

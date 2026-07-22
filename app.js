@@ -365,6 +365,14 @@ function runOpticalWorker(settings, prepared, renderedLines) {
         targetNailDistance: isMultiScaleModel ? 75.5 : 76,
         distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
         distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
+        nailBalanceMultiplier: isMultiScaleModel ? 1.15 : 1,
+        directionBalanceStrength: isMultiScaleModel ? 0.0011 : 0.0005,
+        directionBalanceLimit: isMultiScaleModel ? 0.035 : 0.015,
+        parallelPenaltyImmediate: isMultiScaleModel ? 0.055 : 0.025,
+        parallelPenaltyHistory: isMultiScaleModel ? 0.0045 : 0.003,
+        parallelPenaltyLimit: isMultiScaleModel ? 0.095 : 0.055,
+        repeatBiasStep: isMultiScaleModel ? 0.11 : 0.085,
+        repeatBiasLimit: isMultiScaleModel ? 0.34 : 0.28,
       },
     });
   });
