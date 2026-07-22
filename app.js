@@ -32,6 +32,7 @@ const state = {
   prepared: null,
   points: [],
   sequence: [],
+  sequenceDisplayStart: 0,
   cancelled: false,
   running: false,
   crop: {
@@ -55,6 +56,7 @@ imageInput.addEventListener("change", async (event) => {
   const image = await loadImage(file);
   state.image = image;
   state.sequence = [];
+  state.sequenceDisplayStart = 0;
   resetCrop();
   drawPreparedPreview();
   drawInitialResult();
@@ -167,11 +169,16 @@ async function generate() {
   state.prepared = prepared;
   state.points = buildCirclePoints(settings.points, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
   state.sequence = [0];
+  state.sequenceDisplayStart = 0;
 
+  const isOpticalModel = settings.algorithm === "portrait-v4";
   const residual = new Float32Array(prepared.target);
   const drawn = new Float32Array(prepared.target.length);
   const lineCache = new Map();
+  const nailUsage = new Uint16Array(settings.points);
+  const chordUsage = new Map();
   let current = 0;
+  nailUsage[current] = 1;
   let renderedLines = [];
   let renderedLineCount = 0;
 
@@ -182,25 +189,38 @@ async function generate() {
     if (state.cancelled) break;
 
     const progressRatio = line / settings.lines;
-    const scoringProfile = getScoringProfile(settings.algorithm, progressRatio);
-    const next = findBestNextPoint(
-      current,
-      residual,
-      drawn,
-      prepared,
-      scoringProfile,
-      settings,
-      lineCache,
-    );
+    const scoringProfile = isOpticalModel ? null : getScoringProfile(settings.algorithm, progressRatio);
+    if (scoringProfile) scoringProfile.averageNailVisits = (line + 1) / settings.points;
+    const next = isOpticalModel
+      ? findBestNextPointV4(current, residual, prepared, settings, lineCache, nailUsage, chordUsage, progressRatio)
+      : findBestNextPoint(
+          current,
+          residual,
+          drawn,
+          prepared,
+          scoringProfile,
+          settings,
+          lineCache,
+          nailUsage,
+          chordUsage,
+        );
     if (next === -1) break;
 
     const samples = getLineSamples(current, next, settings, lineCache);
     for (let i = 0; i < samples.length; i++) {
-      residual[samples[i]] = Math.max(0, residual[samples[i]] - settings.lineStrength);
-      drawn[samples[i]] += settings.lineStrength;
+      if (isOpticalModel) {
+        residual[samples[i]] -= 1;
+        drawn[samples[i]] += 1;
+      } else {
+        residual[samples[i]] = Math.max(0, residual[samples[i]] - settings.lineStrength);
+        drawn[samples[i]] += settings.lineStrength;
+      }
     }
 
     renderedLines.push([current, next]);
+    const chordKey = getChordKey(current, next);
+    chordUsage.set(chordKey, (chordUsage.get(chordKey) || 0) + 1);
+    nailUsage[next]++;
     state.sequence.push(next);
     current = next;
 
@@ -209,7 +229,7 @@ async function generate() {
       renderedLineCount = renderedLines.length;
       updateSummary(settings, line + 1);
       progress.value = (line + 1) / settings.lines;
-      const stage = scoringProfile.stage ? ` (${scoringProfile.stage})` : "";
+      const stage = isOpticalModel ? " (оптическая плотность)" : scoringProfile.stage ? ` (${scoringProfile.stage})` : "";
       setStatus(`Построено линий: ${line + 1} / ${settings.lines}${stage}`);
       await waitFrame();
     }
@@ -218,7 +238,7 @@ async function generate() {
   drawResultBase(settings);
   drawThreadLines(renderedLines, settings);
   updateSummary(settings, renderedLines.length);
-  sequenceOutput.value = formatSequence(state.sequence);
+  sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
   progress.value = 1;
   setStatus(state.cancelled ? "Построение остановлено. Инструкция сохранена частично." : "Готово. Инструкция построена.");
   setExportEnabled(state.sequence.length > 1);
@@ -228,7 +248,7 @@ async function generate() {
 }
 
 function readSettings() {
-  const algorithm = ["classic", "portrait", "portrait-v2"].includes(algorithmInput.value)
+  const algorithm = ["classic", "portrait", "portrait-v2", "portrait-v3", "portrait-v4"].includes(algorithmInput.value)
     ? algorithmInput.value
     : "portrait-v2";
   return {
@@ -277,7 +297,7 @@ function prepareImage(settings) {
     }
   }
 
-  const threadTarget = buildThreadTarget(gray, mask, WORK_SIZE, settings.algorithm);
+  const threadTarget = buildThreadTarget(gray, mask, WORK_SIZE, settings);
   for (let y = 0; y < WORK_SIZE; y++) {
     for (let x = 0; x < WORK_SIZE; x++) {
       const idx = y * WORK_SIZE + x;
@@ -297,6 +317,7 @@ function prepareImage(settings) {
   return {
     canvas: temp,
     target,
+    importance: threadTarget.importance,
     detailWeight: threadTarget.detailWeight,
     tangentX: threadTarget.tangentX,
     tangentY: threadTarget.tangentY,
@@ -304,8 +325,11 @@ function prepareImage(settings) {
   };
 }
 
-function buildThreadTarget(gray, mask, size, algorithm) {
+function buildThreadTarget(gray, mask, size, settings) {
+  const { algorithm } = settings;
   const normalized = normalizeByPercentiles(gray, mask);
+  if (algorithm === "portrait-v4") return buildOpticalDensityTarget(normalized, mask, size, settings);
+
   const smooth = boxBlurValues(normalized, mask, size, 3);
   const local = new Float32Array(gray.length);
   const edges = sobelMagnitude(normalized, mask, size);
@@ -336,13 +360,57 @@ function buildThreadTarget(gray, mask, size, algorithm) {
     target[i] = clamp01(darkness * 0.92 + detail + portraitDetail * 0.12);
   }
 
-  const tangents = algorithm === "portrait-v2" ? buildContourTangents(normalized, mask, size) : null;
+  const tangents = algorithm === "portrait-v2" || algorithm === "portrait-v3"
+    ? buildContourTangents(normalized, mask, size)
+    : null;
   return {
     target,
+    importance: null,
     detailWeight,
     tangentX: tangents ? tangents.x : null,
     tangentY: tangents ? tangents.y : null,
     orientationConfidence: tangents ? edges : null,
+  };
+}
+
+function buildOpticalDensityTarget(normalized, mask, size, settings) {
+  const localMean = boxBlurFast(normalized, mask, size, 5);
+  const edges = sobelMagnitude(normalized, mask, size);
+  const target = new Float32Array(normalized.length);
+  const importance = new Float32Array(normalized.length);
+  const radius = size / 2 - 8;
+  let rawTotal = 0;
+  let pixelCount = 0;
+
+  for (let i = 0; i < normalized.length; i++) {
+    if (!mask[i]) continue;
+    const opticalDensity = -Math.log(Math.max(0.04, normalized[i]));
+    const localDark = Math.max(0, localMean[i] - normalized[i]);
+    const detail = Math.pow(clamp01(localDark * 4.5), 0.68);
+    const edge = Math.pow(edges[i], 0.72);
+    const desiredCrossings = 4.1 + opticalDensity * 2.25 + detail * 1.6 + edge * 0.85;
+    target[i] = desiredCrossings;
+    importance[i] = Math.min(3.6, 0.8 + detail + edge * 2);
+    rawTotal += desiredCrossings;
+    pixelCount++;
+  }
+
+  // The reference sequence averages about 1.45 radii of thread per chord.
+  // Scaling the target to the requested line budget keeps the signed residual
+  // meaningful through the final steps instead of exhausting dark pixels early.
+  const expectedMeanCrossings = (settings.lines * radius * 1.45) / Math.max(1, pixelCount);
+  const densityScale = expectedMeanCrossings / Math.max(0.001, rawTotal / Math.max(1, pixelCount));
+  for (let i = 0; i < target.length; i++) {
+    if (mask[i]) target[i] *= densityScale;
+  }
+
+  return {
+    target,
+    importance,
+    detailWeight: null,
+    tangentX: null,
+    tangentY: null,
+    orientationConfidence: null,
   };
 }
 
@@ -489,8 +557,24 @@ function buildContourTangents(values, mask, size) {
 }
 
 function getScoringProfile(algorithm, progressRatio) {
+  const sequencePrior = algorithm === "portrait-v3"
+    ? {
+        lengthExponent: 0.58,
+        nailBalanceScale: 0.035 + progressRatio * 0.04,
+        chordRepeatPenalty: 0.12,
+        targetNailDistance: 76,
+        distancePriorStrength: 0.0005,
+      }
+    : {
+        lengthExponent: 0.5,
+        nailBalanceScale: 0,
+        chordRepeatPenalty: 0,
+        targetNailDistance: 0,
+        distancePriorStrength: 0,
+      };
+
   if (algorithm === "classic") {
-    return { detailScale: 0, detailBase: 0, orientationScale: 0, overdrawPenalty: 0.018, stage: null };
+    return { detailScale: 0, detailBase: 0, orientationScale: 0, overdrawPenalty: 0.018, stage: null, ...sequencePrior };
   }
   if (algorithm === "portrait") {
     return {
@@ -499,18 +583,29 @@ function getScoringProfile(algorithm, progressRatio) {
       orientationScale: 0,
       overdrawPenalty: 0.018,
       stage: null,
+      ...sequencePrior,
+    };
+  }
+  if (algorithm === "portrait-v3") {
+    return {
+      detailScale: 0.65,
+      detailBase: 1,
+      orientationScale: 0.14,
+      overdrawPenalty: 0.018,
+      stage: "эталон",
+      ...sequencePrior,
     };
   }
   if (progressRatio < 0.56) {
-    return { detailScale: 0.2, detailBase: 1, orientationScale: 0.06, overdrawPenalty: 0.018, stage: "тон" };
+    return { detailScale: 0.2, detailBase: 1, orientationScale: 0.06, overdrawPenalty: 0.018, stage: "тон", ...sequencePrior };
   }
   if (progressRatio < 0.82) {
-    return { detailScale: 0.65, detailBase: 1, orientationScale: 0.2, overdrawPenalty: 0.018, stage: "контуры" };
+    return { detailScale: 0.65, detailBase: 1, orientationScale: 0.2, overdrawPenalty: 0.018, stage: "контуры", ...sequencePrior };
   }
-  return { detailScale: 1.15, detailBase: 1, orientationScale: 0.34, overdrawPenalty: 0.018, stage: "детали" };
+  return { detailScale: 1.15, detailBase: 1, orientationScale: 0.34, overdrawPenalty: 0.018, stage: "детали", ...sequencePrior };
 }
 
-function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, settings, lineCache) {
+function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, settings, lineCache, nailUsage, chordUsage) {
   if (!prepared.detailWeight) {
     let best = -1;
     let bestScore = -Infinity;
@@ -520,7 +615,8 @@ function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, s
       if (distance < settings.minSkip) continue;
 
       const samples = getLineSamples(current, candidate, settings, lineCache);
-      const score = scoreLineSamples(samples, residual, drawn, prepared, scoringProfile, settings, 1, 0, 0);
+      const rawScore = scoreLineSamples(samples, residual, drawn, prepared, scoringProfile, settings, 1, 0, 0);
+      const score = adjustCandidateScore(rawScore, current, candidate, scoringProfile, nailUsage, chordUsage);
       if (score > bestScore) {
         bestScore = score;
         best = candidate;
@@ -537,7 +633,7 @@ function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, s
 
     const samples = getLineSamples(current, candidate, settings, lineCache);
     const direction = getLineDirection(current, candidate);
-    const score = scoreLineSamples(
+    const rawScore = scoreLineSamples(
       samples,
       residual,
       drawn,
@@ -548,13 +644,14 @@ function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, s
       direction.x,
       direction.y,
     );
+    const score = adjustCandidateScore(rawScore, current, candidate, scoringProfile, nailUsage, chordUsage);
     insertCandidate(shortlist, { candidate, samples, score, direction }, 24);
   }
 
   let best = -1;
   let bestScore = -Infinity;
   for (const entry of shortlist) {
-    const score = scoreLineSamples(
+    const rawScore = scoreLineSamples(
       entry.samples,
       residual,
       drawn,
@@ -565,6 +662,7 @@ function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, s
       entry.direction.x,
       entry.direction.y,
     );
+    const score = adjustCandidateScore(rawScore, current, entry.candidate, scoringProfile, nailUsage, chordUsage);
     if (score > bestScore) {
       bestScore = score;
       best = entry.candidate;
@@ -600,8 +698,98 @@ function scoreLineSamples(samples, residual, drawn, prepared, scoringProfile, se
     }
   }
 
-  return (score * sampleStride) / Math.sqrt(samples.length || 1)
+  return (score * sampleStride) / Math.pow(samples.length || 1, scoringProfile.lengthExponent)
     - overdraw * sampleStride * scoringProfile.overdrawPenalty;
+}
+
+function adjustCandidateScore(score, current, candidate, scoringProfile, nailUsage, chordUsage) {
+  if (score <= 0 || (scoringProfile.nailBalanceScale === 0 && scoringProfile.chordRepeatPenalty === 0)) {
+    return score;
+  }
+
+  const usageDelta = scoringProfile.averageNailVisits - nailUsage[candidate];
+  let nailFactor = Math.exp(usageDelta * scoringProfile.nailBalanceScale);
+  if (nailUsage[candidate] === 0 && scoringProfile.averageNailVisits < 5) nailFactor *= 1.08;
+  nailFactor = Math.max(0.65, Math.min(1.35, nailFactor));
+
+  const repeats = chordUsage.get(getChordKey(current, candidate)) || 0;
+  const chordFactor = 1 / (1 + repeats * scoringProfile.chordRepeatPenalty);
+  const nailDistance = circularDistance(current, candidate, nailUsage.length);
+  const distanceDelta = Math.max(0, nailDistance - scoringProfile.targetNailDistance);
+  const distanceFactor = Math.exp(-distanceDelta * distanceDelta * scoringProfile.distancePriorStrength);
+  return score * nailFactor * chordFactor * distanceFactor;
+}
+
+function findBestNextPointV4(current, residual, prepared, settings, lineCache, nailUsage, chordUsage, progressRatio) {
+  const shortlist = [];
+  for (let candidate = 0; candidate < settings.points; candidate++) {
+    if (candidate === current) continue;
+    const nailDistance = circularDistance(current, candidate, settings.points);
+    if (nailDistance < settings.minSkip) continue;
+
+    const samples = getLineSamples(current, candidate, settings, lineCache);
+    const rawScore = scoreOpticalDensityLine(samples, residual, prepared.importance, 3);
+    const score = adjustOpticalCandidateScore(
+      rawScore,
+      current,
+      candidate,
+      nailUsage,
+      chordUsage,
+      progressRatio,
+      settings,
+    );
+    insertCandidate(shortlist, { candidate, samples, score }, 28);
+  }
+
+  let best = -1;
+  let bestScore = -Infinity;
+  for (const entry of shortlist) {
+    const rawScore = scoreOpticalDensityLine(entry.samples, residual, prepared.importance, 1);
+    const score = adjustOpticalCandidateScore(
+      rawScore,
+      current,
+      entry.candidate,
+      nailUsage,
+      chordUsage,
+      progressRatio,
+      settings,
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      best = entry.candidate;
+    }
+  }
+
+  return best;
+}
+
+function scoreOpticalDensityLine(samples, residual, importance, sampleStride) {
+  let errorReduction = 0;
+  for (let i = 0; i < samples.length; i += sampleStride) {
+    const idx = samples[i];
+    // Exact reduction of weighted squared error for adding one thread crossing:
+    // r^2 - (r - 1)^2 = 2r - 1.
+    errorReduction += importance[idx] * (2 * residual[idx] - 1);
+  }
+  return (errorReduction * sampleStride) / Math.pow(samples.length || 1, 0.44);
+}
+
+function adjustOpticalCandidateScore(score, current, candidate, nailUsage, chordUsage, progressRatio, settings) {
+  if (score <= 0) return score;
+
+  const averageVisits = (progressRatio * settings.lines + 1) / settings.points;
+  const balanceStrength = 0.055 + smoothStep(0.08, 0.72, progressRatio) * 0.055;
+  const visitDelta = averageVisits - nailUsage[candidate];
+  let nailFactor = Math.exp(visitDelta * balanceStrength);
+  if (progressRatio < 0.14 && nailUsage[candidate] === 0) nailFactor *= 1.12;
+  nailFactor = Math.max(0.62, Math.min(1.48, nailFactor));
+
+  const repeats = chordUsage.get(getChordKey(current, candidate)) || 0;
+  const chordFactor = 1 / (1 + repeats * 0.01);
+  const nailDistance = circularDistance(current, candidate, settings.points);
+  const distanceDelta = nailDistance - 76;
+  const distanceFactor = Math.max(0.88, Math.exp(-distanceDelta * distanceDelta * 0.000025));
+  return score * nailFactor * chordFactor * distanceFactor;
 }
 
 function getLineDirection(a, b) {
@@ -620,10 +808,14 @@ function insertCandidate(shortlist, entry, limit) {
   if (shortlist.length > limit) shortlist.pop();
 }
 
+function getChordKey(a, b) {
+  return a < b ? `${a}:${b}` : `${b}:${a}`;
+}
+
 function getLineSamples(a, b, settings, cache) {
   const low = Math.min(a, b);
   const high = Math.max(a, b);
-  const key = `${low}:${high}`;
+  const key = getChordKey(low, high);
   if (cache.has(key)) return cache.get(key);
 
   const p1 = state.points[low];
@@ -678,6 +870,7 @@ function importScheme(text) {
   state.prepared = null;
   state.cancelled = false;
   state.sequence = sequence.map((point) => point - 1);
+  state.sequenceDisplayStart = 1;
   state.points = buildCirclePoints(pointCount, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
 
   const renderedLines = [];
@@ -689,9 +882,9 @@ function importScheme(text) {
   drawThreadLines(renderedLines, settings);
   drawSchemePlaceholder(pointCount, lineCount);
   updateSummary(settings, lineCount);
-  sequenceOutput.value = formatSequence(state.sequence);
+  sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
   progress.value = 1;
-  setStatus(`Схема загружена: ${sequence.length} точек в последовательности, ${lineCount} соединений.`);
+  setStatus(`Схема загружена: ${lineCount} шагов, ${lineCount} соединений.`);
   setExportEnabled(true);
 }
 
@@ -712,20 +905,24 @@ function parseScheme(text) {
     }
   }
 
-  const ordered = entries.filter((entry) => entry.order >= 1).sort((a, b) => a.order - b.order);
-  if (ordered.length < 2) {
-    throw new Error("нужно минимум две строки вида 50____1 и 25____2");
+  const ordered = entries.filter((entry) => entry.order >= 0).sort((a, b) => a.order - b.order);
+  if (ordered.length < 3) {
+    throw new Error("нужны стартовая строка 1____0 и минимум два следующих шага");
   }
 
   for (let i = 0; i < ordered.length; i++) {
     const entry = ordered[i];
-    const expectedOrder = i + 1;
+    const expectedOrder = i;
     if (!Number.isInteger(entry.point) || entry.point < 1 || entry.point > 600) {
       throw new Error(`точка ${entry.point} вне диапазона 1–600`);
     }
     if (entry.order !== expectedOrder) {
-      throw new Error(`после позиции ${i} ожидается позиция ${expectedOrder}, получено ${entry.order}`);
+      throw new Error(`ожидается позиция ${expectedOrder}, получено ${entry.order}`);
     }
+  }
+
+  if (ordered[0].point !== 1) {
+    throw new Error(`позиция 0 должна содержать стартовую точку 1, получено ${ordered[0].point}`);
   }
 
   return ordered.map((entry) => entry.point);
@@ -797,6 +994,7 @@ function clampCropToImage() {
 
 function invalidateResult() {
   state.sequence = [];
+  state.sequenceDisplayStart = 0;
   setExportEnabled(false);
   sequenceOutput.value = "";
   pointsOut.textContent = "-";
@@ -848,9 +1046,10 @@ function drawThreadLines(lines, settings, startIndex = 0) {
   resultCtx.beginPath();
   resultCtx.arc(resultCanvas.width / 2, resultCanvas.height / 2, resultCanvas.width / 2 - 20, 0, Math.PI * 2);
   resultCtx.clip();
-  resultCtx.globalAlpha = 0.075 + settings.threadMm * 0.32;
+  const opticalPreview = settings.algorithm === "portrait-v4";
+  resultCtx.globalAlpha = opticalPreview ? 0.16 : 0.075 + settings.threadMm * 0.32;
   resultCtx.strokeStyle = "#050506";
-  resultCtx.lineWidth = Math.max(0.42, settings.threadMm * 3.6);
+  resultCtx.lineWidth = opticalPreview ? Math.max(0.65, settings.threadMm * 4.6) : Math.max(0.42, settings.threadMm * 3.6);
   for (let i = startIndex; i < lines.length; i++) {
     const [a, b] = lines[i];
     const p1 = state.points[a];
@@ -939,7 +1138,7 @@ function makeInstructionText() {
     "Point 1 is at the right (3 o'clock). Numbering goes clockwise.",
     "",
     "Sequence:",
-    formatSequence(state.sequence),
+    formatSequence(state.sequence, state.sequenceDisplayStart),
     "",
     "Steps:",
   ];
@@ -968,8 +1167,8 @@ function makeCsvText() {
   return rows.join("\n");
 }
 
-function formatSequence(sequence) {
-  return sequence.map((point) => point + 1).join(" -> ");
+function formatSequence(sequence, startIndex = 0) {
+  return sequence.slice(startIndex).map((point) => point + 1).join(" -> ");
 }
 
 function loadImage(file) {
