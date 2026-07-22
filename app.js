@@ -1,33 +1,47 @@
 import { formatCsvText, formatSchemeText } from "./core/scheme-format.js";
 
-const resultCanvas = document.getElementById("resultCanvas");
-const sourceCanvas = document.getElementById("sourceCanvas");
+const mountedApps = new WeakMap();
+
+export function mountStringArtApp(root = document) {
+const existingCleanup = mountedApps.get(root);
+if (existingCleanup) return existingCleanup;
+
+const getElement = (id) => {
+  const element = root.querySelector(`#${id}`);
+  if (!element) throw new Error(`Не найден обязательный элемент #${id}`);
+  return element;
+};
+
+const resultCanvas = getElement("resultCanvas");
+const sourceCanvas = getElement("sourceCanvas");
 const resultCtx = resultCanvas.getContext("2d", { willReadFrequently: true });
 const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });
 
-const imageInput = document.getElementById("imageInput");
-const schemeInput = document.getElementById("schemeInput");
-const pointsInput = document.getElementById("pointsInput");
-const linesInput = document.getElementById("linesInput");
-const sizeInput = document.getElementById("sizeInput");
-const threadInput = document.getElementById("threadInput");
-const opacityInput = document.getElementById("opacityInput");
-const skipInput = document.getElementById("skipInput");
-const algorithmInput = document.getElementById("algorithmInput");
-const zoomInput = document.getElementById("zoomInput");
-const resetCropButton = document.getElementById("resetCropButton");
-const buildButton = document.getElementById("buildButton");
-const stopButton = document.getElementById("stopButton");
-const pngButton = document.getElementById("pngButton");
-const txtButton = document.getElementById("txtButton");
-const csvButton = document.getElementById("csvButton");
-const statusText = document.getElementById("status");
-const progress = document.getElementById("progress");
-const pointsOut = document.getElementById("pointsOut");
-const linesOut = document.getElementById("linesOut");
-const stepOut = document.getElementById("stepOut");
-const lengthOut = document.getElementById("lengthOut");
-const sequenceOutput = document.getElementById("sequenceOutput");
+if (!resultCtx || !sourceCtx) throw new Error("Canvas 2D недоступен");
+
+const imageInput = getElement("imageInput");
+const schemeInput = getElement("schemeInput");
+const pointsInput = getElement("pointsInput");
+const linesInput = getElement("linesInput");
+const sizeInput = getElement("sizeInput");
+const threadInput = getElement("threadInput");
+const opacityInput = getElement("opacityInput");
+const skipInput = getElement("skipInput");
+const algorithmInput = getElement("algorithmInput");
+const zoomInput = getElement("zoomInput");
+const resetCropButton = getElement("resetCropButton");
+const buildButton = getElement("buildButton");
+const stopButton = getElement("stopButton");
+const pngButton = getElement("pngButton");
+const txtButton = getElement("txtButton");
+const csvButton = getElement("csvButton");
+const statusText = getElement("status");
+const progress = getElement("progress");
+const pointsOut = getElement("pointsOut");
+const linesOut = getElement("linesOut");
+const stepOut = getElement("stepOut");
+const lengthOut = getElement("lengthOut");
+const sequenceOutput = getElement("sequenceOutput");
 
 const state = {
   image: null,
@@ -50,14 +64,36 @@ const state = {
 };
 
 const WORK_SIZE = 560;
+const listenerController = new AbortController();
+let destroyed = false;
+
+const listen = (target, type, handler, options = {}) => {
+  target.addEventListener(type, handler, { ...options, signal: listenerController.signal });
+};
+
+const cleanup = () => {
+  if (destroyed) return;
+  destroyed = true;
+  state.cancelled = true;
+  state.crop.dragging = false;
+  listenerController.abort();
+  if (state.cancelActiveRun) state.cancelActiveRun();
+  else if (state.activeWorker) state.activeWorker.terminate();
+  state.activeWorker = null;
+  state.cancelActiveRun = null;
+  if (mountedApps.get(root) === cleanup) mountedApps.delete(root);
+};
+
+mountedApps.set(root, cleanup);
 
 drawEmpty();
 
-imageInput.addEventListener("change", async (event) => {
+listen(imageInput, "change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
   const image = await loadImage(file);
+  if (destroyed) return;
   state.image = image;
   state.sequence = [];
   state.sequenceDisplayStart = 0;
@@ -68,12 +104,13 @@ imageInput.addEventListener("change", async (event) => {
   setExportEnabled(false);
 });
 
-schemeInput.addEventListener("change", async (event) => {
+listen(schemeInput, "change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file || state.running) return;
 
   try {
     const text = await file.text();
+    if (destroyed) return;
     importScheme(text);
   } catch (error) {
     setStatus(`Ошибка схемы: ${error instanceof Error ? error.message : "не удалось прочитать файл"}`);
@@ -83,23 +120,23 @@ schemeInput.addEventListener("change", async (event) => {
   }
 });
 
-buildButton.addEventListener("click", () => {
+listen(buildButton, "click", () => {
   if (!state.image || state.running) return;
   generate();
 });
 
-stopButton.addEventListener("click", () => {
+listen(stopButton, "click", () => {
   state.cancelled = true;
   if (state.cancelActiveRun) state.cancelActiveRun();
   setStatus("Построение остановлено.");
 });
 
-pngButton.addEventListener("click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
-txtButton.addEventListener("click", () => downloadText("string-art-scheme.txt", formatSchemeText(state.sequence)));
-csvButton.addEventListener("click", () => downloadText("string-art-steps.csv", formatCsvText(state.sequence)));
+listen(pngButton, "click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
+listen(txtButton, "click", () => downloadText("string-art-scheme.txt", formatSchemeText(state.sequence)));
+listen(csvButton, "click", () => downloadText("string-art-steps.csv", formatCsvText(state.sequence)));
 
 for (const input of [pointsInput, sizeInput, zoomInput]) {
-  input.addEventListener("input", () => {
+  listen(input, "input", () => {
     if (!state.image || state.running) return;
     if (input === zoomInput) state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
     clampCropToImage();
@@ -108,20 +145,20 @@ for (const input of [pointsInput, sizeInput, zoomInput]) {
   });
 }
 
-algorithmInput.addEventListener("change", () => {
+listen(algorithmInput, "change", () => {
   if (!state.image || state.running) return;
   invalidateResult();
   drawPreparedPreview();
 });
 
-resetCropButton.addEventListener("click", () => {
+listen(resetCropButton, "click", () => {
   if (!state.image || state.running) return;
   resetCrop();
   invalidateResult();
   drawPreparedPreview();
 });
 
-sourceCanvas.addEventListener("pointerdown", (event) => {
+listen(sourceCanvas, "pointerdown", (event) => {
   if (!state.image || state.running) return;
   sourceCanvas.setPointerCapture(event.pointerId);
   state.crop.dragging = true;
@@ -129,7 +166,7 @@ sourceCanvas.addEventListener("pointerdown", (event) => {
   state.crop.lastY = event.clientY;
 });
 
-sourceCanvas.addEventListener("pointermove", (event) => {
+listen(sourceCanvas, "pointermove", (event) => {
   if (!state.crop.dragging || !state.image || state.running) return;
   const rect = sourceCanvas.getBoundingClientRect();
   const scale = WORK_SIZE / rect.width;
@@ -141,10 +178,10 @@ sourceCanvas.addEventListener("pointermove", (event) => {
   drawPreparedPreview();
 });
 
-sourceCanvas.addEventListener("pointerup", stopDragging);
-sourceCanvas.addEventListener("pointercancel", stopDragging);
+listen(sourceCanvas, "pointerup", stopDragging);
+listen(sourceCanvas, "pointercancel", stopDragging);
 
-sourceCanvas.addEventListener("wheel", (event) => {
+listen(sourceCanvas, "wheel", (event) => {
   if (!state.image || state.running) return;
   event.preventDefault();
   const rect = sourceCanvas.getBoundingClientRect();
@@ -1226,9 +1263,16 @@ function formatSequence(sequence, startIndex = 0) {
 function loadImage(file) {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = reject;
-    image.src = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = (error) => {
+      URL.revokeObjectURL(url);
+      reject(error);
+    };
+    image.src = url;
   });
 }
 
@@ -1284,4 +1328,7 @@ function smoothStep(edge0, edge1, value) {
 
 function waitFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
+return cleanup;
 }
