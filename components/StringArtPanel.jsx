@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileImage, FileText, ListChecks, Play, RotateCcw, Square } from "lucide-react";
+import { FileImage, FileText, ListChecks, RotateCcw } from "lucide-react";
 import Link from "next/link";
 
 export default function StringArtPanel() {
@@ -54,17 +54,6 @@ export default function StringArtPanel() {
       </div>
 
       <div className="actions">
-        <button id="buildButton" type="button">
-          <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
-          Построить
-        </button>
-        <button id="stopButton" type="button" disabled>
-          <Square aria-hidden="true" size={16} fill="currentColor" strokeWidth={2} />
-          Стоп
-        </button>
-      </div>
-
-      <div className="actions">
         <button id="pngButton" type="button" disabled>
           <FileImage aria-hidden="true" size={17} strokeWidth={2} />
           PNG
@@ -72,10 +61,6 @@ export default function StringArtPanel() {
         <button id="txtButton" type="button" disabled>
           <FileText aria-hidden="true" size={17} strokeWidth={2} />
           TXT
-        </button>
-        <button id="csvButton" type="button" disabled>
-          <Download aria-hidden="true" size={17} strokeWidth={2} />
-          CSV
         </button>
       </div>
 

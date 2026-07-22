@@ -11,10 +11,16 @@ import {
   Volume2,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 import { buildSessionReducer, initialBuildSessionState } from "../../core/build-session.js";
 import { parseSchemeText } from "../../core/scheme-format.js";
+import {
+  createCirclePoints,
+  renderStringArtBase,
+  renderStringArtLines,
+  STRING_ART_WORK_SIZE,
+} from "../../core/string-art-renderer.js";
 import {
   loadBuildProgress,
   loadLatestPattern,
@@ -104,7 +110,8 @@ export default function BuildMode() {
         sequence,
         pointCount: Math.max(...sequence),
         lineCount: sequence.length - 1,
-        algorithm: "imported",
+        algorithm: "portrait-v5",
+        threadMm: 0.19,
         createdAt: new Date().toISOString(),
       };
       await saveLatestPattern(pattern);
@@ -147,11 +154,31 @@ export default function BuildMode() {
 
         {state.pattern ? (
           <>
+            <BuildCanvas
+              pattern={state.pattern}
+              stepIndex={state.stepIndex}
+              playback={state.playback}
+              speedMs={state.speedMs}
+            />
+
             <div className="build-progress-line">
               <span>Шаг {Math.min(state.stepIndex + 1, total)} из {total}</span>
               <strong>{progressPercent}%</strong>
             </div>
-            <progress className="build-progress" value={state.stepIndex} max={total} />
+            <input
+              className="build-seek"
+              type="range"
+              min="0"
+              max={total}
+              step="1"
+              value={state.stepIndex}
+              aria-label="Перейти к шагу"
+              onChange={(event) => dispatch({ type: "SEEK", stepIndex: event.target.value })}
+            />
+            <div className="build-seek-limits" aria-hidden="true">
+              <span>0</span>
+              <span>{total}</span>
+            </div>
 
             <div className="build-route" aria-live="polite">
               {complete ? (
@@ -243,5 +270,111 @@ export default function BuildMode() {
         )}
       </aside>
     </main>
+  );
+}
+
+const BUILD_CANVAS_SIZE = 760;
+
+function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
+  const canvasRef = useRef(null);
+  const renderCacheRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !pattern?.sequence?.length) return undefined;
+
+    const context = canvas.getContext("2d");
+    if (!context) return undefined;
+
+    const sequence = pattern.sequence;
+    let renderCache = renderCacheRef.current;
+    if (!renderCache || renderCache.pattern !== pattern) {
+      const pointCount = Math.max(pattern.pointCount || 0, ...sequence);
+      const center = BUILD_CANVAS_SIZE / 2;
+      const workCenter = STRING_ART_WORK_SIZE / 2;
+      const workPoints = createCirclePoints(
+        pointCount,
+        workCenter - 8,
+        workCenter,
+        workCenter,
+      );
+      const displayPoints = createCirclePoints(pointCount, center - 20, center, center);
+      const allLines = [];
+      for (let index = 1; index < sequence.length; index++) {
+        allLines.push([sequence[index - 1] - 1, sequence[index] - 1]);
+      }
+      const baseCanvas = document.createElement("canvas");
+      baseCanvas.width = BUILD_CANVAS_SIZE;
+      baseCanvas.height = BUILD_CANVAS_SIZE;
+      const base = baseCanvas.getContext("2d");
+      if (!base) return undefined;
+
+      renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE);
+      renderStringArtLines(base, allLines, workPoints, {
+        canvasSize: BUILD_CANVAS_SIZE,
+        workSize: STRING_ART_WORK_SIZE,
+        threadMm: pattern.threadMm ?? 0.19,
+        opticalPreview: true,
+      });
+      renderCache = { pattern, baseCanvas, displayPoints };
+      renderCacheRef.current = renderCache;
+    }
+
+    const { baseCanvas, displayPoints } = renderCache;
+    const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
+    const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
+    const animationStartedAt = performance.now();
+    let animationFrame = 0;
+
+    const render = (now) => {
+      context.clearRect(0, 0, BUILD_CANVAS_SIZE, BUILD_CANVAS_SIZE);
+      context.drawImage(baseCanvas, 0, 0);
+
+      if (from && to) {
+        const duration = Math.max(300, speedMs * 0.72);
+        const rawProgress = playback === "playing"
+          ? Math.min(1, (now - animationStartedAt) / duration)
+          : 1;
+        const x = from.x + (to.x - from.x) * rawProgress;
+        const y = from.y + (to.y - from.y) * rawProgress;
+
+        context.save();
+        context.beginPath();
+        context.moveTo(from.x, from.y);
+        context.lineTo(x, y);
+        context.strokeStyle = "#2f9c4c";
+        context.lineWidth = 3;
+        context.stroke();
+
+        context.beginPath();
+        context.arc(from.x, from.y, 6, 0, Math.PI * 2);
+        context.fillStyle = "#172019";
+        context.fill();
+
+        const pulse = playback === "playing" ? Math.sin(now / 110) * 1.4 : 0;
+        context.beginPath();
+        context.arc(x, y, 7 + pulse, 0, Math.PI * 2);
+        context.fillStyle = "#2f9c4c";
+        context.fill();
+        context.restore();
+      }
+
+      if (playback === "playing" && to) animationFrame = requestAnimationFrame(render);
+    };
+
+    render(animationStartedAt);
+    return () => cancelAnimationFrame(animationFrame);
+  }, [pattern, playback, speedMs, stepIndex]);
+
+  return (
+    <div className="build-canvas-wrap">
+      <canvas
+        ref={canvasRef}
+        className="build-canvas"
+        width={BUILD_CANVAS_SIZE}
+        height={BUILD_CANVAS_SIZE}
+        aria-label="Визуализация сборки картины"
+      />
+    </div>
   );
 }

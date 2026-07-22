@@ -1,4 +1,10 @@
-import { formatCsvText, formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import {
+  createCirclePoints,
+  renderNails,
+  renderStringArtBase,
+  renderStringArtLines,
+} from "./core/string-art-renderer.js";
 import { loadLatestPattern, saveLatestPattern } from "./storage/local-project-store.js";
 
 const mountedApps = new WeakMap();
@@ -32,10 +38,8 @@ const algorithmInput = getElement("algorithmInput");
 const zoomInput = getElement("zoomInput");
 const resetCropButton = getElement("resetCropButton");
 const buildButton = getElement("buildButton");
-const stopButton = getElement("stopButton");
 const pngButton = getElement("pngButton");
 const txtButton = getElement("txtButton");
-const csvButton = getElement("csvButton");
 const statusText = getElement("status");
 const progress = getElement("progress");
 const pointsOut = getElement("pointsOut");
@@ -111,6 +115,7 @@ listen(imageInput, "change", async (event) => {
   drawInitialResult();
   setStatus("Фото загружено. Перетащите подготовленное фото для кадра или измените зум.");
   setExportEnabled(false);
+  buildButton.disabled = false;
 });
 
 listen(schemeInput, "change", async (event) => {
@@ -134,15 +139,8 @@ listen(buildButton, "click", () => {
   generate();
 });
 
-listen(stopButton, "click", () => {
-  state.cancelled = true;
-  if (state.cancelActiveRun) state.cancelActiveRun();
-  setStatus("Построение остановлено.");
-});
-
 listen(pngButton, "click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
 listen(txtButton, "click", () => downloadText("string-art-scheme.txt", formatSchemeText(state.sequence)));
-listen(csvButton, "click", () => downloadText("string-art-steps.csv", formatCsvText(state.sequence)));
 
 for (const input of [pointsInput, sizeInput, zoomInput]) {
   listen(input, "input", () => {
@@ -211,7 +209,6 @@ async function generate() {
   state.cancelled = false;
   state.running = true;
   buildButton.disabled = true;
-  stopButton.disabled = false;
   setExportEnabled(false);
   progress.value = 0;
   setStatus("Подготавливаю расчет...");
@@ -302,8 +299,7 @@ async function generate() {
     if (!destroyed && state.sequence.length > 1) void persistLatestPattern(settings);
     state.activeWorker = null;
     state.cancelActiveRun = null;
-    buildButton.disabled = false;
-    stopButton.disabled = true;
+    buildButton.disabled = !state.image;
     state.running = false;
   }
 }
@@ -948,15 +944,7 @@ function getLineSamples(a, b, settings, cache) {
 }
 
 function buildCirclePoints(count, radius, cx, cy) {
-  const points = [];
-  for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2;
-    points.push({
-      x: Math.round(cx + Math.cos(angle) * radius),
-      y: Math.round(cy + Math.sin(angle) * radius),
-    });
-  }
-  return points;
+  return createCirclePoints(count, radius, cx, cy);
 }
 
 function importScheme(text) {
@@ -974,6 +962,7 @@ function importScheme(text) {
   linesInput.value = String(lineCount);
   imageInput.value = "";
   state.image = null;
+  buildButton.disabled = true;
   state.prepared = null;
   state.cancelled = false;
   state.sequence = sequence.map((point) => point - 1);
@@ -1089,73 +1078,22 @@ function drawInitialResult() {
 }
 
 function drawResultBase(settings) {
-  resultCtx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
-  resultCtx.fillStyle = "#f6f3ea";
-  resultCtx.fillRect(0, 0, resultCanvas.width, resultCanvas.height);
-  resultCtx.save();
-  resultCtx.beginPath();
-  resultCtx.arc(resultCanvas.width / 2, resultCanvas.height / 2, resultCanvas.width / 2 - 20, 0, Math.PI * 2);
-  resultCtx.clip();
-  resultCtx.fillStyle = "#f8f6ef";
-  resultCtx.fillRect(0, 0, resultCanvas.width, resultCanvas.height);
-  resultCtx.restore();
-  resultCtx.strokeStyle = "#2d2f34";
-  resultCtx.lineWidth = 2;
-  resultCtx.beginPath();
-  resultCtx.arc(resultCanvas.width / 2, resultCanvas.height / 2, resultCanvas.width / 2 - 20, 0, Math.PI * 2);
-  resultCtx.stroke();
-  const displayPoints = buildCirclePoints(settings.points, resultCanvas.width / 2 - 20, resultCanvas.width / 2, resultCanvas.height / 2);
-  drawNails(resultCtx, displayPoints, resultCanvas.width);
+  renderStringArtBase(resultCtx, settings.points, resultCanvas.width);
 }
 
 function drawThreadLines(lines, settings, startIndex = 0) {
-  const scale = resultCanvas.width / WORK_SIZE;
-  resultCtx.save();
-  resultCtx.beginPath();
-  resultCtx.arc(resultCanvas.width / 2, resultCanvas.height / 2, resultCanvas.width / 2 - 20, 0, Math.PI * 2);
-  resultCtx.clip();
   const opticalPreview = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
-  resultCtx.globalAlpha = opticalPreview ? 0.16 : 0.075 + settings.threadMm * 0.32;
-  resultCtx.strokeStyle = "#050506";
-  resultCtx.lineWidth = opticalPreview ? Math.max(0.65, settings.threadMm * 4.6) : Math.max(0.42, settings.threadMm * 3.6);
-  for (let i = startIndex; i < lines.length; i++) {
-    const [a, b] = lines[i];
-    const p1 = state.points[a];
-    const p2 = state.points[b];
-    resultCtx.beginPath();
-    resultCtx.moveTo(p1.x * scale, p1.y * scale);
-    resultCtx.lineTo(p2.x * scale, p2.y * scale);
-    resultCtx.stroke();
-  }
-  resultCtx.restore();
+  renderStringArtLines(resultCtx, lines, state.points, {
+    canvasSize: resultCanvas.width,
+    workSize: WORK_SIZE,
+    threadMm: settings.threadMm,
+    opticalPreview,
+    startIndex,
+  });
 }
 
 function drawNails(ctx, points, canvasSize) {
-  ctx.save();
-  ctx.fillStyle = "#2e333b";
-  ctx.strokeStyle = "#f3f5f7";
-  ctx.lineWidth = 1;
-  const dot = canvasSize > 500 ? 2.1 : 1.2;
-  const labelEvery = Math.max(1, Math.ceil(points.length / 30));
-  points.forEach((point, index) => {
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, dot, 0, Math.PI * 2);
-    ctx.fill();
-    const pointNumber = index + 1;
-    if (pointNumber === 1 || pointNumber === points.length || pointNumber % labelEvery === 0) {
-      const labelX = point.x + (point.x - canvasSize / 2) * 0.035;
-      let labelY = point.y + (point.y - canvasSize / 2) * 0.035;
-      if (pointNumber === 1) labelY += 8;
-      if (pointNumber === points.length) labelY -= 8;
-      ctx.fillStyle = "#5c6470";
-      ctx.font = "10px ui-monospace, monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(String(pointNumber), labelX, labelY);
-      ctx.fillStyle = "#2e333b";
-    }
-  });
-  ctx.restore();
+  renderNails(ctx, points, canvasSize);
 }
 
 function drawEmpty() {
@@ -1254,7 +1192,6 @@ function setStatus(text) {
 function setExportEnabled(enabled) {
   pngButton.disabled = !enabled;
   txtButton.disabled = !enabled;
-  csvButton.disabled = !enabled;
 }
 
 function setBuildModeEnabled(enabled) {
@@ -1277,6 +1214,7 @@ async function persistLatestPattern(settings) {
       pointCount: settings.points,
       lineCount: state.sequence.length - 1,
       algorithm: settings.algorithm,
+      threadMm: settings.threadMm,
       createdAt: new Date().toISOString(),
     });
     if (!destroyed) setBuildModeEnabled(true);

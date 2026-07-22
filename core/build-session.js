@@ -31,19 +31,21 @@ export function buildSessionReducer(state, action) {
     case "ADVANCE": {
       if (!state.pattern) return state;
       const total = state.pattern.sequence.length - 1;
-      const stepIndex = Math.min(total, state.stepIndex + 1);
-      return { ...state, stepIndex, playback: stepIndex >= total ? "complete" : state.playback };
+      return moveToStep(state, state.stepIndex + 1, total);
     }
     case "NEXT": {
       if (!state.pattern) return state;
       const total = state.pattern.sequence.length - 1;
-      const stepIndex = Math.min(total, state.stepIndex + 1);
-      return { ...state, stepIndex, playback: stepIndex >= total ? "complete" : "paused" };
+      return moveToStep(state, state.stepIndex + 1, total);
     }
     case "PREVIOUS": {
       if (!state.pattern) return state;
-      return { ...state, stepIndex: Math.max(0, state.stepIndex - 1), playback: "paused" };
+      const total = state.pattern.sequence.length - 1;
+      return moveToStep(state, state.stepIndex - 1, total);
     }
+    case "SEEK":
+      if (!state.pattern) return state;
+      return moveToStep(state, action.stepIndex, state.pattern.sequence.length - 1);
     case "RESET":
       return state.pattern ? { ...state, stepIndex: 0, playback: "paused" } : state;
     case "SET_SPEED":
@@ -61,4 +63,12 @@ function clampStep(value, total) {
 
 function clampSpeed(value) {
   return Math.max(500, Math.min(5000, Number.parseInt(value, 10) || 1500));
+}
+
+function moveToStep(state, value, total) {
+  const stepIndex = clampStep(value, total);
+  const playback = stepIndex >= total
+    ? "complete"
+    : state.playback === "playing" ? "playing" : "paused";
+  return { ...state, stepIndex, playback };
 }

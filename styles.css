@@ -66,7 +66,8 @@ textarea {
 .build-progress-line {
   display: flex;
   justify-content: space-between;
-  margin-top: 42px;
+  width: min(100%, 720px);
+  margin: 22px auto 0;
   color: var(--muted);
 }
 
@@ -74,8 +75,31 @@ textarea {
   color: var(--text);
 }
 
-.build-progress {
-  margin-top: 10px;
+.build-canvas-wrap {
+  width: min(100%, 520px);
+  margin: 24px auto 0;
+}
+
+.build-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-color: #555b64;
+}
+
+.build-seek {
+  width: min(100%, 720px);
+  margin: 8px auto 0;
+  cursor: ew-resize;
+}
+
+.build-seek-limits {
+  display: flex;
+  justify-content: space-between;
+  width: min(100%, 720px);
+  margin: 2px auto 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .build-route {
@@ -84,7 +108,7 @@ textarea {
   justify-content: center;
   align-items: center;
   gap: 28px;
-  min-height: 430px;
+  min-height: 300px;
 }
 
 .nail-readout {
@@ -219,6 +243,8 @@ textarea {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
   align-items: center;
 }
@@ -296,11 +322,6 @@ button:disabled {
   color: #091109;
   border-color: transparent;
   font-weight: 760;
-}
-
-#stopButton {
-  background: #312123;
-  color: #ffd7d4;
 }
 
 .stage {
@@ -387,10 +408,6 @@ input[type="range"] {
   gap: 10px;
 }
 
-.actions + .actions {
-  grid-template-columns: repeat(3, 1fr);
-}
-
 .summary {
   min-height: 0;
   display: grid;
@@ -464,6 +481,20 @@ textarea {
   .topbar-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .topbar-actions > * {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .topbar-actions > .file-button:first-child {
+    grid-column: 1 / -1;
+  }
+
+  h1 {
+    font-size: 24px;
   }
 
   .stage {
@@ -483,7 +514,12 @@ textarea {
   .build-route {
     grid-template-columns: minmax(112px, 1fr) 28px minmax(112px, 1fr);
     gap: 8px;
-    min-height: 330px;
+    min-height: 270px;
+  }
+
+  .build-canvas-wrap {
+    width: clamp(210px, 68vw, 260px);
+    margin-top: 20px;
   }
 
   .nail-readout strong {

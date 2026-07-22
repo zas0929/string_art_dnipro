@@ -12,7 +12,7 @@
         <div class="topbar">
           <div>
             <h1>String Art Generator</h1>
-            <p>Фото или готовая схема в макет натяжения нити между пронумерованными точками.</p>
+            <p>Создать картину в стиле String Art по фото</p>
           </div>
           <div class="topbar-actions">
             <label class="file-button">
@@ -23,6 +23,7 @@
               <input id="imageInput" type="file" accept="image/*">
               Загрузить фото
             </label>
+            <button id="buildButton" type="button" disabled>Построить</button>
           </div>
         </div>
 
@@ -32,7 +33,7 @@
         </div>
 
         <div class="status-row">
-          <span id="status">Загрузите фото для расчёта или готовую схему для просмотра.</span>
+          <span id="status">Загрузите фото чтоб посмотреть как будет выглядеть макет</span>
           <progress id="progress" value="0" max="1"></progress>
         </div>
       </section>
@@ -83,14 +84,8 @@
         </div>
 
         <div class="actions">
-          <button id="buildButton" type="button">Построить</button>
-          <button id="stopButton" type="button" disabled>Стоп</button>
-        </div>
-
-        <div class="actions">
           <button id="pngButton" type="button" disabled>PNG</button>
           <button id="txtButton" type="button" disabled>Схема TXT</button>
-          <button id="csvButton" type="button" disabled>CSV</button>
         </div>
 
         <div class="summary">
