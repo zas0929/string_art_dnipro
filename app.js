@@ -165,12 +165,14 @@ async function generate() {
   for (let line = 0; line < settings.lines; line++) {
     if (state.cancelled) break;
 
+    const progressRatio = line / settings.lines;
+    const scoringProfile = getScoringProfile(settings.algorithm, progressRatio);
     const next = findBestNextPoint(
       current,
       residual,
       drawn,
-      prepared.detailWeight,
-      line / settings.lines,
+      prepared,
+      scoringProfile,
       settings,
       lineCache,
     );
@@ -191,7 +193,8 @@ async function generate() {
       renderedLineCount = renderedLines.length;
       updateSummary(settings, line + 1);
       progress.value = (line + 1) / settings.lines;
-      setStatus(`Построено линий: ${line + 1} / ${settings.lines}`);
+      const stage = scoringProfile.stage ? ` (${scoringProfile.stage})` : "";
+      setStatus(`Построено линий: ${line + 1} / ${settings.lines}${stage}`);
       await waitFrame();
     }
   }
@@ -209,6 +212,9 @@ async function generate() {
 }
 
 function readSettings() {
+  const algorithm = ["classic", "portrait", "portrait-v2"].includes(algorithmInput.value)
+    ? algorithmInput.value
+    : "portrait-v2";
   return {
     points: clampInt(pointsInput.value, 60, 600),
     lines: clampInt(linesInput.value, 100, 8000),
@@ -219,7 +225,7 @@ function readSettings() {
     offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
-    algorithm: algorithmInput.value === "classic" ? "classic" : "portrait",
+    algorithm,
   };
 }
 
@@ -272,7 +278,14 @@ function prepareImage(settings) {
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return { canvas: temp, target, detailWeight: threadTarget.detailWeight };
+  return {
+    canvas: temp,
+    target,
+    detailWeight: threadTarget.detailWeight,
+    tangentX: threadTarget.tangentX,
+    tangentY: threadTarget.tangentY,
+    orientationConfidence: threadTarget.orientationConfidence,
+  };
 }
 
 function buildThreadTarget(gray, mask, size, algorithm) {
@@ -281,8 +294,8 @@ function buildThreadTarget(gray, mask, size, algorithm) {
   const local = new Float32Array(gray.length);
   const edges = sobelMagnitude(normalized, mask, size);
   const target = new Float32Array(gray.length);
-  const detailWeight = algorithm === "portrait" ? new Float32Array(gray.length) : null;
-  const broad = algorithm === "portrait" ? boxBlurFast(normalized, mask, size, 10) : null;
+  const detailWeight = algorithm === "classic" ? null : new Float32Array(gray.length);
+  const broad = detailWeight ? boxBlurFast(normalized, mask, size, 10) : null;
 
   for (let i = 0; i < gray.length; i++) {
     if (!mask[i]) continue;
@@ -307,7 +320,14 @@ function buildThreadTarget(gray, mask, size, algorithm) {
     target[i] = clamp01(darkness * 0.92 + detail + portraitDetail * 0.12);
   }
 
-  return { target, detailWeight };
+  const tangents = algorithm === "portrait-v2" ? buildContourTangents(normalized, mask, size) : null;
+  return {
+    target,
+    detailWeight,
+    tangentX: tangents ? tangents.x : null,
+    tangentY: tangents ? tangents.y : null,
+    orientationConfidence: tangents ? edges : null,
+  };
 }
 
 function normalizeByPercentiles(gray, mask) {
@@ -424,10 +444,58 @@ function sobelMagnitude(values, mask, size) {
   return out;
 }
 
-function findBestNextPoint(current, residual, drawn, detailWeight, progressRatio, settings, lineCache) {
-  const detailScale = detailWeight ? 0.18 + smoothStep(0.28, 0.9, progressRatio) * 1.05 : 0;
+function buildContourTangents(values, mask, size) {
+  const x = new Float32Array(values.length);
+  const y = new Float32Array(values.length);
 
-  if (!detailWeight) {
+  for (let py = 1; py < size - 1; py++) {
+    for (let px = 1; px < size - 1; px++) {
+      const idx = py * size + px;
+      if (!mask[idx]) continue;
+      const tl = values[(py - 1) * size + px - 1];
+      const tc = values[(py - 1) * size + px];
+      const tr = values[(py - 1) * size + px + 1];
+      const ml = values[py * size + px - 1];
+      const mr = values[py * size + px + 1];
+      const bl = values[(py + 1) * size + px - 1];
+      const bc = values[(py + 1) * size + px];
+      const br = values[(py + 1) * size + px + 1];
+      const gx = -tl - 2 * ml - bl + tr + 2 * mr + br;
+      const gy = -tl - 2 * tc - tr + bl + 2 * bc + br;
+      const magnitude = Math.sqrt(gx * gx + gy * gy);
+      if (magnitude <= 0.0001) continue;
+      x[idx] = -gy / magnitude;
+      y[idx] = gx / magnitude;
+    }
+  }
+
+  return { x, y };
+}
+
+function getScoringProfile(algorithm, progressRatio) {
+  if (algorithm === "classic") {
+    return { detailScale: 0, detailBase: 0, orientationScale: 0, overdrawPenalty: 0.018, stage: null };
+  }
+  if (algorithm === "portrait") {
+    return {
+      detailScale: 0.18 + smoothStep(0.28, 0.9, progressRatio) * 1.05,
+      detailBase: 1,
+      orientationScale: 0,
+      overdrawPenalty: 0.018,
+      stage: null,
+    };
+  }
+  if (progressRatio < 0.56) {
+    return { detailScale: 0.2, detailBase: 1, orientationScale: 0.06, overdrawPenalty: 0.018, stage: "тон" };
+  }
+  if (progressRatio < 0.82) {
+    return { detailScale: 0.65, detailBase: 1, orientationScale: 0.2, overdrawPenalty: 0.018, stage: "контуры" };
+  }
+  return { detailScale: 1.15, detailBase: 1, orientationScale: 0.34, overdrawPenalty: 0.018, stage: "детали" };
+}
+
+function findBestNextPoint(current, residual, drawn, prepared, scoringProfile, settings, lineCache) {
+  if (!prepared.detailWeight) {
     let best = -1;
     let bestScore = -Infinity;
     for (let candidate = 0; candidate < settings.points; candidate++) {
@@ -436,7 +504,7 @@ function findBestNextPoint(current, residual, drawn, detailWeight, progressRatio
       if (distance < settings.minSkip) continue;
 
       const samples = getLineSamples(current, candidate, settings, lineCache);
-      const score = scoreLineSamples(samples, residual, drawn, null, 0, settings, 1);
+      const score = scoreLineSamples(samples, residual, drawn, prepared, scoringProfile, settings, 1, 0, 0);
       if (score > bestScore) {
         bestScore = score;
         best = candidate;
@@ -452,14 +520,35 @@ function findBestNextPoint(current, residual, drawn, detailWeight, progressRatio
     if (distance < settings.minSkip) continue;
 
     const samples = getLineSamples(current, candidate, settings, lineCache);
-    const score = scoreLineSamples(samples, residual, drawn, detailWeight, detailScale, settings, 3);
-    insertCandidate(shortlist, { candidate, samples, score }, 24);
+    const direction = getLineDirection(current, candidate);
+    const score = scoreLineSamples(
+      samples,
+      residual,
+      drawn,
+      prepared,
+      scoringProfile,
+      settings,
+      3,
+      direction.x,
+      direction.y,
+    );
+    insertCandidate(shortlist, { candidate, samples, score, direction }, 24);
   }
 
   let best = -1;
   let bestScore = -Infinity;
   for (const entry of shortlist) {
-    const score = scoreLineSamples(entry.samples, residual, drawn, detailWeight, detailScale, settings, 1);
+    const score = scoreLineSamples(
+      entry.samples,
+      residual,
+      drawn,
+      prepared,
+      scoringProfile,
+      settings,
+      1,
+      entry.direction.x,
+      entry.direction.y,
+    );
     if (score > bestScore) {
       bestScore = score;
       best = entry.candidate;
@@ -469,21 +558,43 @@ function findBestNextPoint(current, residual, drawn, detailWeight, progressRatio
   return best;
 }
 
-function scoreLineSamples(samples, residual, drawn, detailWeight, detailScale, settings, sampleStride) {
+function scoreLineSamples(samples, residual, drawn, prepared, scoringProfile, settings, sampleStride, lineX, lineY) {
   let score = 0;
   let overdraw = 0;
 
   for (let i = 0; i < samples.length; i += sampleStride) {
     const idx = samples[i];
     const error = residual[idx];
-    const weight = detailWeight ? 1 + detailWeight[idx] * detailScale : 1;
+    let weight = 1;
+    if (prepared.detailWeight) {
+      let directionalWeight = scoringProfile.detailBase;
+      if (prepared.tangentX && scoringProfile.orientationScale > 0) {
+        const alignment = lineX * prepared.tangentX[idx] + lineY * prepared.tangentY[idx];
+        const confidence = prepared.orientationConfidence[idx];
+        const centeredAlignment = 2 * alignment * alignment - 1;
+        const rawOrientationFactor = 1 + scoringProfile.orientationScale * confidence * centeredAlignment;
+        const orientationFactor = Math.max(0.35, Math.min(1.65, rawOrientationFactor));
+        directionalWeight *= orientationFactor;
+      }
+      weight += prepared.detailWeight[idx] * scoringProfile.detailScale * directionalWeight;
+    }
     score += error * error * weight;
     if (drawn[idx] > residual[idx] + settings.lineStrength) {
       overdraw += drawn[idx] - residual[idx];
     }
   }
 
-  return (score * sampleStride) / Math.sqrt(samples.length || 1) - overdraw * sampleStride * 0.018;
+  return (score * sampleStride) / Math.sqrt(samples.length || 1)
+    - overdraw * sampleStride * scoringProfile.overdrawPenalty;
+}
+
+function getLineDirection(a, b) {
+  const p1 = state.points[a];
+  const p2 = state.points[b];
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const length = Math.sqrt(dx * dx + dy * dy) || 1;
+  return { x: dx / length, y: dy / length };
 }
 
 function insertCandidate(shortlist, entry, limit) {
