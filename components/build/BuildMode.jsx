@@ -31,6 +31,7 @@ import {
 export default function BuildMode() {
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
+  const primedSpeechStepRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -73,31 +74,31 @@ export default function BuildMode() {
     const nextPoint = state.pattern.sequence[state.stepIndex + 1];
     if (!nextPoint) return;
 
-    let advanceTimeout = 0;
-    let cancelled = false;
-    const scheduleAdvance = () => {
-      if (cancelled) return;
-      advanceTimeout = window.setTimeout(() => dispatch({ type: "ADVANCE" }), state.speedMs);
-    };
-
-    if (state.voiceEnabled && "speechSynthesis" in window) {
-      const utterance = new SpeechSynthesisUtterance(String(nextPoint));
-      utterance.lang = "ru-RU";
-      utterance.rate = 0.92;
-      utterance.onend = scheduleAdvance;
-      utterance.onerror = scheduleAdvance;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    } else {
-      scheduleAdvance();
+    const advanceTimeout = window.setTimeout(
+      () => dispatch({ type: "ADVANCE" }),
+      state.speedMs,
+    );
+    const speechWasPrimed = primedSpeechStepRef.current === state.stepIndex;
+    primedSpeechStepRef.current = null;
+    if (state.voiceEnabled && !speechWasPrimed) {
+      speakBuildPoint(nextPoint, setMessage);
     }
 
     return () => {
-      cancelled = true;
       window.clearTimeout(advanceTimeout);
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
   }, [state.pattern, state.playback, state.stepIndex, state.speedMs, state.voiceEnabled]);
+
+  const handlePlaybackToggle = () => {
+    if (state.playback !== "playing" && state.voiceEnabled && state.pattern) {
+      const nextPoint = state.pattern.sequence[state.stepIndex + 1];
+      if (nextPoint && speakBuildPoint(nextPoint, setMessage)) {
+        primedSpeechStepRef.current = state.stepIndex;
+      }
+    }
+    dispatch({ type: "TOGGLE_PLAY" });
+  };
 
   const handleSchemeUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -210,7 +211,7 @@ export default function BuildMode() {
               <button
                 className="primary-transport"
                 type="button"
-                onClick={() => dispatch({ type: "TOGGLE_PLAY" })}
+                onClick={handlePlaybackToggle}
                 disabled={complete}
               >
                 {state.playback === "playing"
@@ -273,6 +274,38 @@ export default function BuildMode() {
   );
 }
 
+function speakBuildPoint(point, reportError) {
+  if (
+    typeof window === "undefined"
+    || !("speechSynthesis" in window)
+    || !("SpeechSynthesisUtterance" in window)
+  ) {
+    reportError("Озвучка недоступна в этом браузере. Сборка продолжится без неё.");
+    return false;
+  }
+
+  try {
+    const speech = window.speechSynthesis;
+    const utterance = new window.SpeechSynthesisUtterance(String(point));
+    const russianVoice = speech.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ru"));
+    utterance.lang = "ru-RU";
+    utterance.rate = 0.92;
+    utterance.volume = 1;
+    if (russianVoice) utterance.voice = russianVoice;
+    utterance.onerror = (event) => {
+      if (event.error === "canceled" || event.error === "interrupted") return;
+      reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+    };
+    speech.cancel();
+    speech.resume();
+    speech.speak(utterance);
+    return true;
+  } catch {
+    reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+    return false;
+  }
+}
+
 const BUILD_CANVAS_SIZE = 760;
 
 function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
@@ -310,14 +343,33 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       if (!base) return undefined;
 
       renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE);
-      renderStringArtLines(base, allLines, workPoints, {
+      renderCache = {
+        pattern,
+        base,
+        baseCanvas,
+        displayPoints,
+        workPoints,
+        allLines,
+        renderedLines: 0,
+      };
+      renderCacheRef.current = renderCache;
+    }
+
+    const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
+    if (completedLines < renderCache.renderedLines) {
+      renderStringArtBase(renderCache.base, renderCache.displayPoints.length, BUILD_CANVAS_SIZE);
+      renderCache.renderedLines = 0;
+    }
+    if (completedLines > renderCache.renderedLines) {
+      renderStringArtLines(renderCache.base, renderCache.allLines, renderCache.workPoints, {
         canvasSize: BUILD_CANVAS_SIZE,
         workSize: STRING_ART_WORK_SIZE,
         threadMm: pattern.threadMm ?? 0.19,
         opticalPreview: true,
+        startIndex: renderCache.renderedLines,
+        endIndex: completedLines,
       });
-      renderCache = { pattern, baseCanvas, displayPoints };
-      renderCacheRef.current = renderCache;
+      renderCache.renderedLines = completedLines;
     }
 
     const { baseCanvas, displayPoints } = renderCache;

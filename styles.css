@@ -108,7 +108,7 @@ textarea {
   justify-content: center;
   align-items: center;
   gap: 28px;
-  min-height: 300px;
+  min-height: 260px;
 }
 
 .nail-readout {
@@ -514,7 +514,7 @@ textarea {
   .build-route {
     grid-template-columns: minmax(112px, 1fr) 28px minmax(112px, 1fr);
     gap: 8px;
-    min-height: 270px;
+    min-height: 190px;
   }
 
   .build-canvas-wrap {

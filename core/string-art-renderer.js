@@ -41,6 +41,7 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   const threadMm = options.threadMm ?? 0.19;
   const opticalPreview = options.opticalPreview ?? true;
   const startIndex = options.startIndex ?? 0;
+  const endIndex = Math.min(options.endIndex ?? lines.length, lines.length);
   const scale = canvasSize / workSize;
 
   context.save();
@@ -54,7 +55,7 @@ export function renderStringArtLines(context, lines, points, options = {}) {
     : Math.max(0.42, threadMm * 3.6);
 
   // Each line is stroked separately so intersections accumulate optical density.
-  for (let index = startIndex; index < lines.length; index++) {
+  for (let index = startIndex; index < endIndex; index++) {
     const [fromIndex, toIndex] = lines[index];
     const from = points[fromIndex];
     const to = points[toIndex];
