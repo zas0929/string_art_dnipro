@@ -4,6 +4,7 @@ const resultCtx = resultCanvas.getContext("2d", { willReadFrequently: true });
 const sourceCtx = sourceCanvas.getContext("2d", { willReadFrequently: true });
 
 const imageInput = document.getElementById("imageInput");
+const schemeInput = document.getElementById("schemeInput");
 const pointsInput = document.getElementById("pointsInput");
 const linesInput = document.getElementById("linesInput");
 const sizeInput = document.getElementById("sizeInput");
@@ -59,6 +60,21 @@ imageInput.addEventListener("change", async (event) => {
   drawInitialResult();
   setStatus("Фото загружено. Перетащите подготовленное фото для кадра или измените зум.");
   setExportEnabled(false);
+});
+
+schemeInput.addEventListener("change", async (event) => {
+  const file = event.target.files && event.target.files[0];
+  if (!file || state.running) return;
+
+  try {
+    const text = await file.text();
+    importScheme(text);
+  } catch (error) {
+    setStatus(`Ошибка схемы: ${error instanceof Error ? error.message : "не удалось прочитать файл"}`);
+    setExportEnabled(false);
+  } finally {
+    schemeInput.value = "";
+  }
 });
 
 buildButton.addEventListener("click", () => {
@@ -202,7 +218,7 @@ async function generate() {
   drawResultBase(settings);
   drawThreadLines(renderedLines, settings);
   updateSummary(settings, renderedLines.length);
-  sequenceOutput.value = state.sequence.join(" -> ");
+  sequenceOutput.value = formatSequence(state.sequence);
   progress.value = 1;
   setStatus(state.cancelled ? "Построение остановлено. Инструкция сохранена частично." : "Готово. Инструкция построена.");
   setExportEnabled(state.sequence.length > 1);
@@ -635,13 +651,97 @@ function getLineSamples(a, b, settings, cache) {
 function buildCirclePoints(count, radius, cx, cy) {
   const points = [];
   for (let i = 0; i < count; i++) {
-    const angle = -Math.PI / 2 + (i / count) * Math.PI * 2;
+    const angle = (i / count) * Math.PI * 2;
     points.push({
       x: Math.round(cx + Math.cos(angle) * radius),
       y: Math.round(cy + Math.sin(angle) * radius),
     });
   }
   return points;
+}
+
+function importScheme(text) {
+  const sequence = parseScheme(text);
+  const maxPoint = Math.max(...sequence);
+  const pointCount = Math.max(clampInt(pointsInput.value, 60, 600), maxPoint);
+  const lineCount = sequence.length - 1;
+  const settings = {
+    ...readSettings(),
+    points: pointCount,
+    lines: lineCount,
+  };
+
+  pointsInput.value = String(pointCount);
+  linesInput.value = String(lineCount);
+  imageInput.value = "";
+  state.image = null;
+  state.prepared = null;
+  state.cancelled = false;
+  state.sequence = sequence.map((point) => point - 1);
+  state.points = buildCirclePoints(pointCount, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
+
+  const renderedLines = [];
+  for (let i = 1; i < state.sequence.length; i++) {
+    renderedLines.push([state.sequence[i - 1], state.sequence[i]]);
+  }
+
+  drawResultBase(settings);
+  drawThreadLines(renderedLines, settings);
+  drawSchemePlaceholder(pointCount, lineCount);
+  updateSummary(settings, lineCount);
+  sequenceOutput.value = formatSequence(state.sequence);
+  progress.value = 1;
+  setStatus(`Схема загружена: ${sequence.length} точек в последовательности, ${lineCount} соединений.`);
+  setExportEnabled(true);
+}
+
+function parseScheme(text) {
+  const entries = [];
+  const underscorePair = /(\d+)\s*_+\s*(\d+)/g;
+  let match;
+
+  while ((match = underscorePair.exec(text)) !== null) {
+    entries.push({ point: Number(match[1]), order: Number(match[2]) });
+  }
+
+  if (entries.length === 0) {
+    const normalized = text.replace(/\\n|\/n/gi, "\n").replaceAll("/", "\n");
+    for (const line of normalized.split(/\r?\n/)) {
+      const pair = line.trim().match(/^(\d+)\D+(\d+)$/);
+      if (pair) entries.push({ point: Number(pair[1]), order: Number(pair[2]) });
+    }
+  }
+
+  const ordered = entries.filter((entry) => entry.order >= 1).sort((a, b) => a.order - b.order);
+  if (ordered.length < 2) {
+    throw new Error("нужно минимум две строки вида 50____1 и 25____2");
+  }
+
+  for (let i = 0; i < ordered.length; i++) {
+    const entry = ordered[i];
+    const expectedOrder = i + 1;
+    if (!Number.isInteger(entry.point) || entry.point < 1 || entry.point > 600) {
+      throw new Error(`точка ${entry.point} вне диапазона 1–600`);
+    }
+    if (entry.order !== expectedOrder) {
+      throw new Error(`после позиции ${i} ожидается позиция ${expectedOrder}, получено ${entry.order}`);
+    }
+  }
+
+  return ordered.map((entry) => entry.point);
+}
+
+function drawSchemePlaceholder(pointCount, lineCount) {
+  sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.fillStyle = "#101114";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.fillStyle = "#a9b0ba";
+  sourceCtx.textAlign = "center";
+  sourceCtx.textBaseline = "middle";
+  sourceCtx.font = "20px system-ui";
+  sourceCtx.fillText("Схема загружена", sourceCanvas.width / 2, sourceCanvas.height / 2 - 16);
+  sourceCtx.font = "14px system-ui";
+  sourceCtx.fillText(`${pointCount} точек · ${lineCount} соединений`, sourceCanvas.width / 2, sourceCanvas.height / 2 + 18);
 }
 
 function drawPreparedPreview() {
@@ -769,18 +869,22 @@ function drawNails(ctx, points, canvasSize) {
   ctx.strokeStyle = "#f3f5f7";
   ctx.lineWidth = 1;
   const dot = canvasSize > 500 ? 2.1 : 1.2;
+  const labelEvery = Math.max(1, Math.ceil(points.length / 30));
   points.forEach((point, index) => {
     ctx.beginPath();
     ctx.arc(point.x, point.y, dot, 0, Math.PI * 2);
     ctx.fill();
-    if (index % Math.ceil(points.length / 30) === 0) {
+    const pointNumber = index + 1;
+    if (pointNumber === 1 || pointNumber === points.length || pointNumber % labelEvery === 0) {
       const labelX = point.x + (point.x - canvasSize / 2) * 0.035;
-      const labelY = point.y + (point.y - canvasSize / 2) * 0.035;
+      let labelY = point.y + (point.y - canvasSize / 2) * 0.035;
+      if (pointNumber === 1) labelY += 8;
+      if (pointNumber === points.length) labelY -= 8;
       ctx.fillStyle = "#5c6470";
       ctx.font = "10px ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(String(index), labelX, labelY);
+      ctx.fillText(String(pointNumber), labelX, labelY);
       ctx.fillStyle = "#2e333b";
     }
   });
@@ -805,7 +909,9 @@ function drawEmpty() {
 function updateSummary(settings, lineCount) {
   pointsOut.textContent = String(settings.points);
   linesOut.textContent = String(lineCount);
-  stepOut.textContent = state.sequence.length > 1 ? `${state.sequence[state.sequence.length - 2]} -> ${state.sequence[state.sequence.length - 1]}` : "-";
+  stepOut.textContent = state.sequence.length > 1
+    ? `${state.sequence[state.sequence.length - 2] + 1} -> ${state.sequence[state.sequence.length - 1] + 1}`
+    : "-";
   lengthOut.textContent = estimateThreadLength(settings, lineCount);
 }
 
@@ -830,25 +936,25 @@ function makeInstructionText() {
     `Lines: ${state.sequence.length - 1}`,
     `Size: ${settings.sizeCm} cm`,
     `Thread: ${settings.threadMm} mm`,
-    "Point 0 is at the top. Numbering goes clockwise.",
+    "Point 1 is at the right (3 o'clock). Numbering goes clockwise.",
     "",
     "Sequence:",
-    state.sequence.join(" -> "),
+    formatSequence(state.sequence),
     "",
     "Steps:",
   ];
 
   for (let i = 1; i < state.sequence.length; i++) {
-    lines.push(`${i}. ${state.sequence[i - 1]} -> ${state.sequence[i]}`);
+    lines.push(`${i}. ${state.sequence[i - 1] + 1} -> ${state.sequence[i] + 1}`);
   }
 
   lines.push("", "Point coordinates, cm from center:");
   const radiusCm = settings.sizeCm / 2;
   for (let i = 0; i < settings.points; i++) {
-    const angle = -Math.PI / 2 + (i / settings.points) * Math.PI * 2;
+    const angle = (i / settings.points) * Math.PI * 2;
     const x = Math.cos(angle) * radiusCm;
     const y = Math.sin(angle) * radiusCm;
-    lines.push(`${i}: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
+    lines.push(`${i + 1}: x=${x.toFixed(2)}, y=${y.toFixed(2)}`);
   }
 
   return lines.join("\n");
@@ -857,9 +963,13 @@ function makeInstructionText() {
 function makeCsvText() {
   const rows = ["step,from,to"];
   for (let i = 1; i < state.sequence.length; i++) {
-    rows.push(`${i},${state.sequence[i - 1]},${state.sequence[i]}`);
+    rows.push(`${i},${state.sequence[i - 1] + 1},${state.sequence[i] + 1}`);
   }
   return rows.join("\n");
+}
+
+function formatSequence(sequence) {
+  return sequence.map((point) => point + 1).join(" -> ");
 }
 
 function loadImage(file) {

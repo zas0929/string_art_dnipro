@@ -12,12 +12,18 @@
         <div class="topbar">
           <div>
             <h1>String Art Generator</h1>
-            <p>Фото в последовательность натяжения нити между пронумерованными точками.</p>
+            <p>Фото или готовая схема в макет натяжения нити между пронумерованными точками.</p>
           </div>
-          <label class="file-button">
-            <input id="imageInput" type="file" accept="image/*">
-            Загрузить фото
-          </label>
+          <div class="topbar-actions">
+            <label class="file-button">
+              <input id="schemeInput" type="file" accept=".txt,.csv,text/plain,text/csv">
+              Загрузить схему
+            </label>
+            <label class="file-button">
+              <input id="imageInput" type="file" accept="image/*">
+              Загрузить фото
+            </label>
+          </div>
         </div>
 
         <div class="stage">
@@ -26,7 +32,7 @@
         </div>
 
         <div class="status-row">
-          <span id="status">Загрузите фото, затем нажмите «Построить».</span>
+          <span id="status">Загрузите фото для расчёта или готовую схему для просмотра.</span>
           <progress id="progress" value="0" max="1"></progress>
         </div>
       </section>

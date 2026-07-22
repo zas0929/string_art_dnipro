@@ -48,6 +48,12 @@ textarea {
   margin-bottom: 18px;
 }
 
+.topbar-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 h1,
 h2,
 p {
@@ -260,6 +266,11 @@ textarea {
   .status-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .topbar-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .stage {
