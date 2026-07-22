@@ -177,6 +177,9 @@ async function generate() {
   const lineCache = new Map();
   const nailUsage = new Uint16Array(settings.points);
   const chordUsage = new Map();
+  const directionUsage = new Uint16Array(36);
+  const recentDirections = [];
+  const recentNailDistances = [];
   let current = 0;
   nailUsage[current] = 1;
   let renderedLines = [];
@@ -192,7 +195,20 @@ async function generate() {
     const scoringProfile = isOpticalModel ? null : getScoringProfile(settings.algorithm, progressRatio);
     if (scoringProfile) scoringProfile.averageNailVisits = (line + 1) / settings.points;
     const next = isOpticalModel
-      ? findBestNextPointV4(current, residual, prepared, settings, lineCache, nailUsage, chordUsage, progressRatio)
+      ? findBestNextPointV4(
+          current,
+          residual,
+          prepared,
+          settings,
+          lineCache,
+          nailUsage,
+          chordUsage,
+          directionUsage,
+          recentDirections,
+          recentNailDistances,
+          state.sequence.length > 1 ? state.sequence[state.sequence.length - 2] : -1,
+          progressRatio,
+        )
       : findBestNextPoint(
           current,
           residual,
@@ -220,6 +236,14 @@ async function generate() {
     renderedLines.push([current, next]);
     const chordKey = getChordKey(current, next);
     chordUsage.set(chordKey, (chordUsage.get(chordKey) || 0) + 1);
+    if (isOpticalModel) {
+      const direction = getChordAngle(current, next);
+      directionUsage[getDirectionBin(direction, directionUsage.length)]++;
+      recentDirections.push(direction);
+      if (recentDirections.length > 10) recentDirections.shift();
+      recentNailDistances.push(circularDistance(current, next, settings.points));
+      if (recentNailDistances.length > 120) recentNailDistances.shift();
+    }
     nailUsage[next]++;
     state.sequence.push(next);
     current = next;
@@ -770,21 +794,40 @@ function adjustCandidateScore(score, current, candidate, scoringProfile, nailUsa
   return score * nailFactor * chordFactor * distanceFactor;
 }
 
-function findBestNextPointV4(current, residual, prepared, settings, lineCache, nailUsage, chordUsage, progressRatio) {
+function findBestNextPointV4(
+  current,
+  residual,
+  prepared,
+  settings,
+  lineCache,
+  nailUsage,
+  chordUsage,
+  directionUsage,
+  recentDirections,
+  recentNailDistances,
+  previousPoint,
+  progressRatio,
+) {
   const shortlist = [];
+  const recentDistanceMean = recentNailDistances.length
+    ? recentNailDistances.reduce((sum, distance) => sum + distance, 0) / recentNailDistances.length
+    : 76;
   for (let candidate = 0; candidate < settings.points; candidate++) {
-    if (candidate === current) continue;
+    if (candidate === current || candidate === previousPoint) continue;
     const nailDistance = circularDistance(current, candidate, settings.points);
     if (nailDistance < settings.minSkip) continue;
 
     const samples = getLineSamples(current, candidate, settings, lineCache);
-    const rawScore = scoreOpticalDensityLine(samples, residual, prepared.importance, 3);
+    const rawScore = scoreOpticalDensityLine(samples, residual, prepared.importance, 3, progressRatio);
     const score = adjustOpticalCandidateScore(
       rawScore,
       current,
       candidate,
       nailUsage,
       chordUsage,
+      directionUsage,
+      recentDirections,
+      recentDistanceMean,
       progressRatio,
       settings,
     );
@@ -794,13 +837,16 @@ function findBestNextPointV4(current, residual, prepared, settings, lineCache, n
   let best = -1;
   let bestScore = -Infinity;
   for (const entry of shortlist) {
-    const rawScore = scoreOpticalDensityLine(entry.samples, residual, prepared.importance, 1);
+    const rawScore = scoreOpticalDensityLine(entry.samples, residual, prepared.importance, 1, progressRatio);
     const score = adjustOpticalCandidateScore(
       rawScore,
       current,
       entry.candidate,
       nailUsage,
       chordUsage,
+      directionUsage,
+      recentDirections,
+      recentDistanceMean,
       progressRatio,
       settings,
     );
@@ -813,7 +859,7 @@ function findBestNextPointV4(current, residual, prepared, settings, lineCache, n
   return best;
 }
 
-function scoreOpticalDensityLine(samples, residual, importance, sampleStride) {
+function scoreOpticalDensityLine(samples, residual, importance, sampleStride, progressRatio) {
   let errorReduction = 0;
   for (let i = 0; i < samples.length; i += sampleStride) {
     const idx = samples[i];
@@ -821,25 +867,84 @@ function scoreOpticalDensityLine(samples, residual, importance, sampleStride) {
     // r^2 - (r - 1)^2 = 2r - 1.
     errorReduction += importance[idx] * (2 * residual[idx] - 1);
   }
-  return (errorReduction * sampleStride) / Math.pow(samples.length || 1, 0.44);
+  const lengthExponent = errorReduction >= 0
+    ? 1.05 - progressRatio * 0.4
+    : 1.05;
+  return (errorReduction * sampleStride) / Math.pow(samples.length || 1, lengthExponent);
 }
 
-function adjustOpticalCandidateScore(score, current, candidate, nailUsage, chordUsage, progressRatio, settings) {
-  if (score <= 0) return score;
-
+function adjustOpticalCandidateScore(
+  score,
+  current,
+  candidate,
+  nailUsage,
+  chordUsage,
+  directionUsage,
+  recentDirections,
+  recentDistanceMean,
+  progressRatio,
+  settings,
+) {
+  const magnitude = Math.max(1, Math.abs(score));
   const averageVisits = (progressRatio * settings.lines + 1) / settings.points;
-  const balanceStrength = 0.055 + smoothStep(0.08, 0.72, progressRatio) * 0.055;
+  const balanceStrength = 0.008
+    + smoothStep(0.15, 0.68, progressRatio) * 0.04
+    + smoothStep(0.65, 1, progressRatio) * 0.12;
   const visitDelta = averageVisits - nailUsage[candidate];
-  let nailFactor = Math.exp(visitDelta * balanceStrength);
-  if (progressRatio < 0.14 && nailUsage[candidate] === 0) nailFactor *= 1.12;
-  nailFactor = Math.max(0.62, Math.min(1.48, nailFactor));
+  const maxVisitBias = 0.18 + progressRatio * 0.32;
+  const visitBias = Math.max(-maxVisitBias, Math.min(maxVisitBias, visitDelta * balanceStrength));
+  const newNailBias = progressRatio < 0.14 && nailUsage[candidate] === 0 ? 0.055 : 0;
 
   const repeats = chordUsage.get(getChordKey(current, candidate)) || 0;
-  const chordFactor = 1 / (1 + repeats * 0.01);
+  const repeatBias = Math.min(0.28, repeats * 0.085);
   const nailDistance = circularDistance(current, candidate, settings.points);
   const distanceDelta = nailDistance - 76;
-  const distanceFactor = Math.max(0.88, Math.exp(-distanceDelta * distanceDelta * 0.000025));
-  return score * nailFactor * chordFactor * distanceFactor;
+  const distancePenalty = Math.min(0.12, distanceDelta * distanceDelta * 0.00004);
+  const distanceFeedback = Math.max(
+    -0.45,
+    Math.min(0.45, -(recentDistanceMean - 76) * distanceDelta * 0.002),
+  );
+
+  const direction = getChordAngle(current, candidate);
+  const directionBin = getDirectionBin(direction, directionUsage.length);
+  const averageDirectionUsage = (progressRatio * settings.lines + 1) / directionUsage.length;
+  const directionDelta = averageDirectionUsage - directionUsage[directionBin];
+  const directionBalanceBias = Math.max(-0.015, Math.min(0.015, directionDelta * 0.0005));
+  let parallelPenalty = 0;
+  for (let i = recentDirections.length - 1; i >= 0; i--) {
+    const recency = recentDirections.length - i;
+    const angleDelta = getAngleDistance(direction, recentDirections[i]);
+    const closeness = Math.exp(-(angleDelta * angleDelta) / 0.012);
+    parallelPenalty += closeness * (recency === 1 ? 0.025 : 0.003);
+  }
+  parallelPenalty = Math.min(0.055, parallelPenalty);
+
+  return score + magnitude * (
+    visitBias
+    + newNailBias
+    + repeatBias
+    + directionBalanceBias
+    + distanceFeedback
+    - distancePenalty
+    - parallelPenalty
+  );
+}
+
+function getChordAngle(a, b) {
+  const p1 = state.points[a];
+  const p2 = state.points[b];
+  let angle = Math.atan2(p2.y - p1.y, p2.x - p1.x) % Math.PI;
+  if (angle < 0) angle += Math.PI;
+  return angle;
+}
+
+function getDirectionBin(angle, binCount) {
+  return Math.min(binCount - 1, Math.floor((angle / Math.PI) * binCount));
+}
+
+function getAngleDistance(a, b) {
+  const direct = Math.abs(a - b);
+  return Math.min(direct, Math.PI - direct);
 }
 
 function getLineDirection(a, b) {
