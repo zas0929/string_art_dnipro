@@ -1,0 +1,23 @@
+{
+  "image": "../test-photo.png",
+  "settings": {
+    "image_size": 640,
+    "points": 240,
+    "lines": 4500,
+    "size_cm": 47.0,
+    "thread_mm": 0.16,
+    "line_strength": 0.055,
+    "min_skip": 16,
+    "zoom": 1.0,
+    "offset_x": 0.0,
+    "offset_y": 0.0,
+    "profile": "portrait",
+    "mode": "single",
+    "render_alpha": 0.043,
+    "render_width": 0.48
+  },
+  "diagnostics": {
+    "mse": 0.04777076840400696,
+    "lines": 4500
+  }
+}

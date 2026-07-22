@@ -10,6 +10,7 @@ const sizeInput = document.getElementById("sizeInput");
 const threadInput = document.getElementById("threadInput");
 const opacityInput = document.getElementById("opacityInput");
 const skipInput = document.getElementById("skipInput");
+const algorithmInput = document.getElementById("algorithmInput");
 const zoomInput = document.getElementById("zoomInput");
 const resetCropButton = document.getElementById("resetCropButton");
 const buildButton = document.getElementById("buildButton");
@@ -84,6 +85,12 @@ for (const input of [pointsInput, sizeInput, zoomInput]) {
   });
 }
 
+algorithmInput.addEventListener("change", () => {
+  if (!state.image || state.running) return;
+  invalidateResult();
+  drawPreparedPreview();
+});
+
 resetCropButton.addEventListener("click", () => {
   if (!state.image || state.running) return;
   resetCrop();
@@ -150,6 +157,7 @@ async function generate() {
   const lineCache = new Map();
   let current = 0;
   let renderedLines = [];
+  let renderedLineCount = 0;
 
   drawSourceFromPrepared(prepared, settings);
   drawResultBase(settings);
@@ -157,7 +165,15 @@ async function generate() {
   for (let line = 0; line < settings.lines; line++) {
     if (state.cancelled) break;
 
-    const next = findBestNextPoint(current, residual, drawn, settings, lineCache);
+    const next = findBestNextPoint(
+      current,
+      residual,
+      drawn,
+      prepared.detailWeight,
+      line / settings.lines,
+      settings,
+      lineCache,
+    );
     if (next === -1) break;
 
     const samples = getLineSamples(current, next, settings, lineCache);
@@ -171,8 +187,8 @@ async function generate() {
     current = next;
 
     if (line % 20 === 0 || line === settings.lines - 1) {
-      drawResultBase(settings);
-      drawThreadLines(renderedLines, settings);
+      drawThreadLines(renderedLines, settings, renderedLineCount);
+      renderedLineCount = renderedLines.length;
       updateSummary(settings, line + 1);
       progress.value = (line + 1) / settings.lines;
       setStatus(`Построено линий: ${line + 1} / ${settings.lines}`);
@@ -203,6 +219,7 @@ function readSettings() {
     offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
+    algorithm: algorithmInput.value === "classic" ? "classic" : "portrait",
   };
 }
 
@@ -238,13 +255,13 @@ function prepareImage(settings) {
     }
   }
 
-  const threadTarget = buildThreadTarget(gray, mask, WORK_SIZE);
+  const threadTarget = buildThreadTarget(gray, mask, WORK_SIZE, settings.algorithm);
   for (let y = 0; y < WORK_SIZE; y++) {
     for (let x = 0; x < WORK_SIZE; x++) {
       const idx = y * WORK_SIZE + x;
       const offset = idx * 4;
       const inside = mask[idx] === 1;
-      target[idx] = inside ? threadTarget[idx] : 0;
+      target[idx] = inside ? threadTarget.target[idx] : 0;
       if (!inside) {
         data[offset] = 18;
         data[offset + 1] = 18;
@@ -255,15 +272,17 @@ function prepareImage(settings) {
   }
 
   ctx.putImageData(imageData, 0, 0);
-  return { canvas: temp, target };
+  return { canvas: temp, target, detailWeight: threadTarget.detailWeight };
 }
 
-function buildThreadTarget(gray, mask, size) {
+function buildThreadTarget(gray, mask, size, algorithm) {
   const normalized = normalizeByPercentiles(gray, mask);
   const smooth = boxBlurValues(normalized, mask, size, 3);
   const local = new Float32Array(gray.length);
   const edges = sobelMagnitude(normalized, mask, size);
   const target = new Float32Array(gray.length);
+  const detailWeight = algorithm === "portrait" ? new Float32Array(gray.length) : null;
+  const broad = algorithm === "portrait" ? boxBlurFast(normalized, mask, size, 10) : null;
 
   for (let i = 0; i < gray.length; i++) {
     if (!mask[i]) continue;
@@ -276,10 +295,19 @@ function buildThreadTarget(gray, mask, size) {
     let darkness = 1 - local[i];
     darkness = Math.pow(clamp01(darkness), 0.82);
     const detail = Math.pow(edges[i], 0.7) * 0.22;
-    target[i] = clamp01(darkness * 0.92 + detail);
+    let portraitDetail = 0;
+
+    if (detailWeight) {
+      const localDark = Math.max(0, broad[i] - normalized[i]);
+      const brightNeighborhood = 0.55 + broad[i] * 0.75;
+      portraitDetail = Math.pow(clamp01(localDark * 3.2), 0.68) * brightNeighborhood;
+      detailWeight[i] = clamp01(portraitDetail * 0.82 + Math.pow(edges[i], 0.72) * 0.28);
+    }
+
+    target[i] = clamp01(darkness * 0.92 + detail + portraitDetail * 0.12);
   }
 
-  return target;
+  return { target, detailWeight };
 }
 
 function normalizeByPercentiles(gray, mask) {
@@ -323,6 +351,51 @@ function boxBlurValues(values, mask, size, radius) {
   return out;
 }
 
+function boxBlurFast(values, mask, size, radius) {
+  const out = new Float32Array(values.length);
+  const stride = size + 1;
+  const sums = new Float64Array(stride * stride);
+  const counts = new Uint32Array(stride * stride);
+
+  for (let y = 1; y <= size; y++) {
+    let rowSum = 0;
+    let rowCount = 0;
+    for (let x = 1; x <= size; x++) {
+      const source = (y - 1) * size + x - 1;
+      if (mask[source]) {
+        rowSum += values[source];
+        rowCount++;
+      }
+      const integral = y * stride + x;
+      sums[integral] = sums[integral - stride] + rowSum;
+      counts[integral] = counts[integral - stride] + rowCount;
+    }
+  }
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = y * size + x;
+      if (!mask[idx]) {
+        out[idx] = 1;
+        continue;
+      }
+      const left = Math.max(0, x - radius);
+      const top = Math.max(0, y - radius);
+      const right = Math.min(size - 1, x + radius) + 1;
+      const bottom = Math.min(size - 1, y + radius) + 1;
+      const bottomRight = bottom * stride + right;
+      const bottomLeft = bottom * stride + left;
+      const topRight = top * stride + right;
+      const topLeft = top * stride + left;
+      const sum = sums[bottomRight] - sums[bottomLeft] - sums[topRight] + sums[topLeft];
+      const count = counts[bottomRight] - counts[bottomLeft] - counts[topRight] + counts[topLeft];
+      out[idx] = count ? sum / count : values[idx];
+    }
+  }
+
+  return out;
+}
+
 function sobelMagnitude(values, mask, size) {
   const out = new Float32Array(values.length);
   let max = 0;
@@ -351,34 +424,73 @@ function sobelMagnitude(values, mask, size) {
   return out;
 }
 
-function findBestNextPoint(current, residual, drawn, settings, lineCache) {
-  let best = -1;
-  let bestScore = -Infinity;
+function findBestNextPoint(current, residual, drawn, detailWeight, progressRatio, settings, lineCache) {
+  const detailScale = detailWeight ? 0.18 + smoothStep(0.28, 0.9, progressRatio) * 1.05 : 0;
 
+  if (!detailWeight) {
+    let best = -1;
+    let bestScore = -Infinity;
+    for (let candidate = 0; candidate < settings.points; candidate++) {
+      if (candidate === current) continue;
+      const distance = circularDistance(current, candidate, settings.points);
+      if (distance < settings.minSkip) continue;
+
+      const samples = getLineSamples(current, candidate, settings, lineCache);
+      const score = scoreLineSamples(samples, residual, drawn, null, 0, settings, 1);
+      if (score > bestScore) {
+        bestScore = score;
+        best = candidate;
+      }
+    }
+    return best;
+  }
+
+  const shortlist = [];
   for (let candidate = 0; candidate < settings.points; candidate++) {
     if (candidate === current) continue;
     const distance = circularDistance(current, candidate, settings.points);
     if (distance < settings.minSkip) continue;
 
     const samples = getLineSamples(current, candidate, settings, lineCache);
-    let score = 0;
-    let overdraw = 0;
-    for (let i = 0; i < samples.length; i++) {
-      const idx = samples[i];
-      score += residual[idx] * residual[idx];
-      if (drawn[idx] > residual[idx] + settings.lineStrength) {
-        overdraw += drawn[idx] - residual[idx];
-      }
-    }
-    score = score / Math.sqrt(samples.length || 1) - overdraw * 0.018;
+    const score = scoreLineSamples(samples, residual, drawn, detailWeight, detailScale, settings, 3);
+    insertCandidate(shortlist, { candidate, samples, score }, 24);
+  }
 
+  let best = -1;
+  let bestScore = -Infinity;
+  for (const entry of shortlist) {
+    const score = scoreLineSamples(entry.samples, residual, drawn, detailWeight, detailScale, settings, 1);
     if (score > bestScore) {
       bestScore = score;
-      best = candidate;
+      best = entry.candidate;
     }
   }
 
   return best;
+}
+
+function scoreLineSamples(samples, residual, drawn, detailWeight, detailScale, settings, sampleStride) {
+  let score = 0;
+  let overdraw = 0;
+
+  for (let i = 0; i < samples.length; i += sampleStride) {
+    const idx = samples[i];
+    const error = residual[idx];
+    const weight = detailWeight ? 1 + detailWeight[idx] * detailScale : 1;
+    score += error * error * weight;
+    if (drawn[idx] > residual[idx] + settings.lineStrength) {
+      overdraw += drawn[idx] - residual[idx];
+    }
+  }
+
+  return (score * sampleStride) / Math.sqrt(samples.length || 1) - overdraw * sampleStride * 0.018;
+}
+
+function insertCandidate(shortlist, entry, limit) {
+  let index = shortlist.length;
+  while (index > 0 && shortlist[index - 1].score < entry.score) index--;
+  shortlist.splice(index, 0, entry);
+  if (shortlist.length > limit) shortlist.pop();
 }
 
 function getLineSamples(a, b, settings, cache) {
@@ -519,7 +631,7 @@ function drawResultBase(settings) {
   drawNails(resultCtx, displayPoints, resultCanvas.width);
 }
 
-function drawThreadLines(lines, settings) {
+function drawThreadLines(lines, settings, startIndex = 0) {
   const scale = resultCanvas.width / WORK_SIZE;
   resultCtx.save();
   resultCtx.beginPath();
@@ -528,7 +640,8 @@ function drawThreadLines(lines, settings) {
   resultCtx.globalAlpha = 0.075 + settings.threadMm * 0.32;
   resultCtx.strokeStyle = "#050506";
   resultCtx.lineWidth = Math.max(0.42, settings.threadMm * 3.6);
-  for (const [a, b] of lines) {
+  for (let i = startIndex; i < lines.length; i++) {
+    const [a, b] = lines[i];
     const p1 = state.points[a];
     const p2 = state.points[b];
     resultCtx.beginPath();
@@ -690,6 +803,11 @@ function clampNumber(value, min, max) {
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
+}
+
+function smoothStep(edge0, edge1, value) {
+  const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
+  return t * t * (3 - 2 * t);
 }
 
 function waitFrame() {
