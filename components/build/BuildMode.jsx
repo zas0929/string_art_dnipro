@@ -31,7 +31,16 @@ import {
 export default function BuildMode() {
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
-  const primedSpeechStepRef = useRef(null);
+  const primedSpeechRef = useRef(null);
+
+  useEffect(() => {
+    if (!("speechSynthesis" in window)) return undefined;
+    const speech = window.speechSynthesis;
+    const warmVoices = () => speech.getVoices();
+    warmVoices();
+    speech.addEventListener("voiceschanged", warmVoices);
+    return () => speech.removeEventListener("voiceschanged", warmVoices);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -74,27 +83,53 @@ export default function BuildMode() {
     const nextPoint = state.pattern.sequence[state.stepIndex + 1];
     if (!nextPoint) return;
 
-    const advanceTimeout = window.setTimeout(
-      () => dispatch({ type: "ADVANCE" }),
-      state.speedMs,
-    );
-    const speechWasPrimed = primedSpeechStepRef.current === state.stepIndex;
-    primedSpeechStepRef.current = null;
-    if (state.voiceEnabled && !speechWasPrimed) {
-      speakBuildPoint(nextPoint, setMessage);
+    let cancelled = false;
+    let advanceTimeout = 0;
+    let speechWatchdog = 0;
+    const scheduleAdvance = (delay = state.speedMs) => {
+      if (cancelled || advanceTimeout) return;
+      window.clearTimeout(speechWatchdog);
+      const durationMs = Math.max(0, Number(delay) || 0);
+      advanceTimeout = window.setTimeout(() => dispatch({ type: "ADVANCE" }), durationMs);
+    };
+
+    if (state.voiceEnabled) {
+      const primedSpeech = primedSpeechRef.current?.stepIndex === state.stepIndex
+        ? primedSpeechRef.current.run
+        : speakBuildPoint(nextPoint, setMessage);
+      primedSpeechRef.current = null;
+      speechWatchdog = window.setTimeout(
+        () => scheduleAdvance(0),
+        state.speedMs + 1800,
+      );
+      primedSpeech.finished.then((result) => {
+        const fallbackSpeechTime = result === "ended" ? 0 : 800;
+        scheduleAdvance(state.speedMs + fallbackSpeechTime);
+      });
+    } else {
+      scheduleAdvance();
     }
 
     return () => {
+      cancelled = true;
       window.clearTimeout(advanceTimeout);
+      window.clearTimeout(speechWatchdog);
       if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
   }, [state.pattern, state.playback, state.stepIndex, state.speedMs, state.voiceEnabled]);
 
   const handlePlaybackToggle = () => {
+    if (state.playback !== "playing") setMessage("");
+    if (state.playback === "playing") {
+      primedSpeechRef.current = null;
+    }
     if (state.playback !== "playing" && state.voiceEnabled && state.pattern) {
       const nextPoint = state.pattern.sequence[state.stepIndex + 1];
-      if (nextPoint && speakBuildPoint(nextPoint, setMessage)) {
-        primedSpeechStepRef.current = state.stepIndex;
+      if (nextPoint) {
+        primedSpeechRef.current = {
+          stepIndex: state.stepIndex,
+          run: speakBuildPoint(nextPoint, setMessage),
+        };
       }
     }
     dispatch({ type: "TOGGLE_PLAY" });
@@ -134,6 +169,16 @@ export default function BuildMode() {
   const fromPoint = state.pattern?.sequence[Math.min(state.stepIndex, total)] ?? null;
   const toPoint = complete ? null : state.pattern?.sequence[state.stepIndex + 1] ?? null;
   const progressPercent = total ? Math.round((state.stepIndex / total) * 100) : 0;
+  const routeContext = complete || !state.pattern
+    ? []
+    : Array.from({ length: 7 }, (_, index) => {
+        const offset = index - 3;
+        const sequenceIndex = state.stepIndex + 1 + offset;
+        return {
+          offset,
+          point: state.pattern.sequence[sequenceIndex] ?? null,
+        };
+      });
 
   return (
     <main className="build-page">
@@ -203,6 +248,27 @@ export default function BuildMode() {
               )}
             </div>
 
+            {!complete && (
+              <div className="route-history" aria-label="Недавние и следующие точки">
+                <span className="route-history-label">Недавно</span>
+                <ol>
+                  {routeContext.map(({ offset, point }) => (
+                    <li
+                      key={offset}
+                      className={`${offset < 0 ? "is-past" : ""} ${offset === 0 ? "is-current" : ""} ${point === null ? "is-empty" : ""}`}
+                      aria-current={offset === 0 ? "step" : undefined}
+                      aria-label={point === null
+                        ? undefined
+                        : `${offset < 0 ? "Предыдущая" : offset === 0 ? "Текущая" : "Следующая"} точка ${point}`}
+                    >
+                      <span aria-hidden="true">{point ?? "·"}</span>
+                    </li>
+                  ))}
+                </ol>
+                <span className="route-history-label">Далее</span>
+              </div>
+            )}
+
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
@@ -256,7 +322,11 @@ export default function BuildMode() {
             onChange={(event) => dispatch({ type: "SET_VOICE", enabled: event.target.checked })}
           />
         </label>
-        <button type="button" onClick={() => dispatch({ type: "RESET" })} disabled={!state.pattern || state.stepIndex === 0}>
+        <button
+          type="button"
+          onClick={() => dispatch({ type: "RESET" })}
+          disabled={!state.pattern || state.stepIndex === 0}
+        >
           <RotateCcw aria-hidden="true" size={18} />
           Начать заново
         </button>
@@ -275,34 +345,76 @@ export default function BuildMode() {
 }
 
 function speakBuildPoint(point, reportError) {
+  let settleSpeech;
+  const finished = new Promise((resolve) => {
+    settleSpeech = resolve;
+  });
+  let settled = false;
+  const settle = (result) => {
+    if (settled) return;
+    settled = true;
+    settleSpeech(result);
+  };
+
   if (
     typeof window === "undefined"
     || !("speechSynthesis" in window)
     || !("SpeechSynthesisUtterance" in window)
   ) {
     reportError("Озвучка недоступна в этом браузере. Сборка продолжится без неё.");
-    return false;
+    settle("unavailable");
+    return { started: false, finished };
   }
 
   try {
     const speech = window.speechSynthesis;
-    const utterance = new window.SpeechSynthesisUtterance(String(point));
-    const russianVoice = speech.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ru"));
-    utterance.lang = "ru-RU";
-    utterance.rate = 0.92;
-    utterance.volume = 1;
-    if (russianVoice) utterance.voice = russianVoice;
-    utterance.onerror = (event) => {
-      if (event.error === "canceled" || event.error === "interrupted") return;
-      reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+    const voices = speech.getVoices();
+    const isUkrainian = (voice) => voice.lang.toLowerCase().startsWith("uk");
+    const primaryVoice = voices.find((voice) => voice.default && voice.localService)
+      || voices.find((voice) => voice.default)
+      || null;
+    const fallbackVoice = voices.find((voice) => voice !== primaryVoice && isUkrainian(voice) && voice.localService)
+      || voices.find((voice) => voice !== primaryVoice && isUkrainian(voice))
+      || null;
+    const voiceAttempts = fallbackVoice ? [primaryVoice, fallbackVoice] : [primaryVoice];
+
+    const speakAttempt = (attemptIndex) => {
+      const selectedVoice = voiceAttempts[attemptIndex];
+      const utterance = new window.SpeechSynthesisUtterance(String(point));
+      if (selectedVoice) utterance.lang = selectedVoice.lang;
+      utterance.rate = 0.92;
+      utterance.volume = 1;
+      if (selectedVoice) utterance.voice = selectedVoice;
+      utterance.onend = () => settle("ended");
+      utterance.onerror = (event) => {
+        if (
+          event.error !== "canceled"
+          && event.error !== "interrupted"
+          && attemptIndex + 1 < voiceAttempts.length
+        ) {
+          speakAttempt(attemptIndex + 1);
+          return;
+        }
+        if (event.error !== "canceled" && event.error !== "interrupted") {
+          reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+        }
+        settle(event.error || "error");
+      };
+      speech.speak(utterance);
     };
-    speech.cancel();
-    speech.resume();
-    speech.speak(utterance);
-    return true;
+
+    if (voiceAttempts.length === 0) {
+      reportError("На компьютере не найден системный голос. Сборка продолжится без озвучки.");
+      settle("unavailable");
+    } else {
+      speech.resume();
+      speakAttempt(0);
+    }
+    return { started: true, finished };
   } catch {
     reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
-    return false;
+    settle("error");
+    return { started: false, finished };
   }
 }
 

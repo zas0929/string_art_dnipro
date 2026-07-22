@@ -138,6 +138,74 @@ textarea {
   color: var(--muted);
 }
 
+.route-history {
+  display: grid;
+  grid-template-columns: auto max-content auto;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: -6px auto 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.route-history-label {
+  opacity: 0.72;
+}
+
+.route-history ol {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 30px);
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-history ol::before {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  left: 12px;
+  height: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.route-history li {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #454b56;
+  border-radius: 50%;
+  background: #121419;
+  color: #b8bec8;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+}
+
+.route-history li.is-past {
+  border-color: #343943;
+  color: #747b86;
+}
+
+.route-history li.is-current {
+  border: 2px solid var(--accent);
+  background: #172019;
+  color: var(--text);
+  box-shadow: 0 0 0 3px rgb(126 215 126 / 10%);
+  transform: scale(1.14);
+}
+
+.route-history li.is-empty {
+  opacity: 0.35;
+}
+
 .build-complete,
 .empty-build-state {
   grid-column: 1 / -1;
@@ -515,6 +583,27 @@ textarea {
     grid-template-columns: minmax(112px, 1fr) 28px minmax(112px, 1fr);
     gap: 8px;
     min-height: 190px;
+  }
+
+  .route-history {
+    grid-template-columns: max-content;
+    gap: 0;
+    margin: -2px auto 12px;
+  }
+
+  .route-history-label {
+    display: none;
+  }
+
+  .route-history ol {
+    grid-template-columns: repeat(7, 28px);
+    gap: 6px;
+  }
+
+  .route-history li {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
   }
 
   .build-canvas-wrap {
