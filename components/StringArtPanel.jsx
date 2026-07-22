@@ -1,6 +1,7 @@
 "use client";
 
-import { Download, FileImage, FileText, Play, RotateCcw, Square } from "lucide-react";
+import { Download, FileImage, FileText, ListChecks, Play, RotateCcw, Square } from "lucide-react";
+import Link from "next/link";
 
 export default function StringArtPanel() {
   return (
@@ -21,7 +22,7 @@ export default function StringArtPanel() {
         </label>
         <label>
           Толщина нити, мм
-          <select id="threadInput" defaultValue="0.16">
+          <select id="threadInput" defaultValue="0.19">
             <option value="0.11">0.11 - тонкая</option>
             <option value="0.16">0.16 - средняя</option>
             <option value="0.19">0.19 - обычная</option>
@@ -37,13 +38,9 @@ export default function StringArtPanel() {
         </label>
         <label>
           Режим
-          <select id="algorithmInput" defaultValue="portrait-v4">
+          <select id="algorithmInput" defaultValue="portrait-v5">
             <option value="portrait-v4">Портрет v4 · оптическая модель</option>
             <option value="portrait-v5">Портрет v5 · мульти-масштаб</option>
-            <option value="portrait-v3">Портрет v3 · эталон</option>
-            <option value="portrait-v2">Портрет v2</option>
-            <option value="portrait">Портрет v1</option>
-            <option value="classic">Классический</option>
           </select>
         </label>
         <label>
@@ -81,6 +78,17 @@ export default function StringArtPanel() {
           CSV
         </button>
       </div>
+
+      <Link
+        id="buildModeLink"
+        className="command-link is-disabled"
+        href="/build"
+        aria-disabled="true"
+        tabIndex={-1}
+      >
+        <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
+        Режим сборки
+      </Link>
 
       <div className="summary">
         <h2>Инструкция</h2>

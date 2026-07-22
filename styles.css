@@ -30,6 +30,175 @@ textarea {
   font: inherit;
 }
 
+.build-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  min-height: 100vh;
+}
+
+.build-workspace {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 24px;
+}
+
+.build-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back-link:hover {
+  color: var(--text);
+}
+
+.build-progress-line {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 42px;
+  color: var(--muted);
+}
+
+.build-progress-line strong {
+  color: var(--text);
+}
+
+.build-progress {
+  margin-top: 10px;
+}
+
+.build-route {
+  display: grid;
+  grid-template-columns: minmax(140px, 260px) 52px minmax(140px, 260px);
+  justify-content: center;
+  align-items: center;
+  gap: 28px;
+  min-height: 430px;
+}
+
+.nail-readout {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  background: #15171c;
+}
+
+.nail-readout.is-next {
+  border-color: var(--accent);
+  background: #172019;
+}
+
+.nail-readout span {
+  color: var(--muted);
+}
+
+.nail-readout strong {
+  font-size: clamp(54px, 7vw, 96px);
+  line-height: 1;
+}
+
+.route-arrow {
+  color: var(--muted);
+}
+
+.build-complete,
+.empty-build-state {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 320px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.build-complete strong {
+  color: var(--accent);
+  font-size: 72px;
+}
+
+.empty-build-state strong {
+  color: var(--text);
+  font-size: 24px;
+}
+
+.build-transport {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(110px, 160px));
+  justify-content: center;
+  gap: 12px;
+}
+
+.primary-transport {
+  background: var(--accent);
+  color: #091109;
+  border-color: transparent;
+  font-weight: 760;
+}
+
+.build-message {
+  min-height: 24px;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.build-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.voice-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.voice-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-toggle input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.build-summary {
+  margin-top: 10px;
+}
+
+.build-summary dd {
+  overflow-wrap: anywhere;
+}
+
+.build-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--muted);
+}
+
 .app {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
@@ -76,7 +245,8 @@ p {
 }
 
 .file-button,
-button {
+button,
+.command-link {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -89,10 +259,12 @@ button {
   justify-content: center;
   white-space: nowrap;
   gap: 8px;
+  text-decoration: none;
 }
 
 .file-button svg,
-button svg {
+button svg,
+.command-link svg {
   flex: 0 0 auto;
 }
 
@@ -104,13 +276,19 @@ button svg {
 }
 
 button:hover,
-.file-button:hover {
+.file-button:hover,
+.command-link:hover {
   border-color: var(--accent);
 }
 
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.command-link.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 #buildButton {
@@ -260,6 +438,15 @@ textarea {
     border-left: 0;
     border-top: 1px solid var(--line);
   }
+
+  .build-page {
+    grid-template-columns: 1fr;
+  }
+
+  .build-controls {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -281,5 +468,38 @@ textarea {
 
   .stage {
     grid-template-columns: 1fr;
+  }
+
+  .build-workspace,
+  .build-controls {
+    padding: 16px;
+  }
+
+  .build-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .build-route {
+    grid-template-columns: minmax(112px, 1fr) 28px minmax(112px, 1fr);
+    gap: 8px;
+    min-height: 330px;
+  }
+
+  .nail-readout strong {
+    font-size: 52px;
+  }
+
+  .route-arrow {
+    width: 28px;
+  }
+
+  .build-transport {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .build-transport button {
+    min-width: 0;
+    padding: 0 8px;
   }
 }

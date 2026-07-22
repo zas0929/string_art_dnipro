@@ -1,4 +1,5 @@
-import { formatCsvText, formatSchemeText } from "./core/scheme-format.js";
+import { formatCsvText, formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import { loadLatestPattern, saveLatestPattern } from "./storage/local-project-store.js";
 
 const mountedApps = new WeakMap();
 
@@ -42,6 +43,7 @@ const linesOut = getElement("linesOut");
 const stepOut = getElement("stepOut");
 const lengthOut = getElement("lengthOut");
 const sequenceOutput = getElement("sequenceOutput");
+const buildModeLink = root.querySelector("#buildModeLink");
 
 const state = {
   image: null,
@@ -87,6 +89,13 @@ const cleanup = () => {
 mountedApps.set(root, cleanup);
 
 drawEmpty();
+if (buildModeLink) {
+  void loadLatestPattern()
+    .then((pattern) => {
+      if (!destroyed) setBuildModeEnabled(Boolean(pattern));
+    })
+    .catch(() => setBuildModeEnabled(false));
+}
 
 listen(imageInput, "change", async (event) => {
   const file = event.target.files && event.target.files[0];
@@ -290,6 +299,7 @@ async function generate() {
     setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
     setExportEnabled(state.sequence.length > 1);
   } finally {
+    if (!destroyed && state.sequence.length > 1) void persistLatestPattern(settings);
     state.activeWorker = null;
     state.cancelActiveRun = null;
     buildButton.disabled = false;
@@ -365,9 +375,9 @@ function runOpticalWorker(settings, prepared, renderedLines) {
 }
 
 function readSettings() {
-  const algorithm = ["classic", "portrait", "portrait-v2", "portrait-v3", "portrait-v4", "portrait-v5"].includes(algorithmInput.value)
+  const algorithm = ["portrait-v4", "portrait-v5"].includes(algorithmInput.value)
     ? algorithmInput.value
-    : "portrait-v2";
+    : "portrait-v5";
   return {
     points: clampInt(pointsInput.value, 60, 600),
     lines: clampInt(linesInput.value, 100, 8000),
@@ -950,7 +960,7 @@ function buildCirclePoints(count, radius, cx, cy) {
 }
 
 function importScheme(text) {
-  const sequence = parseScheme(text);
+  const sequence = parseSchemeText(text);
   const maxPoint = Math.max(...sequence);
   const pointCount = Math.max(clampInt(pointsInput.value, 60, 600), maxPoint);
   const lineCount = sequence.length - 1;
@@ -983,46 +993,7 @@ function importScheme(text) {
   progress.value = 1;
   setStatus(`Схема загружена: ${lineCount} шагов, ${lineCount} соединений.`);
   setExportEnabled(true);
-}
-
-function parseScheme(text) {
-  const entries = [];
-  const underscorePair = /(\d+)\s*_+\s*(\d+)/g;
-  let match;
-
-  while ((match = underscorePair.exec(text)) !== null) {
-    entries.push({ point: Number(match[1]), order: Number(match[2]) });
-  }
-
-  if (entries.length === 0) {
-    const normalized = text.replace(/\\n|\/n/gi, "\n").replaceAll("/", "\n");
-    for (const line of normalized.split(/\r?\n/)) {
-      const pair = line.trim().match(/^(\d+)\D+(\d+)$/);
-      if (pair) entries.push({ point: Number(pair[1]), order: Number(pair[2]) });
-    }
-  }
-
-  const ordered = entries.filter((entry) => entry.order >= 0).sort((a, b) => a.order - b.order);
-  if (ordered.length < 3) {
-    throw new Error("нужны стартовая строка 1____0 и минимум два следующих шага");
-  }
-
-  for (let i = 0; i < ordered.length; i++) {
-    const entry = ordered[i];
-    const expectedOrder = i;
-    if (!Number.isInteger(entry.point) || entry.point < 1 || entry.point > 600) {
-      throw new Error(`точка ${entry.point} вне диапазона 1–600`);
-    }
-    if (entry.order !== expectedOrder) {
-      throw new Error(`ожидается позиция ${expectedOrder}, получено ${entry.order}`);
-    }
-  }
-
-  if (ordered[0].point !== 1) {
-    throw new Error(`позиция 0 должна содержать стартовую точку 1, получено ${ordered[0].point}`);
-  }
-
-  return ordered.map((entry) => entry.point);
+  void persistLatestPattern(settings);
 }
 
 function drawSchemePlaceholder(pointCount, lineCount) {
@@ -1284,6 +1255,35 @@ function setExportEnabled(enabled) {
   pngButton.disabled = !enabled;
   txtButton.disabled = !enabled;
   csvButton.disabled = !enabled;
+}
+
+function setBuildModeEnabled(enabled) {
+  if (!buildModeLink) return;
+  buildModeLink.classList.toggle("is-disabled", !enabled);
+  buildModeLink.setAttribute("aria-disabled", String(!enabled));
+  buildModeLink.tabIndex = enabled ? 0 : -1;
+}
+
+async function persistLatestPattern(settings) {
+  if (state.sequence.length < 2) return;
+  try {
+    const id = typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    await saveLatestPattern({
+      id,
+      name: "Последняя схема",
+      sequence: state.sequence.map((point) => point + 1),
+      pointCount: settings.points,
+      lineCount: state.sequence.length - 1,
+      algorithm: settings.algorithm,
+      createdAt: new Date().toISOString(),
+    });
+    if (!destroyed) setBuildModeEnabled(true);
+  } catch (error) {
+    if (!destroyed) setBuildModeEnabled(false);
+    console.warn("Не удалось сохранить схему для режима сборки", error);
+  }
 }
 
 function downloadText(filename, text) {
