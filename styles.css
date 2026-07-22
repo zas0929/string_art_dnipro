@@ -88,6 +88,12 @@ button {
   align-items: center;
   justify-content: center;
   white-space: nowrap;
+  gap: 8px;
+}
+
+.file-button svg,
+button svg {
+  flex: 0 0 auto;
 }
 
 .file-button input {
@@ -203,7 +209,7 @@ input[type="range"] {
   gap: 10px;
 }
 
-.actions:last-of-type {
+.actions + .actions {
   grid-template-columns: repeat(3, 1fr);
 }
 
