@@ -1,4 +1,3 @@
-import { OpticalRoutePlanner } from "./core/optical-route-planner.js";
 import { formatCsvText, formatSchemeText } from "./core/scheme-format.js";
 
 const resultCanvas = document.getElementById("resultCanvas");
@@ -38,6 +37,8 @@ const state = {
   sequenceDisplayStart: 0,
   cancelled: false,
   running: false,
+  activeWorker: null,
+  cancelActiveRun: null,
   crop: {
     zoom: 1,
     offsetX: 0,
@@ -89,7 +90,8 @@ buildButton.addEventListener("click", () => {
 
 stopButton.addEventListener("click", () => {
   state.cancelled = true;
-  setStatus("Останавливаю после текущего блока...");
+  if (state.cancelActiveRun) state.cancelActiveRun();
+  setStatus("Построение остановлено.");
 });
 
 pngButton.addEventListener("click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
@@ -166,6 +168,7 @@ async function generate() {
   stopButton.disabled = false;
   setExportEnabled(false);
   progress.value = 0;
+  setStatus("Подготавливаю расчет...");
 
   const settings = readSettings();
   const prepared = prepareImage(settings);
@@ -175,29 +178,11 @@ async function generate() {
   state.sequenceDisplayStart = 0;
 
   const isOpticalModel = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
-  const isMultiScaleModel = settings.algorithm === "portrait-v5";
-  const residual = isOpticalModel ? null : new Float32Array(prepared.target);
+  const residual = new Float32Array(prepared.target);
   const drawn = new Float32Array(prepared.target.length);
   const lineCache = new Map();
   const nailUsage = new Uint16Array(settings.points);
   const chordUsage = new Map();
-  const opticalPlanner = isOpticalModel
-    ? new OpticalRoutePlanner({
-        points: state.points,
-        lineCount: settings.lines,
-        minSkip: settings.minSkip,
-        size: WORK_SIZE,
-        target: prepared.target,
-        importance: prepared.importance,
-        getLineSamples: (from, to) => getLineSamples(from, to, settings, lineCache),
-        scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
-        lookaheadInterval: isMultiScaleModel ? 8 : 0,
-        detailBoost: isMultiScaleModel ? 0.08 : 0,
-        targetNailDistance: isMultiScaleModel ? 75.5 : 76,
-        distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
-        distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-      })
-    : null;
   let current = 0;
   nailUsage[current] = 1;
   let renderedLines = [];
@@ -206,15 +191,18 @@ async function generate() {
   drawSourceFromPrepared(prepared, settings);
   drawResultBase(settings);
 
-  for (let line = 0; line < settings.lines; line++) {
-    if (state.cancelled) break;
+  try {
+    if (isOpticalModel) {
+      const result = await runOpticalWorker(settings, prepared, renderedLines);
+      state.cancelled = result.cancelled;
+    } else {
+      for (let line = 0; line < settings.lines; line++) {
+        if (state.cancelled) break;
 
-    const progressRatio = line / settings.lines;
-    const scoringProfile = isOpticalModel ? null : getScoringProfile(settings.algorithm, progressRatio);
-    if (scoringProfile) scoringProfile.averageNailVisits = (line + 1) / settings.points;
-    const next = isOpticalModel
-      ? opticalPlanner.findNext(progressRatio)
-      : findBestNextPoint(
+        const progressRatio = line / settings.lines;
+        const scoringProfile = getScoringProfile(settings.algorithm, progressRatio);
+        scoringProfile.averageNailVisits = (line + 1) / settings.points;
+        const next = findBestNextPoint(
           current,
           residual,
           drawn,
@@ -225,48 +213,118 @@ async function generate() {
           nailUsage,
           chordUsage,
         );
-    if (next === -1) break;
+        if (next === -1) break;
 
-    const samples = getLineSamples(current, next, settings, lineCache);
-    if (isOpticalModel) {
-      opticalPlanner.commit(next);
-    } else {
-      for (let i = 0; i < samples.length; i++) {
-        residual[samples[i]] = Math.max(0, residual[samples[i]] - settings.lineStrength);
-        drawn[samples[i]] += settings.lineStrength;
+        const samples = getLineSamples(current, next, settings, lineCache);
+        for (let i = 0; i < samples.length; i++) {
+          residual[samples[i]] = Math.max(0, residual[samples[i]] - settings.lineStrength);
+          drawn[samples[i]] += settings.lineStrength;
+        }
+
+        renderedLines.push([current, next]);
+        const chordKey = getChordKey(current, next);
+        chordUsage.set(chordKey, (chordUsage.get(chordKey) || 0) + 1);
+        nailUsage[next]++;
+        state.sequence.push(next);
+        current = next;
+
+        if (line % 20 === 0 || line === settings.lines - 1) {
+          drawThreadLines(renderedLines, settings, renderedLineCount);
+          renderedLineCount = renderedLines.length;
+          updateSummary(settings, line + 1);
+          progress.value = (line + 1) / settings.lines;
+          const stage = scoringProfile.stage ? ` (${scoringProfile.stage})` : "";
+          setStatus(`Построено линий: ${line + 1} / ${settings.lines}${stage}`);
+          await waitFrame();
+        }
       }
     }
 
-    renderedLines.push([current, next]);
-    if (!isOpticalModel) {
-      const chordKey = getChordKey(current, next);
-      chordUsage.set(chordKey, (chordUsage.get(chordKey) || 0) + 1);
-      nailUsage[next]++;
-    }
-    state.sequence.push(next);
-    current = next;
-
-    if (line % 20 === 0 || line === settings.lines - 1) {
-      drawThreadLines(renderedLines, settings, renderedLineCount);
-      renderedLineCount = renderedLines.length;
-      updateSummary(settings, line + 1);
-      progress.value = (line + 1) / settings.lines;
-      const stage = isOpticalModel ? " (оптическая плотность)" : scoringProfile.stage ? ` (${scoringProfile.stage})` : "";
-      setStatus(`Построено линий: ${line + 1} / ${settings.lines}${stage}`);
-      await waitFrame();
-    }
+    drawResultBase(settings);
+    drawThreadLines(renderedLines, settings);
+    updateSummary(settings, renderedLines.length);
+    sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
+    progress.value = state.cancelled ? renderedLines.length / settings.lines : 1;
+    setStatus(state.cancelled
+      ? "Построение остановлено. Инструкция сохранена частично."
+      : "Готово. Инструкция построена.");
+    setExportEnabled(state.sequence.length > 1);
+  } catch (error) {
+    setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
+    setExportEnabled(state.sequence.length > 1);
+  } finally {
+    state.activeWorker = null;
+    state.cancelActiveRun = null;
+    buildButton.disabled = false;
+    stopButton.disabled = true;
+    state.running = false;
   }
+}
 
-  drawResultBase(settings);
-  drawThreadLines(renderedLines, settings);
-  updateSummary(settings, renderedLines.length);
-  sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
-  progress.value = 1;
-  setStatus(state.cancelled ? "Построение остановлено. Инструкция сохранена частично." : "Готово. Инструкция построена.");
-  setExportEnabled(state.sequence.length > 1);
-  buildButton.disabled = false;
-  stopButton.disabled = true;
-  state.running = false;
+function runOpticalWorker(settings, prepared, renderedLines) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL("./workers/optical-worker.js", import.meta.url), { type: "module" });
+    const isMultiScaleModel = settings.algorithm === "portrait-v5";
+    let settled = false;
+
+    const finish = (result, error = null) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      if (state.activeWorker === worker) state.activeWorker = null;
+      if (state.cancelActiveRun === cancel) state.cancelActiveRun = null;
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const cancel = () => finish({ cancelled: true });
+
+    state.activeWorker = worker;
+    state.cancelActiveRun = cancel;
+
+    worker.addEventListener("message", (event) => {
+      const message = event.data;
+      if (message?.type === "progress") {
+        const startIndex = renderedLines.length;
+        for (const line of message.lines) {
+          renderedLines.push(line);
+          state.sequence.push(line[1]);
+        }
+        drawThreadLines(renderedLines, settings, startIndex);
+        updateSummary(settings, message.completed);
+        progress.value = message.completed / message.total;
+        const stage = isMultiScaleModel ? " (мульти-масштаб)" : " (оптическая плотность)";
+        setStatus(`Построено линий: ${message.completed} / ${message.total}${stage}`);
+      } else if (message?.type === "done") {
+        finish({ cancelled: false });
+      } else if (message?.type === "error") {
+        finish(null, new Error(message.message));
+      }
+    });
+
+    worker.addEventListener("error", (event) => {
+      finish(null, new Error(event.message || "Web Worker не смог выполнить расчет"));
+    });
+
+    worker.postMessage({
+      type: "start",
+      points: state.points,
+      settings: {
+        lines: settings.lines,
+        minSkip: settings.minSkip,
+        workSize: WORK_SIZE,
+      },
+      target: prepared.target,
+      importance: prepared.importance,
+      plannerOptions: {
+        scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
+        lookaheadInterval: isMultiScaleModel ? 8 : 0,
+        detailBoost: isMultiScaleModel ? 0.08 : 0,
+        targetNailDistance: isMultiScaleModel ? 75.5 : 76,
+        distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
+        distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
+      },
+    });
+  });
 }
 
 function readSettings() {
