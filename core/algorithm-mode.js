@@ -20,6 +20,10 @@ export function usesImprovedOpticalKernel(algorithm) {
   return algorithm === "portrait-v6";
 }
 
+export function usesAutomaticNeutralBackground(algorithm) {
+  return algorithm === "portrait-v5" || algorithm === "portrait-v6";
+}
+
 export function canRefineAlgorithm(algorithm) {
   return algorithm === "portrait-v6";
 }

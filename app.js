@@ -1,11 +1,13 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
 import { getOpticalThreadCoverage } from "./core/line-kernel.js";
+import { neutralizeConnectedLightBackground } from "./core/neutral-background.js";
 import {
   SUPPORTED_ALGORITHMS,
   canRefineAlgorithm,
   isStableV5Algorithm,
   isMultiScaleAlgorithm,
   isOpticalAlgorithm,
+  usesAutomaticNeutralBackground,
   usesImprovedOpticalKernel,
 } from "./core/algorithm-mode.js";
 import {
@@ -645,7 +647,9 @@ function prepareImage(settings) {
   }
 
   const analysisGray = isOpticalAlgorithm(settings.algorithm)
-    ? replaceConnectedLightBackground(gray, data, mask, WORK_SIZE)
+    ? neutralizeConnectedLightBackground(gray, data, mask, WORK_SIZE, {
+        automatic: usesAutomaticNeutralBackground(settings.algorithm),
+      }).gray
     : gray;
   const threadTarget = buildThreadTarget(analysisGray, mask, WORK_SIZE, settings);
   for (let y = 0; y < WORK_SIZE; y++) {
@@ -673,53 +677,6 @@ function prepareImage(settings) {
     tangentY: threadTarget.tangentY,
     orientationConfidence: threadTarget.orientationConfidence,
   };
-}
-
-function replaceConnectedLightBackground(gray, rgba, mask, size) {
-  const background = new Uint8Array(gray.length);
-  const queue = new Int32Array(gray.length);
-  let head = 0;
-  let tail = 0;
-
-  const isNeutralLight = (idx) => {
-    const offset = idx * 4;
-    const red = rgba[offset];
-    const green = rgba[offset + 1];
-    const blue = rgba[offset + 2];
-    const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-    return gray[idx] >= 205 && chroma <= 34;
-  };
-
-  const enqueue = (idx) => {
-    if (background[idx] || !isNeutralLight(idx)) return;
-    background[idx] = 1;
-    queue[tail++] = idx;
-  };
-
-  for (let x = 0; x < size; x++) {
-    enqueue(x);
-    enqueue((size - 1) * size + x);
-  }
-  for (let y = 1; y < size - 1; y++) {
-    enqueue(y * size);
-    enqueue(y * size + size - 1);
-  }
-
-  while (head < tail) {
-    const idx = queue[head++];
-    const x = idx % size;
-    const y = Math.floor(idx / size);
-    if (x > 0) enqueue(idx - 1);
-    if (x < size - 1) enqueue(idx + 1);
-    if (y > 0) enqueue(idx - size);
-    if (y < size - 1) enqueue(idx + size);
-  }
-
-  const adjusted = new Float32Array(gray);
-  for (let i = 0; i < adjusted.length; i++) {
-    if (mask[i] && background[i]) adjusted[i] = Math.min(adjusted[i], 145);
-  }
-  return adjusted;
 }
 
 function buildThreadTarget(gray, mask, size, settings) {
