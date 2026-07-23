@@ -1,4 +1,5 @@
 import { OpticalRoutePlanner } from "../core/optical-route-planner.js";
+import { LegacyOpticalRoutePlanner } from "../core/legacy-optical-route-planner.js";
 import {
   createDiscreteLineSamples,
   createSubpixelLineKernel,
@@ -89,7 +90,10 @@ function refineOpticalRoute({
 
 function createPlanner(points, settings, target, importance, plannerOptions) {
   const lineCache = new Map();
-  return new OpticalRoutePlanner({
+  const Planner = settings.legacyV5
+    ? LegacyOpticalRoutePlanner
+    : OpticalRoutePlanner;
+  return new Planner({
     points,
     lineCount: settings.lines,
     minSkip: settings.minSkip,

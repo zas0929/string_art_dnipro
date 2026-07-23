@@ -3,8 +3,10 @@ import { getOpticalThreadCoverage } from "./core/line-kernel.js";
 import {
   SUPPORTED_ALGORITHMS,
   canRefineAlgorithm,
+  isStableV5Algorithm,
   isMultiScaleAlgorithm,
   isOpticalAlgorithm,
+  usesImprovedOpticalKernel,
 } from "./core/algorithm-mode.js";
 import {
   createCirclePoints,
@@ -396,10 +398,10 @@ function runOpticalWorker(settings, prepared, renderedLines) {
     worker.postMessage({
       type: "start",
       points: state.points,
-      settings: getOpticalWorkerSettings(settings, isMultiScaleModel),
+      settings: getOpticalWorkerSettings(settings),
       target: prepared.target,
       importance: prepared.importance,
-      plannerOptions: getOpticalPlannerOptions(isMultiScaleModel),
+      plannerOptions: getOpticalPlannerOptions(settings.algorithm),
     });
   });
 }
@@ -503,7 +505,7 @@ function runRefineWorker(settings, prepared, sequence) {
       type: "refine",
       points: state.points,
       settings: {
-        ...getOpticalWorkerSettings(settings, true),
+        ...getOpticalWorkerSettings(settings),
         postOptimizeWindows: Math.min(
           120,
           Math.max(36, Math.round(settings.lines * 0.025)),
@@ -512,23 +514,27 @@ function runRefineWorker(settings, prepared, sequence) {
       },
       target: prepared.target,
       importance: prepared.importance,
-      plannerOptions: getOpticalPlannerOptions(true),
+      plannerOptions: getOpticalPlannerOptions(settings.algorithm),
       sequence: Int32Array.from(sequence),
     });
   });
 }
 
-function getOpticalWorkerSettings(settings, isMultiScaleModel) {
+function getOpticalWorkerSettings(settings) {
+  const improvedKernel = usesImprovedOpticalKernel(settings.algorithm);
   return {
     lines: settings.lines,
     minSkip: settings.minSkip,
     workSize: WORK_SIZE,
-    subpixel: isMultiScaleModel,
-    lineCoverage: isMultiScaleModel ? getOpticalThreadCoverage(settings.threadMm) : 1,
+    legacyV5: isStableV5Algorithm(settings.algorithm),
+    subpixel: improvedKernel,
+    lineCoverage: improvedKernel ? getOpticalThreadCoverage(settings.threadMm) : 1,
   };
 }
 
-function getOpticalPlannerOptions(isMultiScaleModel) {
+function getOpticalPlannerOptions(algorithm) {
+  const isMultiScaleModel = isMultiScaleAlgorithm(algorithm);
+  const improvedRouteModel = usesImprovedOpticalKernel(algorithm);
   return {
     scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
     lookaheadInterval: isMultiScaleModel ? 8 : 0,
@@ -536,14 +542,14 @@ function getOpticalPlannerOptions(isMultiScaleModel) {
     targetNailDistance: isMultiScaleModel ? 75.5 : 76,
     distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
     distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-    nailBalanceMultiplier: isMultiScaleModel ? 1.4 : 1,
-    directionBalanceStrength: isMultiScaleModel ? 0.0011 : 0.0005,
-    directionBalanceLimit: isMultiScaleModel ? 0.035 : 0.015,
-    parallelPenaltyImmediate: isMultiScaleModel ? 0.055 : 0.025,
-    parallelPenaltyHistory: isMultiScaleModel ? 0.0045 : 0.003,
-    parallelPenaltyLimit: isMultiScaleModel ? 0.095 : 0.055,
-    repeatBiasStep: isMultiScaleModel ? 0.11 : 0.085,
-    repeatBiasLimit: isMultiScaleModel ? 0.34 : 0.28,
+    nailBalanceMultiplier: improvedRouteModel ? 1.4 : 1,
+    directionBalanceStrength: improvedRouteModel ? 0.0011 : 0.0005,
+    directionBalanceLimit: improvedRouteModel ? 0.035 : 0.015,
+    parallelPenaltyImmediate: improvedRouteModel ? 0.055 : 0.025,
+    parallelPenaltyHistory: improvedRouteModel ? 0.0045 : 0.003,
+    parallelPenaltyLimit: improvedRouteModel ? 0.095 : 0.055,
+    repeatBiasStep: improvedRouteModel ? 0.11 : 0.085,
+    repeatBiasLimit: improvedRouteModel ? 0.34 : 0.28,
   };
 }
 
@@ -791,7 +797,7 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
   // The reference sequence averages about 1.45 radii of thread per chord.
   // Scaling the target to the requested line budget keeps the signed residual
   // meaningful through the final steps instead of exhausting dark pixels early.
-  const lineCoverage = isMultiScaleAlgorithm(settings.algorithm)
+  const lineCoverage = usesImprovedOpticalKernel(settings.algorithm)
     ? getOpticalThreadCoverage(settings.threadMm)
     : 1;
   const expectedMeanCrossings = (
