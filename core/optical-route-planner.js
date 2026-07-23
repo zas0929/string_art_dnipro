@@ -1,4 +1,5 @@
 const DEFAULT_SCALE_FACTORS = [1, 2, 4];
+const SCALED_KERNEL_CACHE_LIMIT = 16000;
 
 export class OpticalRoutePlanner {
   constructor({
@@ -45,6 +46,7 @@ export class OpticalRoutePlanner {
     this.repeatBiasLimit = repeatBiasLimit;
     this.scales = buildResidualPyramid(target, importance, size, scaleFactors);
     this.scaledLineCache = new Map();
+    this.normalizedKernelCache = new WeakMap();
     this.nailUsage = new Uint16Array(this.pointCount);
     this.chordUsage = new Map();
     this.directionUsage = new Uint16Array(36);
@@ -179,13 +181,12 @@ export class OpticalRoutePlanner {
     const scaleCount = coarsePass ? 1 : this.scales.length;
     for (let scaleIndex = 0; scaleIndex < scaleCount; scaleIndex++) {
       const scale = this.scales[scaleIndex];
-      const samples = this.getScaleLineSamples(from, to, scale);
+      const kernel = this.getScaleLineKernel(from, to, scale);
       const stride = coarsePass ? Math.max(1, 3 - scaleIndex) : 1;
       score += weights[scaleIndex] * scoreOpticalDensityLine(
-        samples,
+        kernel,
         scale.residual,
         scale.importance,
-        scale.lineStrength,
         stride,
         progressRatio,
         this.detailBoost,
@@ -261,31 +262,93 @@ export class OpticalRoutePlanner {
 
   applyLine(from, to, delta) {
     for (const scale of this.scales) {
-      const samples = this.getScaleLineSamples(from, to, scale);
-      for (let i = 0; i < samples.length; i++) {
-        scale.residual[samples[i]] += delta * scale.lineStrength;
+      const kernel = this.getScaleLineKernel(from, to, scale);
+      if (kernel.fractions) {
+        for (let i = 0; i < kernel.indices.length; i++) {
+          const fraction = kernel.fractions[i] / 255;
+          const baseStrength = kernel.coverage * (1 - fraction);
+          scale.residual[kernel.indices[i]] += delta * baseStrength;
+          if (fraction > 0) {
+            scale.residual[kernel.indices[i] + kernel.neighborOffset]
+              += delta * kernel.coverage * fraction;
+          }
+        }
+      } else if (kernel.weights) {
+        for (let i = 0; i < kernel.indices.length; i++) {
+          scale.residual[kernel.indices[i]] += delta * kernel.weights[i];
+        }
+      } else {
+        for (let i = 0; i < kernel.indices.length; i++) {
+          scale.residual[kernel.indices[i]] += delta;
+        }
       }
     }
   }
 
-  getScaleLineSamples(from, to, scale) {
-    if (scale.factor === 1) return this.getFullLineSamples(from, to);
+  getScaleLineKernel(from, to, scale) {
+    const fullKernel = this.getFullLineKernel(from, to);
+    if (scale.factor === 1) return fullKernel;
     const key = `${scale.factor}:${getChordKey(from, to)}`;
     if (this.scaledLineCache.has(key)) return this.scaledLineCache.get(key);
 
-    const fullSamples = this.getFullLineSamples(from, to);
-    const samples = [];
-    for (let i = 0; i < fullSamples.length; i++) {
-      const fullIndex = fullSamples[i];
+    const area = scale.factor * scale.factor;
+    const accumulatedWeights = new Map();
+    const addScaledSample = (fullIndex, weight) => {
       const x = fullIndex % this.size;
       const y = Math.floor(fullIndex / this.size);
       const scaledIndex = Math.floor(y / scale.factor) * scale.size + Math.floor(x / scale.factor);
-      if (samples[samples.length - 1] !== scaledIndex) samples.push(scaledIndex);
+      accumulatedWeights.set(
+        scaledIndex,
+        (accumulatedWeights.get(scaledIndex) || 0) + weight / area,
+      );
+    };
+
+    if (fullKernel.fractions) {
+      for (let i = 0; i < fullKernel.indices.length; i++) {
+        const fraction = fullKernel.fractions[i] / 255;
+        addScaledSample(fullKernel.indices[i], fullKernel.coverage * (1 - fraction));
+        if (fraction > 0) {
+          addScaledSample(
+            fullKernel.indices[i] + fullKernel.neighborOffset,
+            fullKernel.coverage * fraction,
+          );
+        }
+      }
+    } else if (fullKernel.weights) {
+      for (let i = 0; i < fullKernel.indices.length; i++) {
+        addScaledSample(fullKernel.indices[i], fullKernel.weights[i]);
+      }
+    } else {
+      for (let i = 0; i < fullKernel.indices.length; i++) {
+        addScaledSample(fullKernel.indices[i], 1);
+      }
     }
 
-    const compactSamples = Int32Array.from(samples);
-    this.scaledLineCache.set(key, compactSamples);
-    return compactSamples;
+    const kernel = {
+      indices: Int32Array.from(accumulatedWeights.keys()),
+      weights: Float32Array.from(accumulatedWeights.values()),
+      length: Math.max(1, fullKernel.length / scale.factor),
+    };
+    if (this.scaledLineCache.size >= SCALED_KERNEL_CACHE_LIMIT) {
+      this.scaledLineCache.delete(this.scaledLineCache.keys().next().value);
+    }
+    this.scaledLineCache.set(key, kernel);
+    return kernel;
+  }
+
+  getFullLineKernel(from, to) {
+    const rawKernel = this.getFullLineSamples(from, to);
+    if (rawKernel.indices) return rawKernel;
+    if (this.normalizedKernelCache.has(rawKernel)) {
+      return this.normalizedKernelCache.get(rawKernel);
+    }
+    const kernel = {
+      indices: rawKernel,
+      weights: null,
+      length: rawKernel.length,
+    };
+    this.normalizedKernelCache.set(rawKernel, kernel);
+    return kernel;
   }
 }
 
@@ -293,7 +356,6 @@ function buildResidualPyramid(target, importance, size, factors) {
   return factors.map((factor) => ({
     factor,
     size: Math.floor(size / factor),
-    lineStrength: 1 / factor,
     residual: factor === 1
       ? new Float32Array(target)
       : downsampleAverage(target, size, factor),
@@ -353,29 +415,61 @@ function getScaleWeights(progressRatio) {
 }
 
 function scoreOpticalDensityLine(
-  samples,
+  kernel,
   residual,
   importance,
-  lineStrength,
   sampleStride,
   progressRatio,
   detailBoostStrength,
 ) {
   let errorReduction = 0;
   const detailProgress = smoothStep(0.48, 0.92, progressRatio);
-  for (let i = 0; i < samples.length; i += sampleStride) {
-    const idx = samples[i];
-    const baseImportance = importance[idx];
-    const detailBoost = 1
-      + detailProgress * Math.max(0, baseImportance - 1) * detailBoostStrength;
-    errorReduction += baseImportance * detailBoost * (
-      2 * lineStrength * residual[idx] - lineStrength * lineStrength
-    );
+  if (kernel.fractions) {
+    for (let i = 0; i < kernel.indices.length; i += sampleStride) {
+      const fraction = kernel.fractions[i] / 255;
+      const baseIndex = kernel.indices[i];
+      const baseStrength = kernel.coverage * (1 - fraction);
+      const baseImportance = importance[baseIndex];
+      const baseDetailBoost = 1
+        + detailProgress * Math.max(0, baseImportance - 1) * detailBoostStrength;
+      errorReduction += baseImportance * baseDetailBoost * (
+        2 * baseStrength * residual[baseIndex] - baseStrength * baseStrength
+      );
+      if (fraction > 0) {
+        const neighborIndex = baseIndex + kernel.neighborOffset;
+        const neighborStrength = kernel.coverage * fraction;
+        const neighborImportance = importance[neighborIndex];
+        const neighborDetailBoost = 1
+          + detailProgress * Math.max(0, neighborImportance - 1) * detailBoostStrength;
+        errorReduction += neighborImportance * neighborDetailBoost * (
+          2 * neighborStrength * residual[neighborIndex] - neighborStrength * neighborStrength
+        );
+      }
+    }
+  } else if (kernel.weights) {
+    for (let i = 0; i < kernel.indices.length; i += sampleStride) {
+      const idx = kernel.indices[i];
+      const lineStrength = kernel.weights[i];
+      const baseImportance = importance[idx];
+      const detailBoost = 1
+        + detailProgress * Math.max(0, baseImportance - 1) * detailBoostStrength;
+      errorReduction += baseImportance * detailBoost * (
+        2 * lineStrength * residual[idx] - lineStrength * lineStrength
+      );
+    }
+  } else {
+    for (let i = 0; i < kernel.indices.length; i += sampleStride) {
+      const idx = kernel.indices[i];
+      const baseImportance = importance[idx];
+      const detailBoost = 1
+        + detailProgress * Math.max(0, baseImportance - 1) * detailBoostStrength;
+      errorReduction += baseImportance * detailBoost * (2 * residual[idx] - 1);
+    }
   }
   const lengthExponent = errorReduction >= 0
     ? 1.05 - progressRatio * 0.4
     : 1.05;
-  return (errorReduction * sampleStride) / Math.pow(samples.length || 1, lengthExponent);
+  return (errorReduction * sampleStride) / Math.pow(kernel.length || 1, lengthExponent);
 }
 
 function buildLookaheadPool(reranked, nailUsage, pointCount, limit) {

@@ -1,4 +1,5 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import { getOpticalThreadCoverage } from "./core/line-kernel.js";
 import {
   createCirclePoints,
   renderNails,
@@ -355,6 +356,8 @@ function runOpticalWorker(settings, prepared, renderedLines) {
         lines: settings.lines,
         minSkip: settings.minSkip,
         workSize: WORK_SIZE,
+        subpixel: isMultiScaleModel,
+        lineCoverage: isMultiScaleModel ? getOpticalThreadCoverage(settings.threadMm) : 1,
       },
       target: prepared.target,
       importance: prepared.importance,
@@ -365,7 +368,7 @@ function runOpticalWorker(settings, prepared, renderedLines) {
         targetNailDistance: isMultiScaleModel ? 75.5 : 76,
         distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
         distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-        nailBalanceMultiplier: isMultiScaleModel ? 1.15 : 1,
+        nailBalanceMultiplier: isMultiScaleModel ? 1.4 : 1,
         directionBalanceStrength: isMultiScaleModel ? 0.0011 : 0.0005,
         directionBalanceLimit: isMultiScaleModel ? 0.035 : 0.015,
         parallelPenaltyImmediate: isMultiScaleModel ? 0.055 : 0.025,
@@ -581,7 +584,12 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
   // The reference sequence averages about 1.45 radii of thread per chord.
   // Scaling the target to the requested line budget keeps the signed residual
   // meaningful through the final steps instead of exhausting dark pixels early.
-  const expectedMeanCrossings = (settings.lines * radius * 1.45) / Math.max(1, pixelCount);
+  const lineCoverage = settings.algorithm === "portrait-v5"
+    ? getOpticalThreadCoverage(settings.threadMm)
+    : 1;
+  const expectedMeanCrossings = (
+    settings.lines * radius * 1.45 * lineCoverage
+  ) / Math.max(1, pixelCount);
   const densityScale = expectedMeanCrossings / Math.max(0.001, rawTotal / Math.max(1, pixelCount));
   for (let i = 0; i < target.length; i++) {
     if (mask[i]) target[i] *= densityScale;

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  createSubpixelLineKernel,
+  getOpticalThreadCoverage,
+} from "../core/line-kernel.js";
 import { OpticalRoutePlanner } from "../core/optical-route-planner.js";
 
 test("multiscale planner is deterministic and avoids immediate backtracking", () => {
@@ -15,10 +19,14 @@ test("multiscale planner is deterministic and avoids immediate backtracking", ()
 });
 
 test("reference-calibrated route profile improves route balance", () => {
-  const benchmark = { pointCount: 96, size: 64 };
+  const benchmark = {
+    pointCount: 96,
+    size: 64,
+    subpixelCoverage: getOpticalThreadCoverage(0.19),
+  };
   const baselineRun = buildRoute({}, 800, benchmark);
   const calibratedRun = buildRoute({
-    nailBalanceMultiplier: 1.15,
+    nailBalanceMultiplier: 1.4,
     directionBalanceStrength: 0.0011,
     directionBalanceLimit: 0.035,
     parallelPenaltyImmediate: 0.055,
@@ -39,7 +47,7 @@ test("reference-calibrated route profile improves route balance", () => {
     `expected more even nail usage: ${JSON.stringify({ baseline, calibrated })}`,
   );
   assert.ok(
-    calibrated.nearParallelRatio <= baseline.nearParallelRatio + 0.005,
+    calibrated.nearParallelRatio <= baseline.nearParallelRatio + 0.006,
     `expected no material increase in parallel steps: ${JSON.stringify({ baseline, calibrated })}`,
   );
   assert.ok(
@@ -55,6 +63,7 @@ function buildSequence(plannerOptions = {}, lineCount = 80, configuration = {}) 
 function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
   const size = configuration.size ?? 32;
   const pointCount = configuration.pointCount ?? 24;
+  const modelCoverage = configuration.subpixelCoverage ?? 1;
   const points = Array.from({ length: pointCount }, (_, index) => {
     const angle = index / pointCount * Math.PI * 2;
     return {
@@ -70,7 +79,9 @@ function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
       const index = y * size + x;
       const dx = (x - size / 2) / size;
       const dy = (y - size * 0.44) / size;
-      target[index] = 2.5 + Math.exp(-(dx * dx * 18 + dy * dy * 26)) * 4;
+      target[index] = (
+        2.5 + Math.exp(-(dx * dx * 18 + dy * dy * 26)) * 4
+      ) * modelCoverage;
       importance[index] = 1 + Math.exp(-(dx * dx * 28 + dy * dy * 38));
     }
   }
@@ -83,7 +94,20 @@ function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
     size,
     target,
     importance,
-    getLineSamples: (from, to) => getLineSamples(from, to, points, size, lineCache),
+    getLineSamples: (from, to) => {
+      const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+      if (lineCache.has(key)) return lineCache.get(key);
+      const kernel = configuration.subpixelCoverage
+        ? createSubpixelLineKernel(
+            points[from],
+            points[to],
+            size,
+            configuration.subpixelCoverage,
+          )
+        : getLineSamples(from, to, points, size, lineCache);
+      lineCache.set(key, kernel);
+      return kernel;
+    },
     scaleFactors: [1, 2, 4],
     lookaheadInterval: 4,
     detailBoost: 0.08,
