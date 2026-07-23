@@ -64,7 +64,32 @@ function generateOpticalRoute({ points, settings, target, importance, plannerOpt
       lines: batch.splice(0),
     });
   }
-  self.postMessage({ type: "done", completed: planner.sequence.length - 1 });
+
+  let optimization = null;
+  if (settings.postOptimize) {
+    optimization = planner.optimizeWeakVertices({
+      windowLimit: settings.postOptimizeWindows,
+      shortlistSize: settings.postOptimizeShortlist,
+      onProgress: (detail) => {
+        self.postMessage({ type: "refine-progress", ...detail });
+      },
+    });
+    const sequence = Int32Array.from(planner.sequence);
+    self.postMessage(
+      {
+        type: "refined",
+        sequence,
+        optimization,
+      },
+      [sequence.buffer],
+    );
+  }
+
+  self.postMessage({
+    type: "done",
+    completed: planner.sequence.length - 1,
+    optimization,
+  });
 }
 
 function getLineKernel(from, to, points, settings, cache) {

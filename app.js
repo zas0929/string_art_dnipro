@@ -338,6 +338,24 @@ function runOpticalWorker(settings, prepared, renderedLines) {
         progress.value = message.completed / message.total;
         const stage = isMultiScaleModel ? " (мульти-масштаб)" : " (оптическая плотность)";
         setStatus(`Построено линий: ${message.completed} / ${message.total}${stage}`);
+      } else if (message?.type === "refine-progress") {
+        setStatus(
+          `Уточняю слабые участки: ${message.attempted} / ${message.total}`
+          + ` · улучшено: ${message.accepted}`,
+        );
+      } else if (message?.type === "refined") {
+        const refinedSequence = Array.from(message.sequence);
+        state.sequence = refinedSequence;
+        renderedLines.length = 0;
+        for (let index = 1; index < refinedSequence.length; index++) {
+          renderedLines.push([refinedSequence[index - 1], refinedSequence[index]]);
+        }
+        drawResultBase(settings);
+        drawThreadLines(renderedLines, settings);
+        updateSummary(settings, renderedLines.length);
+        setStatus(
+          `Локальная оптимизация завершена: улучшено участков ${message.optimization.accepted}`,
+        );
       } else if (message?.type === "done") {
         finish({ cancelled: false });
       } else if (message?.type === "error") {
@@ -358,6 +376,11 @@ function runOpticalWorker(settings, prepared, renderedLines) {
         workSize: WORK_SIZE,
         subpixel: isMultiScaleModel,
         lineCoverage: isMultiScaleModel ? getOpticalThreadCoverage(settings.threadMm) : 1,
+        postOptimize: isMultiScaleModel,
+        postOptimizeWindows: isMultiScaleModel
+          ? Math.min(120, Math.max(36, Math.round(settings.lines * 0.025)))
+          : 0,
+        postOptimizeShortlist: isMultiScaleModel ? 10 : 0,
       },
       target: prepared.target,
       importance: prepared.importance,
