@@ -40,7 +40,8 @@ export default function StringArtPanel() {
           Режим
           <select id="algorithmInput" defaultValue="portrait-v5">
             <option value="portrait-v4">Портрет v4 · оптическая модель</option>
-            <option value="portrait-v5">Портрет v5 · мульти-масштаб</option>
+            <option value="portrait-v5">Портрет v5 · стабильный</option>
+            <option value="portrait-v6">Портрет v6 · экспериментальный</option>
           </select>
         </label>
       </div>

@@ -5,10 +5,12 @@ import {
 } from "../core/line-kernel.js";
 
 self.addEventListener("message", (event) => {
-  if (event.data?.type !== "start") return;
-
   try {
-    generateOpticalRoute(event.data);
+    if (event.data?.type === "start") {
+      generateOpticalRoute(event.data);
+    } else if (event.data?.type === "refine") {
+      refineOpticalRoute(event.data);
+    }
   } catch (error) {
     self.postMessage({
       type: "error",
@@ -18,23 +20,7 @@ self.addEventListener("message", (event) => {
 });
 
 function generateOpticalRoute({ points, settings, target, importance, plannerOptions }) {
-  const lineCache = new Map();
-  const planner = new OpticalRoutePlanner({
-    points,
-    lineCount: settings.lines,
-    minSkip: settings.minSkip,
-    size: settings.workSize,
-    target,
-    importance,
-    getLineSamples: (from, to) => getLineKernel(
-      from,
-      to,
-      points,
-      settings,
-      lineCache,
-    ),
-    ...plannerOptions,
-  });
+  const planner = createPlanner(points, settings, target, importance, plannerOptions);
   const batch = [];
   let current = 0;
 
@@ -65,6 +51,60 @@ function generateOpticalRoute({ points, settings, target, importance, plannerOpt
     });
   }
   self.postMessage({ type: "done", completed: planner.sequence.length - 1 });
+}
+
+function refineOpticalRoute({
+  points,
+  settings,
+  target,
+  importance,
+  plannerOptions,
+  sequence,
+}) {
+  if (!sequence || sequence.length < 3 || sequence[0] !== 0) {
+    throw new Error("Для улучшения нужна готовая последовательность v6");
+  }
+  const planner = createPlanner(points, settings, target, importance, plannerOptions);
+  for (let index = 1; index < sequence.length; index++) {
+    planner.commit(sequence[index]);
+  }
+
+  const optimization = planner.optimizeWeakVertices({
+    windowLimit: settings.postOptimizeWindows,
+    shortlistSize: settings.postOptimizeShortlist,
+    onProgress: (detail) => {
+      self.postMessage({ type: "refine-progress", ...detail });
+    },
+  });
+  const refinedSequence = Int32Array.from(planner.sequence);
+  self.postMessage(
+    {
+      type: "refined",
+      sequence: refinedSequence,
+      optimization,
+    },
+    [refinedSequence.buffer],
+  );
+}
+
+function createPlanner(points, settings, target, importance, plannerOptions) {
+  const lineCache = new Map();
+  return new OpticalRoutePlanner({
+    points,
+    lineCount: settings.lines,
+    minSkip: settings.minSkip,
+    size: settings.workSize,
+    target,
+    importance,
+    getLineSamples: (from, to) => getLineKernel(
+      from,
+      to,
+      points,
+      settings,
+      lineCache,
+    ),
+    ...plannerOptions,
+  });
 }
 
 function getLineKernel(from, to, points, settings, cache) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Play, RotateCcw, Upload } from "lucide-react";
+import { ImagePlus, Play, RotateCcw, Sparkles, Upload } from "lucide-react";
 
 export default function StringArtWorkspace() {
   return (
@@ -24,6 +24,16 @@ export default function StringArtWorkspace() {
           <button id="buildButton" type="button" disabled>
             <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
             Построить
+          </button>
+          <button
+            id="improveButton"
+            className="improve-button"
+            type="button"
+            title="Экспериментально улучшить слабые участки"
+            disabled
+          >
+            <Sparkles aria-hidden="true" size={18} strokeWidth={2} />
+            <span id="improveButtonLabel">Улучшить участки</span>
           </button>
         </div>
       </div>

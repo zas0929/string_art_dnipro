@@ -56,6 +56,36 @@ test("reference-calibrated route profile improves route balance", () => {
   );
 });
 
+test("optional weak-segment refinement is deterministic and reversible by sequence", () => {
+  const configuration = {
+    pointCount: 72,
+    size: 56,
+    subpixelCoverage: getOpticalThreadCoverage(0.19),
+    optimize: {
+      windowLimit: 36,
+      shortlistSize: 8,
+    },
+  };
+  const first = buildRoute({}, 420, configuration);
+  const second = buildRoute({}, 420, configuration);
+
+  assert.deepEqual(first.sequenceBeforeOptimization, second.sequenceBeforeOptimization);
+  assert.deepEqual(first.sequence, second.sequence);
+  assert.deepEqual(first.optimization, second.optimization);
+  assert.equal(first.sequence.length, first.sequenceBeforeOptimization.length);
+  assert.ok(
+    first.optimization.accepted > 0,
+    `expected at least one optional replacement: ${JSON.stringify(first.optimization)}`,
+  );
+  assert.ok(
+    first.residualError < first.residualErrorBeforeOptimization,
+    `expected lower mathematical residual: ${JSON.stringify(first)}`,
+  );
+  for (let index = 1; index < first.sequence.length - 1; index++) {
+    assert.notEqual(first.sequence[index - 1], first.sequence[index + 1]);
+  }
+});
+
 function buildSequence(plannerOptions = {}, lineCount = 80, configuration = {}) {
   return buildRoute(plannerOptions, lineCount, configuration).sequence;
 }
@@ -120,7 +150,23 @@ function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
     assert.notEqual(next, -1);
     planner.commit(next);
   }
-  const fineScale = planner.scales[0];
+  const sequenceBeforeOptimization = planner.sequence.slice();
+  const residualErrorBeforeOptimization = calculateResidualError(planner.scales[0]);
+  const optimization = configuration.optimize
+    ? planner.optimizeWeakVertices(configuration.optimize)
+    : null;
+  const residualError = calculateResidualError(planner.scales[0]);
+
+  return {
+    sequence: planner.sequence,
+    sequenceBeforeOptimization,
+    residualError,
+    residualErrorBeforeOptimization,
+    optimization,
+  };
+}
+
+function calculateResidualError(fineScale) {
   let weightedError = 0;
   let totalImportance = 0;
   for (let index = 0; index < fineScale.residual.length; index++) {
@@ -128,10 +174,7 @@ function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
     weightedError += pixelImportance * fineScale.residual[index] ** 2;
     totalImportance += pixelImportance;
   }
-  return {
-    sequence: planner.sequence,
-    residualError: weightedError / Math.max(1, totalImportance),
-  };
+  return weightedError / Math.max(1, totalImportance);
 }
 
 function analyzeRoute(sequence, pointCount) {

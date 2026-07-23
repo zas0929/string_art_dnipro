@@ -1,5 +1,7 @@
 const DEFAULT_SCALE_FACTORS = [1, 2, 4];
 const SCALED_KERNEL_CACHE_LIMIT = 16000;
+const DEFAULT_OPTIMIZATION_WINDOW_LIMIT = 120;
+const DEFAULT_OPTIMIZATION_SHORTLIST_SIZE = 10;
 
 export class OpticalRoutePlanner {
   constructor({
@@ -122,6 +124,203 @@ export class OpticalRoutePlanner {
     this.nailUsage[next]++;
     this.sequence.push(next);
     this.current = next;
+  }
+
+  optimizeWeakVertices({
+    windowLimit = DEFAULT_OPTIMIZATION_WINDOW_LIMIT,
+    shortlistSize = DEFAULT_OPTIMIZATION_SHORTLIST_SIZE,
+    minimumGain = 0.001,
+    onProgress = null,
+  } = {}) {
+    const availableWindows = this.sequence.length - 2;
+    const cappedWindowLimit = Math.min(
+      Math.max(0, Math.floor(windowLimit)),
+      availableWindows,
+    );
+    if (cappedWindowLimit === 0) {
+      return { attempted: 0, accepted: 0, totalGain: 0 };
+    }
+
+    const weakWindows = this.rankWeakWindows();
+    const blocked = new Uint8Array(this.sequence.length);
+    const coarseScale = this.scales[this.scales.length - 1];
+    const exactScaleWeights = this.scales.length === 1 ? [1] : getScaleWeights(1);
+    let attempted = 0;
+    let accepted = 0;
+    let totalGain = 0;
+
+    for (const weakWindow of weakWindows) {
+      if (attempted >= cappedWindowLimit) break;
+      const index = weakWindow.index;
+      if (blocked[index]) continue;
+
+      const from = this.sequence[index - 1];
+      const currentMiddle = this.sequence[index];
+      const to = this.sequence[index + 1];
+      const shortlist = [{ candidate: currentMiddle, score: 0 }];
+
+      for (let candidate = 0; candidate < this.pointCount; candidate++) {
+        if (candidate === currentMiddle || !this.isReplacementAllowed(index, candidate)) {
+          continue;
+        }
+        const coarseGain = this.scoreVertexReplacement(
+          from,
+          currentMiddle,
+          to,
+          candidate,
+          [coarseScale],
+          [1],
+        );
+        insertCandidate(shortlist, { candidate, score: coarseGain }, shortlistSize);
+      }
+
+      let bestCandidate = currentMiddle;
+      let bestGain = 0;
+      for (const entry of shortlist) {
+        if (entry.candidate === currentMiddle) continue;
+        const fineGain = this.scoreVertexReplacement(
+          from,
+          currentMiddle,
+          to,
+          entry.candidate,
+          [this.scales[0]],
+          [1],
+        );
+        if (fineGain <= minimumGain) continue;
+        const exactGain = this.scoreVertexReplacement(
+          from,
+          currentMiddle,
+          to,
+          entry.candidate,
+          this.scales,
+          exactScaleWeights,
+        );
+        if (
+          exactGain > bestGain
+          || (exactGain === bestGain && entry.candidate < bestCandidate)
+        ) {
+          bestGain = exactGain;
+          bestCandidate = entry.candidate;
+        }
+      }
+
+      attempted++;
+      if (bestCandidate !== currentMiddle && bestGain > minimumGain) {
+        this.applyLine(from, currentMiddle, 1);
+        this.applyLine(currentMiddle, to, 1);
+        this.applyLine(from, bestCandidate, -1);
+        this.applyLine(bestCandidate, to, -1);
+        this.sequence[index] = bestCandidate;
+        accepted++;
+        totalGain += bestGain;
+
+        blocked[index] = 1;
+        if (index > 1) blocked[index - 1] = 1;
+        if (index + 1 < blocked.length - 1) blocked[index + 1] = 1;
+      }
+
+      if (
+        typeof onProgress === "function"
+        && (attempted % 12 === 0 || attempted === cappedWindowLimit)
+      ) {
+        onProgress({ attempted, accepted, total: cappedWindowLimit, totalGain });
+      }
+    }
+
+    if (
+      typeof onProgress === "function"
+      && attempted > 0
+      && attempted % 12 !== 0
+    ) {
+      onProgress({ attempted, accepted, total: cappedWindowLimit, totalGain });
+    }
+
+    return { attempted, accepted, totalGain };
+  }
+
+  rankWeakWindows() {
+    const fineScale = this.scales[0];
+    const windows = [];
+
+    for (let index = 1; index < this.sequence.length - 1; index++) {
+      windows.push({
+        index,
+        removalGain: this.scoreVertexReplacement(
+          this.sequence[index - 1],
+          this.sequence[index],
+          this.sequence[index + 1],
+          null,
+          [fineScale],
+          [1],
+        ),
+      });
+    }
+
+    return windows.sort(
+      (a, b) => b.removalGain - a.removalGain || a.index - b.index,
+    );
+  }
+
+  scoreVertexReplacement(
+    from,
+    currentMiddle,
+    to,
+    candidate,
+    scales,
+    scaleWeights,
+  ) {
+    let gain = 0;
+
+    for (let scaleIndex = 0; scaleIndex < scales.length; scaleIndex++) {
+      const scale = scales[scaleIndex];
+      const residualDelta = new Map();
+      accumulateKernelDelta(
+        residualDelta,
+        this.getScaleLineKernel(from, currentMiddle, scale),
+        1,
+      );
+      accumulateKernelDelta(
+        residualDelta,
+        this.getScaleLineKernel(currentMiddle, to, scale),
+        1,
+      );
+      if (candidate !== null) {
+        accumulateKernelDelta(
+          residualDelta,
+          this.getScaleLineKernel(from, candidate, scale),
+          -1,
+        );
+        accumulateKernelDelta(
+          residualDelta,
+          this.getScaleLineKernel(candidate, to, scale),
+          -1,
+        );
+      }
+      gain += (scaleWeights[scaleIndex] ?? 0) * scoreResidualDelta(
+        residualDelta,
+        scale.residual,
+        scale.importance,
+      );
+    }
+
+    return gain;
+  }
+
+  isReplacementAllowed(index, candidate) {
+    const from = this.sequence[index - 1];
+    const to = this.sequence[index + 1];
+    if (
+      candidate === from
+      || candidate === to
+      || (index > 1 && candidate === this.sequence[index - 2])
+      || (index + 2 < this.sequence.length && candidate === this.sequence[index + 2])
+    ) {
+      return false;
+    }
+    return (
+      circularDistance(from, candidate, this.pointCount) >= this.minSkip
+      && circularDistance(candidate, to, this.pointCount) >= this.minSkip
+    );
   }
 
   selectWithLookahead(reranked, progressRatio, recentDistanceMean) {
@@ -470,6 +669,51 @@ function scoreOpticalDensityLine(
     ? 1.05 - progressRatio * 0.4
     : 1.05;
   return (errorReduction * sampleStride) / Math.pow(kernel.length || 1, lengthExponent);
+}
+
+function accumulateKernelDelta(deltaByIndex, kernel, multiplier) {
+  const add = (index, value) => {
+    if (value === 0) return;
+    deltaByIndex.set(index, (deltaByIndex.get(index) || 0) + value);
+  };
+
+  if (kernel.fractions) {
+    for (let i = 0; i < kernel.indices.length; i++) {
+      const fraction = kernel.fractions[i] / 255;
+      add(kernel.indices[i], multiplier * kernel.coverage * (1 - fraction));
+      if (fraction > 0) {
+        add(
+          kernel.indices[i] + kernel.neighborOffset,
+          multiplier * kernel.coverage * fraction,
+        );
+      }
+    }
+    return;
+  }
+
+  if (kernel.weights) {
+    for (let i = 0; i < kernel.indices.length; i++) {
+      add(kernel.indices[i], multiplier * kernel.weights[i]);
+    }
+    return;
+  }
+
+  for (let i = 0; i < kernel.indices.length; i++) {
+    add(kernel.indices[i], multiplier);
+  }
+}
+
+function scoreResidualDelta(deltaByIndex, residual, importance) {
+  let improvement = 0;
+
+  for (const [index, delta] of deltaByIndex) {
+    if (Math.abs(delta) < 1e-8) continue;
+    const before = residual[index];
+    const after = before + delta;
+    improvement += importance[index] * (before * before - after * after);
+  }
+
+  return improvement;
 }
 
 function buildLookaheadPool(reranked, nailUsage, pointCount, limit) {

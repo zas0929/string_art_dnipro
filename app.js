@@ -1,6 +1,12 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
 import { getOpticalThreadCoverage } from "./core/line-kernel.js";
 import {
+  SUPPORTED_ALGORITHMS,
+  canRefineAlgorithm,
+  isMultiScaleAlgorithm,
+  isOpticalAlgorithm,
+} from "./core/algorithm-mode.js";
+import {
   createCirclePoints,
   renderNails,
   renderStringArtBase,
@@ -40,6 +46,8 @@ const zoomInput = getElement("zoomInput");
 const zoomValue = getElement("zoomValue");
 const resetCropButton = getElement("resetCropButton");
 const buildButton = getElement("buildButton");
+const improveButton = getElement("improveButton");
+const improveButtonLabel = getElement("improveButtonLabel");
 const pngButton = getElement("pngButton");
 const txtButton = getElement("txtButton");
 const statusText = getElement("status");
@@ -61,6 +69,8 @@ const state = {
   running: false,
   activeWorker: null,
   cancelActiveRun: null,
+  originalSequenceBeforeImprove: null,
+  lastGeneratedSettings: null,
   crop: {
     zoom: 1,
     offsetX: 0,
@@ -114,6 +124,9 @@ listen(imageInput, "change", async (event) => {
   state.image = image;
   state.sequence = [];
   state.sequenceDisplayStart = 0;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   resetCrop();
   drawPreparedPreview();
   drawInitialResult();
@@ -143,6 +156,15 @@ listen(schemeInput, "change", async (event) => {
 listen(buildButton, "click", () => {
   if (!state.image || state.running) return;
   generate();
+});
+
+listen(improveButton, "click", () => {
+  if (state.running) return;
+  if (state.originalSequenceBeforeImprove) {
+    restoreSequenceBeforeImprove();
+    return;
+  }
+  void improveWeakSegments();
 });
 
 listen(pngButton, "click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
@@ -226,6 +248,9 @@ async function generate() {
   state.cancelled = false;
   state.running = true;
   buildButton.disabled = true;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   setExportEnabled(false);
   progress.value = 0;
   setStatus("Подготавливаю расчет...");
@@ -237,7 +262,7 @@ async function generate() {
   state.sequence = [0];
   state.sequenceDisplayStart = 0;
 
-  const isOpticalModel = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
+  const isOpticalModel = isOpticalAlgorithm(settings.algorithm);
   const residual = new Float32Array(prepared.target);
   const drawn = new Float32Array(prepared.target.length);
   const lineCache = new Map();
@@ -309,6 +334,8 @@ async function generate() {
       ? "Построение остановлено. Инструкция сохранена частично."
       : "Готово. Инструкция построена.");
     setExportEnabled(state.sequence.length > 1);
+    if (!state.cancelled) state.lastGeneratedSettings = settings;
+    updateImproveButton();
   } catch (error) {
     setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
     setExportEnabled(state.sequence.length > 1);
@@ -318,13 +345,14 @@ async function generate() {
     state.cancelActiveRun = null;
     buildButton.disabled = !state.image;
     state.running = false;
+    updateImproveButton();
   }
 }
 
 function runOpticalWorker(settings, prepared, renderedLines) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./workers/optical-worker.js", import.meta.url), { type: "module" });
-    const isMultiScaleModel = settings.algorithm === "portrait-v5";
+    const isMultiScaleModel = isMultiScaleAlgorithm(settings.algorithm);
     let settled = false;
 
     const finish = (result, error = null) => {
@@ -368,37 +396,200 @@ function runOpticalWorker(settings, prepared, renderedLines) {
     worker.postMessage({
       type: "start",
       points: state.points,
-      settings: {
-        lines: settings.lines,
-        minSkip: settings.minSkip,
-        workSize: WORK_SIZE,
-        subpixel: isMultiScaleModel,
-        lineCoverage: isMultiScaleModel ? getOpticalThreadCoverage(settings.threadMm) : 1,
-      },
+      settings: getOpticalWorkerSettings(settings, isMultiScaleModel),
       target: prepared.target,
       importance: prepared.importance,
-      plannerOptions: {
-        scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
-        lookaheadInterval: isMultiScaleModel ? 8 : 0,
-        detailBoost: isMultiScaleModel ? 0.08 : 0,
-        targetNailDistance: isMultiScaleModel ? 75.5 : 76,
-        distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
-        distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-        nailBalanceMultiplier: isMultiScaleModel ? 1.4 : 1,
-        directionBalanceStrength: isMultiScaleModel ? 0.0011 : 0.0005,
-        directionBalanceLimit: isMultiScaleModel ? 0.035 : 0.015,
-        parallelPenaltyImmediate: isMultiScaleModel ? 0.055 : 0.025,
-        parallelPenaltyHistory: isMultiScaleModel ? 0.0045 : 0.003,
-        parallelPenaltyLimit: isMultiScaleModel ? 0.095 : 0.055,
-        repeatBiasStep: isMultiScaleModel ? 0.11 : 0.085,
-        repeatBiasLimit: isMultiScaleModel ? 0.34 : 0.28,
-      },
+      plannerOptions: getOpticalPlannerOptions(isMultiScaleModel),
     });
   });
 }
 
+async function improveWeakSegments() {
+  const settings = state.lastGeneratedSettings;
+  if (
+    !settings
+    || !canRefineAlgorithm(settings.algorithm)
+    || !state.prepared
+    || state.sequence.length < 3
+  ) {
+    updateImproveButton();
+    return;
+  }
+
+  const originalSequence = state.sequence.slice();
+  state.running = true;
+  buildButton.disabled = true;
+  updateImproveButton();
+  setExportEnabled(false);
+  progress.value = 0;
+  setStatus("Ищу слабые участки...");
+
+  try {
+    const result = await runRefineWorker(settings, state.prepared, originalSequence);
+    if (result.cancelled) return;
+
+    if (result.optimization.accepted > 0) {
+      state.originalSequenceBeforeImprove = originalSequence;
+      state.sequence = result.sequence;
+      renderSequenceResult(settings);
+      setStatus(
+        `Экспериментальное улучшение готово: заменено участков ${result.optimization.accepted}.`,
+      );
+      void persistLatestPattern(settings);
+    } else {
+      setStatus("Подходящих замен не найдено. Исходный макет сохранён.");
+      setExportEnabled(true);
+    }
+  } catch (error) {
+    setStatus(
+      `Ошибка улучшения: ${error instanceof Error ? error.message : "неизвестная ошибка"}`,
+    );
+    setExportEnabled(true);
+  } finally {
+    state.activeWorker = null;
+    state.cancelActiveRun = null;
+    state.running = false;
+    buildButton.disabled = !state.image;
+    updateImproveButton();
+  }
+}
+
+function runRefineWorker(settings, prepared, sequence) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL("./workers/optical-worker.js", import.meta.url),
+      { type: "module" },
+    );
+    let settled = false;
+
+    const finish = (result, error = null) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      if (state.activeWorker === worker) state.activeWorker = null;
+      if (state.cancelActiveRun === cancel) state.cancelActiveRun = null;
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const cancel = () => finish({ cancelled: true });
+
+    state.activeWorker = worker;
+    state.cancelActiveRun = cancel;
+
+    worker.addEventListener("message", (event) => {
+      const message = event.data;
+      if (message?.type === "refine-progress") {
+        progress.value = message.total ? message.attempted / message.total : 0;
+        setStatus(
+          `Проверено слабых участков: ${message.attempted} / ${message.total}`
+          + ` · найдено замен: ${message.accepted}`,
+        );
+      } else if (message?.type === "refined") {
+        finish({
+          cancelled: false,
+          sequence: Array.from(message.sequence),
+          optimization: message.optimization,
+        });
+      } else if (message?.type === "error") {
+        finish(null, new Error(message.message));
+      }
+    });
+
+    worker.addEventListener("error", (event) => {
+      finish(null, new Error(event.message || "Web Worker не смог улучшить маршрут"));
+    });
+
+    worker.postMessage({
+      type: "refine",
+      points: state.points,
+      settings: {
+        ...getOpticalWorkerSettings(settings, true),
+        postOptimizeWindows: Math.min(
+          120,
+          Math.max(36, Math.round(settings.lines * 0.025)),
+        ),
+        postOptimizeShortlist: 10,
+      },
+      target: prepared.target,
+      importance: prepared.importance,
+      plannerOptions: getOpticalPlannerOptions(true),
+      sequence: Int32Array.from(sequence),
+    });
+  });
+}
+
+function getOpticalWorkerSettings(settings, isMultiScaleModel) {
+  return {
+    lines: settings.lines,
+    minSkip: settings.minSkip,
+    workSize: WORK_SIZE,
+    subpixel: isMultiScaleModel,
+    lineCoverage: isMultiScaleModel ? getOpticalThreadCoverage(settings.threadMm) : 1,
+  };
+}
+
+function getOpticalPlannerOptions(isMultiScaleModel) {
+  return {
+    scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
+    lookaheadInterval: isMultiScaleModel ? 8 : 0,
+    detailBoost: isMultiScaleModel ? 0.08 : 0,
+    targetNailDistance: isMultiScaleModel ? 75.5 : 76,
+    distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
+    distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
+    nailBalanceMultiplier: isMultiScaleModel ? 1.4 : 1,
+    directionBalanceStrength: isMultiScaleModel ? 0.0011 : 0.0005,
+    directionBalanceLimit: isMultiScaleModel ? 0.035 : 0.015,
+    parallelPenaltyImmediate: isMultiScaleModel ? 0.055 : 0.025,
+    parallelPenaltyHistory: isMultiScaleModel ? 0.0045 : 0.003,
+    parallelPenaltyLimit: isMultiScaleModel ? 0.095 : 0.055,
+    repeatBiasStep: isMultiScaleModel ? 0.11 : 0.085,
+    repeatBiasLimit: isMultiScaleModel ? 0.34 : 0.28,
+  };
+}
+
+function renderSequenceResult(settings) {
+  const renderedLines = [];
+  for (let index = 1; index < state.sequence.length; index++) {
+    renderedLines.push([state.sequence[index - 1], state.sequence[index]]);
+  }
+  drawResultBase(settings);
+  drawThreadLines(renderedLines, settings);
+  updateSummary(settings, renderedLines.length);
+  sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
+  progress.value = 1;
+  setExportEnabled(true);
+}
+
+function restoreSequenceBeforeImprove() {
+  if (!state.originalSequenceBeforeImprove || !state.lastGeneratedSettings) return;
+  state.sequence = state.originalSequenceBeforeImprove;
+  state.originalSequenceBeforeImprove = null;
+  renderSequenceResult(state.lastGeneratedSettings);
+  setStatus("Экспериментальное улучшение отменено. Восстановлен исходный макет.");
+  updateImproveButton();
+  void persistLatestPattern(state.lastGeneratedSettings);
+}
+
+function updateImproveButton() {
+  const canImprove = Boolean(
+    state.image
+    && state.prepared
+    && canRefineAlgorithm(state.lastGeneratedSettings?.algorithm)
+    && state.sequence.length > 2,
+  );
+  const canRevert = Boolean(state.originalSequenceBeforeImprove);
+  improveButton.disabled = state.running || (!canImprove && !canRevert);
+  improveButton.classList.toggle("is-revert", canRevert);
+  improveButtonLabel.textContent = canRevert
+    ? "Вернуть исходный"
+    : "Улучшить участки";
+  improveButton.title = canRevert
+    ? "Отменить экспериментальное улучшение"
+    : "Экспериментально улучшить слабые участки";
+}
+
 function readSettings() {
-  const algorithm = ["portrait-v4", "portrait-v5"].includes(algorithmInput.value)
+  const algorithm = SUPPORTED_ALGORITHMS.includes(algorithmInput.value)
     ? algorithmInput.value
     : "portrait-v5";
   return {
@@ -447,7 +638,7 @@ function prepareImage(settings) {
     }
   }
 
-  const analysisGray = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5"
+  const analysisGray = isOpticalAlgorithm(settings.algorithm)
     ? replaceConnectedLightBackground(gray, data, mask, WORK_SIZE)
     : gray;
   const threadTarget = buildThreadTarget(analysisGray, mask, WORK_SIZE, settings);
@@ -528,7 +719,7 @@ function replaceConnectedLightBackground(gray, rgba, mask, size) {
 function buildThreadTarget(gray, mask, size, settings) {
   const { algorithm } = settings;
   const normalized = normalizeByPercentiles(gray, mask);
-  if (algorithm === "portrait-v4" || algorithm === "portrait-v5") {
+  if (isOpticalAlgorithm(algorithm)) {
     return buildOpticalDensityTarget(normalized, mask, size, settings);
   }
 
@@ -600,7 +791,7 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
   // The reference sequence averages about 1.45 radii of thread per chord.
   // Scaling the target to the requested line budget keeps the signed residual
   // meaningful through the final steps instead of exhausting dark pixels early.
-  const lineCoverage = settings.algorithm === "portrait-v5"
+  const lineCoverage = isMultiScaleAlgorithm(settings.algorithm)
     ? getOpticalThreadCoverage(settings.threadMm)
     : 1;
   const expectedMeanCrossings = (
@@ -1001,6 +1192,9 @@ function importScheme(text) {
   state.cancelled = false;
   state.sequence = sequence.map((point) => point - 1);
   state.sequenceDisplayStart = 1;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   state.points = buildCirclePoints(pointCount, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
 
   const renderedLines = [];
@@ -1148,6 +1342,9 @@ function clampCropToImage() {
 function invalidateResult(redrawBase = true) {
   state.sequence = [];
   state.sequenceDisplayStart = 0;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   setExportEnabled(false);
   sequenceOutput.value = "";
   pointsOut.textContent = "-";
@@ -1178,7 +1375,7 @@ function drawResultBase(settings) {
 }
 
 function drawThreadLines(lines, settings, startIndex = 0) {
-  const opticalPreview = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
+  const opticalPreview = isOpticalAlgorithm(settings.algorithm);
   renderStringArtLines(resultCtx, lines, state.points, {
     canvasSize: resultCanvas.width,
     workSize: WORK_SIZE,

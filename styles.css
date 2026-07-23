@@ -392,6 +392,16 @@ button:disabled {
   font-weight: 760;
 }
 
+.improve-button {
+  background: #242932;
+  border-color: #454d59;
+}
+
+.improve-button.is-revert {
+  color: var(--muted);
+  background: transparent;
+}
+
 .stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -674,6 +684,10 @@ textarea {
   }
 
   .topbar-actions > .file-button:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .topbar-actions > .improve-button {
     grid-column: 1 / -1;
   }
 
