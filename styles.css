@@ -399,6 +399,12 @@ button:disabled {
   align-items: start;
 }
 
+.canvas-column {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
 canvas {
   width: 100%;
   aspect-ratio: 1;
@@ -414,6 +420,116 @@ canvas {
 
 #sourceCanvas:active {
   cursor: grabbing;
+}
+
+.crop-controls {
+  --zoom-progress: 0%;
+  display: grid;
+  gap: 7px;
+  padding: 2px 1px 0;
+}
+
+.crop-control-heading,
+.crop-control-row {
+  display: flex;
+  align-items: center;
+}
+
+.crop-control-heading {
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.crop-control-heading label {
+  display: block;
+  font-size: inherit;
+}
+
+.crop-control-heading output {
+  min-width: 42px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.crop-control-row {
+  gap: 10px;
+}
+
+#zoomInput {
+  appearance: none;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+#zoomInput::-webkit-slider-runnable-track {
+  height: 5px;
+  border: 1px solid #444a54;
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      to right,
+      var(--accent-2) 0,
+      var(--accent-2) var(--zoom-progress),
+      #2a2e35 var(--zoom-progress),
+      #2a2e35 100%
+    );
+}
+
+#zoomInput::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 2px solid #101114;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 0 0 1px #7a8290;
+}
+
+#zoomInput::-moz-range-track {
+  height: 5px;
+  border: 1px solid #444a54;
+  border-radius: 3px;
+  background: #2a2e35;
+}
+
+#zoomInput::-moz-range-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--accent-2);
+}
+
+#zoomInput::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #101114;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 0 0 1px #7a8290;
+}
+
+#zoomInput:focus-visible::-webkit-slider-thumb {
+  outline: 3px solid rgb(126 215 126 / 30%);
+  outline-offset: 2px;
+}
+
+#zoomInput:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.crop-reset-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 11px;
+  font-size: 12px;
 }
 
 .status-row {

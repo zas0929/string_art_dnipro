@@ -37,6 +37,7 @@ const opacityInput = getElement("opacityInput");
 const skipInput = getElement("skipInput");
 const algorithmInput = getElement("algorithmInput");
 const zoomInput = getElement("zoomInput");
+const zoomValue = getElement("zoomValue");
 const resetCropButton = getElement("resetCropButton");
 const buildButton = getElement("buildButton");
 const pngButton = getElement("pngButton");
@@ -73,6 +74,7 @@ const state = {
 const WORK_SIZE = 560;
 const listenerController = new AbortController();
 let destroyed = false;
+let cropPreviewFrame = 0;
 
 const listen = (target, type, handler, options = {}) => {
   target.addEventListener(type, handler, { ...options, signal: listenerController.signal });
@@ -84,6 +86,7 @@ const cleanup = () => {
   state.cancelled = true;
   state.crop.dragging = false;
   listenerController.abort();
+  if (cropPreviewFrame) cancelAnimationFrame(cropPreviewFrame);
   if (state.cancelActiveRun) state.cancelActiveRun();
   else if (state.activeWorker) state.activeWorker.terminate();
   state.activeWorker = null;
@@ -114,6 +117,8 @@ listen(imageInput, "change", async (event) => {
   resetCrop();
   drawPreparedPreview();
   drawInitialResult();
+  zoomInput.disabled = false;
+  resetCropButton.disabled = false;
   setStatus("Фото загружено. Перетащите подготовленное фото для кадра или измените зум.");
   setExportEnabled(false);
   buildButton.disabled = false;
@@ -143,15 +148,24 @@ listen(buildButton, "click", () => {
 listen(pngButton, "click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
 listen(txtButton, "click", () => downloadText("string-art-scheme.txt", formatSchemeText(state.sequence)));
 
-for (const input of [pointsInput, sizeInput, zoomInput]) {
+for (const input of [pointsInput, sizeInput]) {
   listen(input, "input", () => {
     if (!state.image || state.running) return;
-    if (input === zoomInput) state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
     clampCropToImage();
     invalidateResult();
     drawPreparedPreview();
   });
 }
+
+listen(zoomInput, "input", () => {
+  if (!state.image || state.running) return;
+  const hasGeneratedResult = state.sequence.length > 1;
+  state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
+  clampCropToImage();
+  updateZoomControl();
+  invalidateResult(hasGeneratedResult);
+  drawPreparedPreview();
+});
 
 listen(algorithmInput, "change", () => {
   if (!state.image || state.running) return;
@@ -197,12 +211,14 @@ listen(sourceCanvas, "wheel", (event) => {
   const previousZoom = state.crop.zoom;
   const nextZoom = clampNumber(previousZoom * (event.deltaY < 0 ? 1.08 : 0.92), 1, 4);
   if (nextZoom === previousZoom) return;
+  const hasGeneratedResult = state.sequence.length > 1;
   state.crop.zoom = nextZoom;
   zoomInput.value = nextZoom.toFixed(2);
+  updateZoomControl();
   state.crop.offsetX = before.x - WORK_SIZE / 2 - ((before.x - WORK_SIZE / 2 - state.crop.offsetX) * nextZoom) / previousZoom;
   state.crop.offsetY = before.y - WORK_SIZE / 2 - ((before.y - WORK_SIZE / 2 - state.crop.offsetY) * nextZoom) / previousZoom;
   clampCropToImage();
-  invalidateResult();
+  invalidateResult(hasGeneratedResult);
   drawPreparedPreview();
 }, { passive: false });
 
@@ -979,6 +995,8 @@ function importScheme(text) {
   imageInput.value = "";
   state.image = null;
   buildButton.disabled = true;
+  zoomInput.disabled = true;
+  resetCropButton.disabled = true;
   state.prepared = null;
   state.cancelled = false;
   state.sequence = sequence.map((point) => point - 1);
@@ -1015,9 +1033,70 @@ function drawSchemePlaceholder(pointCount, lineCount) {
 }
 
 function drawPreparedPreview() {
-  const settings = readSettings();
-  const prepared = prepareImage(settings);
-  drawSourceFromPrepared(prepared, settings);
+  if (!state.image || cropPreviewFrame) return;
+  cropPreviewFrame = requestAnimationFrame(() => {
+    cropPreviewFrame = 0;
+    if (destroyed || !state.image) return;
+    drawInteractiveSourcePreview();
+  });
+}
+
+function drawInteractiveSourcePreview() {
+  const canvasScale = sourceCanvas.width / WORK_SIZE;
+  const fit = getImageFit(state.image, WORK_SIZE, {
+    zoom: state.crop.zoom,
+    offsetX: state.crop.offsetX,
+    offsetY: state.crop.offsetY,
+  });
+  const cropRadius = (WORK_SIZE / 2 - 8) * canvasScale;
+
+  sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.fillStyle = "#050506";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.save();
+  sourceCtx.beginPath();
+  sourceCtx.arc(
+    sourceCanvas.width / 2,
+    sourceCanvas.height / 2,
+    cropRadius,
+    0,
+    Math.PI * 2,
+  );
+  sourceCtx.clip();
+  sourceCtx.fillStyle = "#fff";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.imageSmoothingEnabled = true;
+  sourceCtx.imageSmoothingQuality = "high";
+  sourceCtx.drawImage(
+    state.image,
+    fit.x * canvasScale,
+    fit.y * canvasScale,
+    fit.width * canvasScale,
+    fit.height * canvasScale,
+  );
+  sourceCtx.restore();
+
+  const pointCount = clampInt(pointsInput.value, 60, 600);
+  drawNails(
+    sourceCtx,
+    buildCirclePoints(
+      pointCount,
+      sourceCanvas.width / 2 - 16,
+      sourceCanvas.width / 2,
+      sourceCanvas.height / 2,
+    ),
+    sourceCanvas.width,
+  );
+}
+
+function updateZoomControl() {
+  const progressRatio = (state.crop.zoom - 1) / 3;
+  zoomValue.value = `${Math.round(state.crop.zoom * 100)}%`;
+  zoomValue.textContent = zoomValue.value;
+  zoomInput.style.setProperty(
+    "--zoom-progress",
+    `${Math.max(0, Math.min(1, progressRatio)) * 100}%`,
+  );
 }
 
 function resetCrop() {
@@ -1026,6 +1105,7 @@ function resetCrop() {
   state.crop.offsetY = 0;
   state.crop.dragging = false;
   zoomInput.value = "1";
+  updateZoomControl();
 }
 
 function stopDragging() {
@@ -1065,7 +1145,7 @@ function clampCropToImage() {
   state.crop.offsetY = Math.max(-maxY, Math.min(maxY, state.crop.offsetY));
 }
 
-function invalidateResult() {
+function invalidateResult(redrawBase = true) {
   state.sequence = [];
   state.sequenceDisplayStart = 0;
   setExportEnabled(false);
@@ -1076,7 +1156,7 @@ function invalidateResult() {
   lengthOut.textContent = "-";
   progress.value = 0;
   setStatus("Кадр изменён. Нажмите «Построить», чтобы пересчитать инструкцию.");
-  if (state.image) drawInitialResult();
+  if (state.image && redrawBase) drawInitialResult();
 }
 
 function drawSourceFromPrepared(prepared, settings) {

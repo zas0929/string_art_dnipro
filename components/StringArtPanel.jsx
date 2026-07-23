@@ -1,6 +1,6 @@
 "use client";
 
-import { FileImage, FileText, ListChecks, RotateCcw } from "lucide-react";
+import { FileImage, FileText, ListChecks } from "lucide-react";
 import Link from "next/link";
 
 export default function StringArtPanel() {
@@ -43,14 +43,6 @@ export default function StringArtPanel() {
             <option value="portrait-v5">Портрет v5 · мульти-масштаб</option>
           </select>
         </label>
-        <label>
-          Зум фото
-          <input id="zoomInput" type="range" min="1" max="4" step="0.01" defaultValue="1" />
-        </label>
-        <button id="resetCropButton" type="button">
-          <RotateCcw aria-hidden="true" size={18} strokeWidth={2} />
-          Сбросить кадр
-        </button>
       </div>
 
       <div className="actions">

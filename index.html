@@ -28,8 +28,22 @@
         </div>
 
         <div class="stage">
-          <canvas id="resultCanvas" width="760" height="760" aria-label="String art preview"></canvas>
-          <canvas id="sourceCanvas" width="760" height="760" aria-label="Prepared source image"></canvas>
+          <div class="canvas-column">
+            <canvas id="resultCanvas" width="760" height="760" aria-label="String art preview"></canvas>
+          </div>
+          <div class="canvas-column">
+            <canvas id="sourceCanvas" width="760" height="760" aria-label="Prepared source image"></canvas>
+            <div class="crop-controls">
+              <div class="crop-control-heading">
+                <label for="zoomInput">Масштаб фото</label>
+                <output id="zoomValue" for="zoomInput">100%</output>
+              </div>
+              <div class="crop-control-row">
+                <input id="zoomInput" type="range" min="1" max="4" step="0.01" value="1" aria-label="Масштаб фото" disabled>
+                <button id="resetCropButton" class="crop-reset-button" type="button" title="Сбросить кадр" disabled>Сбросить</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="status-row">
@@ -76,11 +90,6 @@
               <option value="portrait-v5" selected>Портрет v5 · мульти-масштаб</option>
             </select>
           </label>
-          <label>
-            Зум фото
-            <input id="zoomInput" type="range" min="1" max="4" step="0.01" value="1">
-          </label>
-          <button id="resetCropButton" type="button">Сбросить кадр</button>
         </div>
 
         <div class="actions">

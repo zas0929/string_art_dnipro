@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Play, Upload } from "lucide-react";
+import { ImagePlus, Play, RotateCcw, Upload } from "lucide-react";
 
 export default function StringArtWorkspace() {
   return (
@@ -29,8 +29,40 @@ export default function StringArtWorkspace() {
       </div>
 
       <div className="stage">
-        <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
-        <canvas id="sourceCanvas" width="760" height="760" aria-label="Исходное фото и выбранный кадр" />
+        <div className="canvas-column">
+          <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
+        </div>
+        <div className="canvas-column">
+          <canvas id="sourceCanvas" width="760" height="760" aria-label="Исходное фото и выбранный кадр" />
+          <div className="crop-controls">
+            <div className="crop-control-heading">
+              <label htmlFor="zoomInput">Масштаб фото</label>
+              <output id="zoomValue" htmlFor="zoomInput">100%</output>
+            </div>
+            <div className="crop-control-row">
+              <input
+                id="zoomInput"
+                type="range"
+                min="1"
+                max="4"
+                step="0.01"
+                defaultValue="1"
+                aria-label="Масштаб фото"
+                disabled
+              />
+              <button
+                id="resetCropButton"
+                className="crop-reset-button"
+                type="button"
+                title="Сбросить кадр"
+                disabled
+              >
+                <RotateCcw aria-hidden="true" size={17} strokeWidth={2} />
+                Сбросить
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="status-row" aria-live="polite">
