@@ -2,6 +2,11 @@ import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
 import { getOpticalThreadCoverage } from "./core/line-kernel.js";
 import { neutralizeConnectedLightBackground } from "./core/neutral-background.js";
 import {
+  buildDetailPriorityMap,
+  composeAnalysisPreviewGray,
+  enhanceAnalysisGray,
+} from "./core/photo-enhancement.js";
+import {
   SUPPORTED_ALGORITHMS,
   canRefineAlgorithm,
   isStableV5Algorithm,
@@ -46,6 +51,12 @@ const threadInput = getElement("threadInput");
 const opacityInput = getElement("opacityInput");
 const skipInput = getElement("skipInput");
 const algorithmInput = getElement("algorithmInput");
+const enhancementControls = getElement("enhancementControls");
+const enhanceInput = getElement("enhanceInput");
+const contrastInput = getElement("contrastInput");
+const contrastValue = getElement("contrastValue");
+const sharpnessInput = getElement("sharpnessInput");
+const sharpnessValue = getElement("sharpnessValue");
 const zoomInput = getElement("zoomInput");
 const zoomValue = getElement("zoomValue");
 const resetCropButton = getElement("resetCropButton");
@@ -86,6 +97,7 @@ const state = {
 };
 
 const WORK_SIZE = 560;
+const LIVE_PREVIEW_SIZE = 360;
 const listenerController = new AbortController();
 let destroyed = false;
 let cropPreviewFrame = 0;
@@ -111,6 +123,7 @@ const cleanup = () => {
 mountedApps.set(root, cleanup);
 
 drawEmpty();
+updateEnhancementControls();
 if (buildModeLink) {
   void loadLatestPattern()
     .then((pattern) => {
@@ -198,6 +211,22 @@ listen(algorithmInput, "change", () => {
   invalidateResult();
   drawPreparedPreview();
 });
+
+listen(enhanceInput, "change", () => {
+  updateEnhancementControls();
+  if (!state.image || state.running) return;
+  invalidateResult();
+  drawPreparedPreview();
+});
+
+for (const input of [contrastInput, sharpnessInput]) {
+  listen(input, "input", () => {
+    updateEnhancementControls();
+    if (!state.image || state.running || !enhanceInput.checked) return;
+    invalidateResult();
+    drawPreparedPreview();
+  });
+}
 
 listen(resetCropButton, "click", () => {
   if (!state.image || state.running) return;
@@ -596,6 +625,21 @@ function updateImproveButton() {
     : "Экспериментально улучшить слабые участки";
 }
 
+function updateEnhancementControls() {
+  const enabled = enhanceInput.checked;
+  enhancementControls.classList.toggle("is-disabled", !enabled);
+  contrastInput.disabled = !enabled;
+  sharpnessInput.disabled = !enabled;
+  sourceCanvas.setAttribute(
+    "aria-label",
+    enabled
+      ? "Предпросмотр карты деталей для расчёта"
+      : "Исходное фото и выбранный кадр",
+  );
+  contrastValue.textContent = `${clampInt(contrastInput.value, 0, 100)}%`;
+  sharpnessValue.textContent = `${clampInt(sharpnessInput.value, 0, 100)}%`;
+}
+
 function readSettings() {
   const algorithm = SUPPORTED_ALGORITHMS.includes(algorithmInput.value)
     ? algorithmInput.value
@@ -610,66 +654,44 @@ function readSettings() {
     offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
+    enhancePhoto: enhanceInput.checked,
+    contrast: clampNumber(contrastInput.value, 0, 100) / 100,
+    sharpness: clampNumber(sharpnessInput.value, 0, 100) / 100,
     algorithm,
   };
 }
 
 function prepareImage(settings) {
-  const temp = document.createElement("canvas");
-  temp.width = WORK_SIZE;
-  temp.height = WORK_SIZE;
-  const ctx = temp.getContext("2d", { willReadFrequently: true });
-  ctx.fillStyle = "white";
-  ctx.fillRect(0, 0, WORK_SIZE, WORK_SIZE);
-
-  const fit = getImageFit(state.image, WORK_SIZE, settings);
-  ctx.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
-
-  const imageData = ctx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
-  const data = imageData.data;
-  const gray = new Float32Array(WORK_SIZE * WORK_SIZE);
-  const mask = new Uint8Array(WORK_SIZE * WORK_SIZE);
+  const frame = createSourceFrame(settings, WORK_SIZE);
+  const { analysisGray, detailPriority } = buildAnalysisMaps(frame, settings);
   const target = new Float32Array(WORK_SIZE * WORK_SIZE);
-  const radius = WORK_SIZE / 2 - 8;
-  const cx = WORK_SIZE / 2;
-  const cy = WORK_SIZE / 2;
+  const analysisPreview = settings.enhancePhoto
+    ? renderAnalysisPreview(frame, analysisGray, detailPriority)
+    : null;
+  const threadTarget = buildThreadTarget(
+    analysisGray,
+    frame.mask,
+    WORK_SIZE,
+    settings,
+    detailPriority,
+  );
 
-  for (let y = 0; y < WORK_SIZE; y++) {
-    for (let x = 0; x < WORK_SIZE; x++) {
-      const idx = y * WORK_SIZE + x;
-      const offset = idx * 4;
-      const dx = x - cx;
-      const dy = y - cy;
-      const inside = dx * dx + dy * dy <= radius * radius;
-      mask[idx] = inside ? 1 : 0;
-      gray[idx] = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+  for (let index = 0; index < target.length; index++) {
+    const offset = index * 4;
+    const inside = frame.mask[index] === 1;
+    target[index] = inside ? threadTarget.target[index] : 0;
+    if (!inside) {
+      frame.data[offset] = 18;
+      frame.data[offset + 1] = 18;
+      frame.data[offset + 2] = 18;
+      frame.data[offset + 3] = 255;
     }
   }
 
-  const analysisGray = isOpticalAlgorithm(settings.algorithm)
-    ? neutralizeConnectedLightBackground(gray, data, mask, WORK_SIZE, {
-        automatic: usesAutomaticNeutralBackground(settings.algorithm),
-      }).gray
-    : gray;
-  const threadTarget = buildThreadTarget(analysisGray, mask, WORK_SIZE, settings);
-  for (let y = 0; y < WORK_SIZE; y++) {
-    for (let x = 0; x < WORK_SIZE; x++) {
-      const idx = y * WORK_SIZE + x;
-      const offset = idx * 4;
-      const inside = mask[idx] === 1;
-      target[idx] = inside ? threadTarget.target[idx] : 0;
-      if (!inside) {
-        data[offset] = 18;
-        data[offset + 1] = 18;
-        data[offset + 2] = 18;
-        data[offset + 3] = 255;
-      }
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
+  frame.ctx.putImageData(frame.imageData, 0, 0);
   return {
-    canvas: temp,
+    canvas: frame.canvas,
+    analysisPreview,
     target,
     importance: threadTarget.importance,
     detailWeight: threadTarget.detailWeight,
@@ -679,11 +701,122 @@ function prepareImage(settings) {
   };
 }
 
-function buildThreadTarget(gray, mask, size, settings) {
+function createSourceFrame(settings, size) {
+  const temp = document.createElement("canvas");
+  temp.width = size;
+  temp.height = size;
+  const ctx = temp.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, size, size);
+
+  const scale = size / WORK_SIZE;
+  const fit = getImageFit(state.image, size, {
+    ...settings,
+    offsetX: settings.offsetX * scale,
+    offsetY: settings.offsetY * scale,
+  });
+  ctx.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
+
+  const imageData = ctx.getImageData(0, 0, size, size);
+  const data = imageData.data;
+  const gray = new Float32Array(size * size);
+  const mask = new Uint8Array(size * size);
+  const radius = size / 2 - 8 * scale;
+  const center = size / 2;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = y * size + x;
+      const offset = idx * 4;
+      const dx = x - center;
+      const dy = y - center;
+      const inside = dx * dx + dy * dy <= radius * radius;
+      mask[idx] = inside ? 1 : 0;
+      gray[idx] = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+    }
+  }
+
+  return {
+    canvas: temp,
+    ctx,
+    imageData,
+    data,
+    gray,
+    mask,
+    size,
+  };
+}
+
+function buildAnalysisMaps(frame, settings) {
+  const { data, gray, mask, size } = frame;
+  const baseAnalysisGray = isOpticalAlgorithm(settings.algorithm)
+    ? neutralizeConnectedLightBackground(gray, data, mask, size, {
+        automatic: usesAutomaticNeutralBackground(settings.algorithm),
+      }).gray
+    : gray;
+  const analysisGray = settings.enhancePhoto
+    ? enhanceAnalysisGray(baseAnalysisGray, mask, size, {
+        contrast: settings.contrast,
+        sharpness: settings.sharpness * 0.25,
+      })
+    : baseAnalysisGray;
+  const detailPriority = settings.enhancePhoto
+    ? buildDetailPriorityMap(
+        baseAnalysisGray,
+        mask,
+        size,
+        settings.sharpness,
+      )
+    : null;
+
+  return { analysisGray, detailPriority };
+}
+
+function renderAnalysisPreview(frame, analysisGray, detailPriority) {
+  const preview = document.createElement("canvas");
+  preview.width = frame.size;
+  preview.height = frame.size;
+  const previewCtx = preview.getContext("2d");
+  const previewImage = previewCtx.createImageData(frame.size, frame.size);
+  const previewGray = composeAnalysisPreviewGray(
+    analysisGray,
+    detailPriority,
+    frame.mask,
+  );
+
+  for (let index = 0; index < previewGray.length; index++) {
+    const offset = index * 4;
+    const value = previewGray[index];
+    previewImage.data[offset] = value;
+    previewImage.data[offset + 1] = value;
+    previewImage.data[offset + 2] = value;
+    previewImage.data[offset + 3] = 255;
+  }
+  previewCtx.putImageData(previewImage, 0, 0);
+  return preview;
+}
+
+function createLiveAnalysisPreview(settings) {
+  const frame = createSourceFrame(settings, LIVE_PREVIEW_SIZE);
+  const { analysisGray, detailPriority } = buildAnalysisMaps(frame, settings);
+  return renderAnalysisPreview(
+    frame,
+    analysisGray,
+    detailPriority,
+  );
+}
+
+function buildThreadTarget(gray, mask, size, settings, detailPriority = null) {
   const { algorithm } = settings;
   const normalized = normalizeByPercentiles(gray, mask);
   if (isOpticalAlgorithm(algorithm)) {
-    return buildOpticalDensityTarget(normalized, mask, size, settings);
+    return buildOpticalDensityTarget(
+      normalized,
+      mask,
+      size,
+      settings,
+      detailPriority,
+    );
   }
 
   const smooth = boxBlurValues(normalized, mask, size, 3);
@@ -729,7 +862,13 @@ function buildThreadTarget(gray, mask, size, settings) {
   };
 }
 
-function buildOpticalDensityTarget(normalized, mask, size, settings) {
+function buildOpticalDensityTarget(
+  normalized,
+  mask,
+  size,
+  settings,
+  detailPriority,
+) {
   const localMean = boxBlurFast(normalized, mask, size, 5);
   const edges = sobelMagnitude(normalized, mask, size);
   const target = new Float32Array(normalized.length);
@@ -744,9 +883,17 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
     const localDark = Math.max(0, localMean[i] - normalized[i]);
     const detail = Math.pow(clamp01(localDark * 4.5), 0.68);
     const edge = Math.pow(edges[i], 0.72);
-    const desiredCrossings = 4.1 + opticalDensity * 2.25 + detail * 1.6 + edge * 0.85;
+    const structuralPriority = detailPriority?.[i] || 0;
+    const desiredCrossings = 4.1
+      + opticalDensity * 2.25
+      + detail * 1.6
+      + edge * 0.85
+      + structuralPriority * 1.35;
     target[i] = desiredCrossings;
-    importance[i] = Math.min(3.6, 0.8 + detail + edge * 2);
+    importance[i] = Math.min(
+      4.8,
+      0.8 + detail + edge * 2 + structuralPriority * 2.4,
+    );
     rawTotal += desiredCrossings;
     pixelCount++;
   }
@@ -1199,6 +1346,14 @@ function drawPreparedPreview() {
 }
 
 function drawInteractiveSourcePreview() {
+  if (enhanceInput.checked) {
+    const preview = createLiveAnalysisPreview(readSettings());
+    sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+    sourceCtx.drawImage(preview, 0, 0, sourceCanvas.width, sourceCanvas.height);
+    drawSourceNails();
+    return;
+  }
+
   const canvasScale = sourceCanvas.width / WORK_SIZE;
   const fit = getImageFit(state.image, WORK_SIZE, {
     zoom: state.crop.zoom,
@@ -1233,6 +1388,10 @@ function drawInteractiveSourcePreview() {
   );
   sourceCtx.restore();
 
+  drawSourceNails();
+}
+
+function drawSourceNails() {
   const pointCount = clampInt(pointsInput.value, 60, 600);
   drawNails(
     sourceCtx,
@@ -1323,7 +1482,13 @@ function drawSourceFromPrepared(prepared, settings) {
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
   sourceCtx.fillStyle = "#050506";
   sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-  sourceCtx.drawImage(prepared.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.drawImage(
+    prepared.analysisPreview || prepared.canvas,
+    0,
+    0,
+    sourceCanvas.width,
+    sourceCanvas.height,
+  );
   drawNails(sourceCtx, buildCirclePoints(settings.points, sourceCanvas.width / 2 - 16, sourceCanvas.width / 2, sourceCanvas.height / 2), sourceCanvas.width);
 }
 

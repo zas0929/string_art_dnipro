@@ -92,6 +92,26 @@
               <option value="portrait-v6">Портрет v6 · экспериментальный</option>
             </select>
           </label>
+          <div id="enhancementControls" class="enhancement-controls is-disabled">
+            <label class="toggle-control">
+              <input id="enhanceInput" type="checkbox">
+              <span>Усилить детали макета</span>
+            </label>
+            <label>
+              <span class="range-label">
+                Тональный контраст
+                <output id="contrastValue" for="contrastInput">25%</output>
+              </span>
+              <input id="contrastInput" type="range" aria-label="Тональный контраст" min="0" max="100" step="1" value="25" disabled>
+            </label>
+            <label>
+              <span class="range-label">
+                Приоритет деталей
+                <output id="sharpnessValue" for="sharpnessInput">55%</output>
+              </span>
+              <input id="sharpnessInput" type="range" aria-label="Приоритет деталей" min="0" max="100" step="1" value="55" disabled>
+            </label>
+          </div>
         </div>
 
         <div class="actions">

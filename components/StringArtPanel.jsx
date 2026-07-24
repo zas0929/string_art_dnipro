@@ -44,6 +44,44 @@ export default function StringArtPanel() {
             <option value="portrait-v6">Портрет v6 · экспериментальный</option>
           </select>
         </label>
+        <div id="enhancementControls" className="enhancement-controls is-disabled">
+          <label className="toggle-control">
+            <input id="enhanceInput" type="checkbox" />
+            <span>Усилить детали макета</span>
+          </label>
+          <label>
+            <span className="range-label">
+              Тональный контраст
+              <output id="contrastValue" htmlFor="contrastInput">25%</output>
+            </span>
+            <input
+              id="contrastInput"
+              type="range"
+              aria-label="Тональный контраст"
+              min="0"
+              max="100"
+              step="1"
+              defaultValue="25"
+              disabled
+            />
+          </label>
+          <label>
+            <span className="range-label">
+              Приоритет деталей
+              <output id="sharpnessValue" htmlFor="sharpnessInput">55%</output>
+            </span>
+            <input
+              id="sharpnessInput"
+              type="range"
+              aria-label="Приоритет деталей"
+              min="0"
+              max="100"
+              step="1"
+              defaultValue="55"
+              disabled
+            />
+          </label>
+        </div>
       </div>
 
       <div className="actions">
