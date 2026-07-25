@@ -26,6 +26,7 @@ export class OpticalRoutePlanner {
     parallelPenaltyLimit = 0.055,
     repeatBiasStep = 0.085,
     repeatBiasLimit = 0.28,
+    adaptiveRouteProfile = null,
   }) {
     this.points = points;
     this.pointCount = points.length;
@@ -46,6 +47,7 @@ export class OpticalRoutePlanner {
     this.parallelPenaltyLimit = parallelPenaltyLimit;
     this.repeatBiasStep = repeatBiasStep;
     this.repeatBiasLimit = repeatBiasLimit;
+    this.adaptiveRouteProfile = adaptiveRouteProfile;
     this.scales = buildResidualPyramid(target, importance, size, scaleFactors);
     this.scaledLineCache = new Map();
     this.normalizedKernelCache = new WeakMap();
@@ -63,9 +65,10 @@ export class OpticalRoutePlanner {
     const previousPoint = this.sequence.length > 1
       ? this.sequence[this.sequence.length - 2]
       : -1;
+    const routeProfile = this.getRouteProfile(progressRatio);
     const recentDistanceMean = this.recentNailDistances.length
       ? average(this.recentNailDistances)
-      : this.targetNailDistance;
+      : routeProfile.targetNailDistance;
     const shortlist = [];
 
     for (let candidate = 0; candidate < this.pointCount; candidate++) {
@@ -396,31 +399,35 @@ export class OpticalRoutePlanner {
   }
 
   adjustRouteScore(score, from, candidate, recentDistanceMean, progressRatio) {
+    const routeProfile = this.getRouteProfile(progressRatio);
     const magnitude = Math.max(1, Math.abs(score));
     const averageVisits = (progressRatio * this.lineCount + 1) / this.pointCount;
     const balanceStrength = (0.008
       + smoothStep(0.15, 0.68, progressRatio) * 0.04
       + smoothStep(0.65, 1, progressRatio) * 0.12)
-      * this.nailBalanceMultiplier;
+      * routeProfile.nailBalanceMultiplier;
     const visitDelta = averageVisits - this.nailUsage[candidate];
     const maxVisitBias = 0.18 + progressRatio * 0.32;
     const visitBias = clamp(visitDelta * balanceStrength, -maxVisitBias, maxVisitBias);
     const newNailBias = progressRatio < 0.14 && this.nailUsage[candidate] === 0 ? 0.055 : 0;
 
     const repeats = this.chordUsage.get(getChordKey(from, candidate)) || 0;
-    const repeatBias = Math.min(this.repeatBiasLimit, repeats * this.repeatBiasStep);
+    const repeatBias = Math.min(
+      routeProfile.repeatBiasLimit,
+      repeats * routeProfile.repeatBiasStep,
+    );
     const nailDistance = circularDistance(from, candidate, this.pointCount);
-    const distanceDelta = nailDistance - this.targetNailDistance;
+    const distanceDelta = nailDistance - routeProfile.targetNailDistance;
     const distancePenalty = Math.min(
-      0.16,
-      distanceDelta * distanceDelta * this.distancePenaltyStrength,
+      routeProfile.distancePenaltyLimit,
+      distanceDelta * distanceDelta * routeProfile.distancePenaltyStrength,
     );
     const distanceFeedback = clamp(
-      -(recentDistanceMean - this.targetNailDistance)
+      -(recentDistanceMean - routeProfile.targetNailDistance)
         * distanceDelta
-        * this.distanceFeedbackStrength,
-      -0.45,
-      0.45,
+        * routeProfile.distanceFeedbackStrength,
+      -routeProfile.distanceFeedbackLimit,
+      routeProfile.distanceFeedbackLimit,
     );
 
     const direction = getChordAngle(this.points, from, candidate);
@@ -428,9 +435,9 @@ export class OpticalRoutePlanner {
     const averageDirectionUsage = (progressRatio * this.lineCount + 1) / this.directionUsage.length;
     const directionDelta = averageDirectionUsage - this.directionUsage[directionBin];
     const directionBalanceBias = clamp(
-      directionDelta * this.directionBalanceStrength,
-      -this.directionBalanceLimit,
-      this.directionBalanceLimit,
+      directionDelta * routeProfile.directionBalanceStrength,
+      -routeProfile.directionBalanceLimit,
+      routeProfile.directionBalanceLimit,
     );
     let parallelPenalty = 0;
 
@@ -439,7 +446,9 @@ export class OpticalRoutePlanner {
       const angleDelta = getAngleDistance(direction, this.recentDirections[i]);
       const closeness = Math.exp(-(angleDelta * angleDelta) / 0.012);
       parallelPenalty += closeness * (
-        recency === 1 ? this.parallelPenaltyImmediate : this.parallelPenaltyHistory
+        recency === 1
+          ? routeProfile.parallelPenaltyImmediate
+          : routeProfile.parallelPenaltyHistory
       );
     }
 
@@ -450,8 +459,55 @@ export class OpticalRoutePlanner {
       + directionBalanceBias
       + distanceFeedback
       - distancePenalty
-      - Math.min(this.parallelPenaltyLimit, parallelPenalty)
+      - Math.min(routeProfile.parallelPenaltyLimit, parallelPenalty)
     );
+  }
+
+  getRouteProfile(progressRatio) {
+    const baseProfile = {
+      targetNailDistance: this.targetNailDistance,
+      distancePenaltyStrength: this.distancePenaltyStrength,
+      distancePenaltyLimit: 0.16,
+      distanceFeedbackStrength: this.distanceFeedbackStrength,
+      distanceFeedbackLimit: 0.45,
+      nailBalanceMultiplier: this.nailBalanceMultiplier,
+      directionBalanceStrength: this.directionBalanceStrength,
+      directionBalanceLimit: this.directionBalanceLimit,
+      parallelPenaltyImmediate: this.parallelPenaltyImmediate,
+      parallelPenaltyHistory: this.parallelPenaltyHistory,
+      parallelPenaltyLimit: this.parallelPenaltyLimit,
+      repeatBiasStep: this.repeatBiasStep,
+      repeatBiasLimit: this.repeatBiasLimit,
+    };
+    if (this.adaptiveRouteProfile !== "reference-v1") return baseProfile;
+
+    const distanceStage = smoothStep(0.06, 0.23, progressRatio);
+    const structureStage = smoothStep(0.12, 0.42, progressRatio);
+    const finishingStage = smoothStep(0.78, 0.96, progressRatio);
+
+    return {
+      targetNailDistance: mix(40, 76, distanceStage),
+      distancePenaltyStrength: mix(0.00005, 0.000065, structureStage)
+        + finishingStage * 0.00003,
+      distancePenaltyLimit: mix(0.12, 0.18, structureStage)
+        + finishingStage * 0.08,
+      distanceFeedbackStrength: mix(0.0016, 0.0025, structureStage)
+        + finishingStage * 0.0012,
+      distanceFeedbackLimit: mix(0.32, 0.5, structureStage),
+      nailBalanceMultiplier: 0.52 + finishingStage * 0.55,
+      directionBalanceStrength: mix(0.0001, 0.0002, structureStage)
+        + finishingStage * 0.00008,
+      directionBalanceLimit: mix(0.005, 0.01, structureStage)
+        + finishingStage * 0.006,
+      parallelPenaltyImmediate: mix(0.002, 0.032, structureStage)
+        + finishingStage * 0.07,
+      parallelPenaltyHistory: mix(0.0005, 0.0032, structureStage)
+        + finishingStage * 0.0042,
+      parallelPenaltyLimit: mix(0.008, 0.066, structureStage)
+        + finishingStage * 0.095,
+      repeatBiasStep: 0,
+      repeatBiasLimit: 0,
+    };
   }
 
   isCandidateAllowed(from, candidate, previousPoint) {
@@ -775,6 +831,10 @@ function average(values) {
   let sum = 0;
   for (const value of values) sum += value;
   return values.length ? sum / values.length : 0;
+}
+
+function mix(start, end, ratio) {
+  return start + (end - start) * ratio;
 }
 
 function clamp(value, minimum, maximum) {

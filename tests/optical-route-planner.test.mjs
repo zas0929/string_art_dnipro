@@ -18,6 +18,22 @@ test("multiscale planner is deterministic and avoids immediate backtracking", ()
   }
 });
 
+test("reference profile moves from local strokes to structured finishing", () => {
+  const planner = createProfilePlanner();
+  const early = planner.getRouteProfile(0.04);
+  const middle = planner.getRouteProfile(0.2);
+  const finishing = planner.getRouteProfile(0.98);
+
+  assert.equal(early.targetNailDistance, 40);
+  assert.ok(middle.targetNailDistance > 65 && middle.targetNailDistance < 76);
+  assert.ok(Math.abs(finishing.targetNailDistance - 76) < 1e-9);
+  assert.ok(early.parallelPenaltyLimit < middle.parallelPenaltyLimit);
+  assert.ok(middle.parallelPenaltyLimit < finishing.parallelPenaltyLimit);
+  assert.ok(early.nailBalanceMultiplier < finishing.nailBalanceMultiplier);
+  assert.equal(finishing.repeatBiasStep, 0);
+  assert.equal(finishing.repeatBiasLimit, 0);
+});
+
 test("reference-calibrated route profile improves route balance", () => {
   const benchmark = {
     pointCount: 96,
@@ -55,6 +71,26 @@ test("reference-calibrated route profile improves route balance", () => {
     `expected image error within 2% of baseline: ${JSON.stringify({ baselineRun, calibratedRun })}`,
   );
 });
+
+function createProfilePlanner() {
+  const size = 8;
+  return new OpticalRoutePlanner({
+    points: [
+      { x: 1, y: 4 },
+      { x: 4, y: 1 },
+      { x: 7, y: 4 },
+      { x: 4, y: 7 },
+    ],
+    lineCount: 100,
+    minSkip: 1,
+    size,
+    target: new Float32Array(size * size),
+    importance: new Float32Array(size * size).fill(1),
+    getLineSamples: () => Int32Array.of(0),
+    scaleFactors: [1],
+    adaptiveRouteProfile: "reference-v1",
+  });
+}
 
 test("optional weak-segment refinement is deterministic and reversible by sequence", () => {
   const configuration = {

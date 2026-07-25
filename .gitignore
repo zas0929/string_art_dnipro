@@ -2,5 +2,8 @@ node_modules/
 .pnpm-store/
 .next/
 out/
+package-lock.json
+playwright-report/
+test-results/
 *.log
 .DS_Store

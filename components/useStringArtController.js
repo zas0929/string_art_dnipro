@@ -1,25 +1,23 @@
 "use client";
 
 import { useEffect } from "react";
+import { mountStringArtApp } from "../app.js";
 
 export function useStringArtController(rootRef) {
   useEffect(() => {
-    let active = true;
     let cleanup = null;
+    const root = rootRef.current;
 
-    import("../app.js")
-      .then(({ mountStringArtApp }) => {
-        if (!active || !rootRef.current) return;
-        cleanup = mountStringArtApp(rootRef.current);
-      })
-      .catch((error) => {
-        if (!active) return;
-        const status = rootRef.current?.querySelector("#status");
-        if (status) status.textContent = `Ошибка запуска: ${error.message}`;
-      });
+    try {
+      cleanup = mountStringArtApp(root);
+      root.dataset.controllerReady = "true";
+    } catch (error) {
+      const status = root?.querySelector("#status");
+      if (status) status.textContent = `Ошибка запуска: ${error.message}`;
+    }
 
     return () => {
-      active = false;
+      if (root) delete root.dataset.controllerReady;
       if (cleanup) cleanup();
     };
   }, [rootRef]);

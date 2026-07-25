@@ -9,19 +9,28 @@ import {
 import {
   SUPPORTED_ALGORITHMS,
   canRefineAlgorithm,
+  isReferenceAlgorithm,
   isStableV5Algorithm,
   isMultiScaleAlgorithm,
   isOpticalAlgorithm,
   usesAutomaticNeutralBackground,
   usesImprovedOpticalKernel,
+  usesReferenceCalibratedRoute,
 } from "./core/algorithm-mode.js";
+import {
+  REFERENCE_LINE_STRENGTH,
+  REFERENCE_LINE_WIDTH,
+  REFERENCE_RECENT_PEG_WINDOW,
+  REFERENCE_WORK_SIZE,
+  createReferenceTarget,
+} from "./core/reference-thread-planner.js";
 import {
   createCirclePoints,
   renderNails,
   renderStringArtBase,
   renderStringArtLines,
 } from "./core/string-art-renderer.js";
-import { loadLatestPattern, saveLatestPattern } from "./storage/local-project-store.js";
+import { saveLatestPattern } from "./storage/local-project-store.js";
 
 const mountedApps = new WeakMap();
 
@@ -72,8 +81,6 @@ const linesOut = getElement("linesOut");
 const stepOut = getElement("stepOut");
 const lengthOut = getElement("lengthOut");
 const sequenceOutput = getElement("sequenceOutput");
-const buildModeLink = root.querySelector("#buildModeLink");
-
 const state = {
   image: null,
   prepared: null,
@@ -124,14 +131,6 @@ mountedApps.set(root, cleanup);
 
 drawEmpty();
 updateEnhancementControls();
-if (buildModeLink) {
-  void loadLatestPattern()
-    .then((pattern) => {
-      if (!destroyed) setBuildModeEnabled(Boolean(pattern));
-    })
-    .catch(() => setBuildModeEnabled(false));
-}
-
 listen(imageInput, "change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
@@ -207,6 +206,7 @@ listen(zoomInput, "input", () => {
 });
 
 listen(algorithmInput, "change", () => {
+  updateEnhancementControls();
   if (!state.image || state.running) return;
   invalidateResult();
   drawPreparedPreview();
@@ -295,6 +295,7 @@ async function generate() {
   state.sequence = [0];
   state.sequenceDisplayStart = 0;
 
+  const isReferenceModel = isReferenceAlgorithm(settings.algorithm);
   const isOpticalModel = isOpticalAlgorithm(settings.algorithm);
   const residual = new Float32Array(prepared.target);
   const drawn = new Float32Array(prepared.target.length);
@@ -310,7 +311,10 @@ async function generate() {
   drawResultBase(settings);
 
   try {
-    if (isOpticalModel) {
+    if (isReferenceModel) {
+      const result = await runReferenceWorker(settings, prepared, renderedLines);
+      state.cancelled = result.cancelled;
+    } else if (isOpticalModel) {
       const result = await runOpticalWorker(settings, prepared, renderedLines);
       state.cancelled = result.cancelled;
     } else {
@@ -380,6 +384,67 @@ async function generate() {
     state.running = false;
     updateImproveButton();
   }
+}
+
+function runReferenceWorker(settings, prepared, renderedLines) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL("./workers/reference-worker.js", import.meta.url),
+      { type: "module" },
+    );
+    let settled = false;
+
+    const finish = (result, error = null) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      if (state.activeWorker === worker) state.activeWorker = null;
+      if (state.cancelActiveRun === cancel) state.cancelActiveRun = null;
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const cancel = () => finish({ cancelled: true });
+
+    state.activeWorker = worker;
+    state.cancelActiveRun = cancel;
+    worker.addEventListener("message", (event) => {
+      const message = event.data;
+      if (message?.type === "progress") {
+        const startIndex = renderedLines.length;
+        for (const line of message.lines) {
+          renderedLines.push(line);
+          state.sequence.push(line[1]);
+        }
+        drawThreadLines(renderedLines, settings, startIndex);
+        updateSummary(settings, message.completed);
+        progress.value = message.completed / message.total;
+        setStatus(
+          `Построено линий: ${message.completed} / ${message.total}`
+          + " (эталонное ядро)",
+        );
+      } else if (message?.type === "done") {
+        finish({ cancelled: false });
+      } else if (message?.type === "error") {
+        finish(null, new Error(message.message));
+      }
+    });
+    worker.addEventListener("error", (event) => {
+      finish(null, new Error(event.message || "Reference worker не смог выполнить расчет"));
+    });
+    worker.postMessage({
+      type: "start",
+      settings: {
+        points: settings.points,
+        lines: settings.lines,
+        minSkip: settings.minSkip,
+        workSize: REFERENCE_WORK_SIZE,
+        recentPegWindow: REFERENCE_RECENT_PEG_WINDOW,
+        lineStrength: REFERENCE_LINE_STRENGTH,
+        lineWidth: REFERENCE_LINE_WIDTH,
+      },
+      target: prepared.referenceTarget,
+    });
+  });
 }
 
 function runOpticalWorker(settings, prepared, renderedLines) {
@@ -565,22 +630,23 @@ function getOpticalWorkerSettings(settings) {
 
 function getOpticalPlannerOptions(algorithm) {
   const isMultiScaleModel = isMultiScaleAlgorithm(algorithm);
-  const improvedRouteModel = usesImprovedOpticalKernel(algorithm);
+  const referenceCalibratedRoute = usesReferenceCalibratedRoute(algorithm);
   return {
     scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
     lookaheadInterval: isMultiScaleModel ? 8 : 0,
-    detailBoost: isMultiScaleModel ? 0.08 : 0,
+    detailBoost: referenceCalibratedRoute ? 0.2 : isMultiScaleModel ? 0.08 : 0,
+    adaptiveRouteProfile: referenceCalibratedRoute ? "reference-v1" : null,
     targetNailDistance: isMultiScaleModel ? 75.5 : 76,
     distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
     distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-    nailBalanceMultiplier: improvedRouteModel ? 1.4 : 1,
-    directionBalanceStrength: improvedRouteModel ? 0.0011 : 0.0005,
-    directionBalanceLimit: improvedRouteModel ? 0.035 : 0.015,
-    parallelPenaltyImmediate: improvedRouteModel ? 0.055 : 0.025,
-    parallelPenaltyHistory: improvedRouteModel ? 0.0045 : 0.003,
-    parallelPenaltyLimit: improvedRouteModel ? 0.095 : 0.055,
-    repeatBiasStep: improvedRouteModel ? 0.11 : 0.085,
-    repeatBiasLimit: improvedRouteModel ? 0.34 : 0.28,
+    nailBalanceMultiplier: 1,
+    directionBalanceStrength: 0.0005,
+    directionBalanceLimit: 0.015,
+    parallelPenaltyImmediate: 0.025,
+    parallelPenaltyHistory: 0.003,
+    parallelPenaltyLimit: 0.055,
+    repeatBiasStep: 0.085,
+    repeatBiasLimit: 0.28,
   };
 }
 
@@ -626,8 +692,10 @@ function updateImproveButton() {
 }
 
 function updateEnhancementControls() {
-  const enabled = enhanceInput.checked;
+  const referenceMode = isReferenceAlgorithm(algorithmInput.value);
+  const enabled = enhanceInput.checked && !referenceMode;
   enhancementControls.classList.toggle("is-disabled", !enabled);
+  enhanceInput.disabled = referenceMode;
   contrastInput.disabled = !enabled;
   sharpnessInput.disabled = !enabled;
   sourceCanvas.setAttribute(
@@ -654,7 +722,7 @@ function readSettings() {
     offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
-    enhancePhoto: enhanceInput.checked,
+    enhancePhoto: enhanceInput.checked && !isReferenceAlgorithm(algorithm),
     contrast: clampNumber(contrastInput.value, 0, 100) / 100,
     sharpness: clampNumber(sharpnessInput.value, 0, 100) / 100,
     algorithm,
@@ -665,16 +733,29 @@ function prepareImage(settings) {
   const frame = createSourceFrame(settings, WORK_SIZE);
   const { analysisGray, detailPriority } = buildAnalysisMaps(frame, settings);
   const target = new Float32Array(WORK_SIZE * WORK_SIZE);
+  const referenceMode = isReferenceAlgorithm(settings.algorithm);
   const analysisPreview = settings.enhancePhoto
     ? renderAnalysisPreview(frame, analysisGray, detailPriority)
     : null;
-  const threadTarget = buildThreadTarget(
-    analysisGray,
-    frame.mask,
-    WORK_SIZE,
-    settings,
-    detailPriority,
-  );
+  const threadTarget = referenceMode
+    ? {
+        target,
+        importance: null,
+        detailWeight: null,
+        tangentX: null,
+        tangentY: null,
+        orientationConfidence: null,
+      }
+    : buildThreadTarget(
+        analysisGray,
+        frame.mask,
+        WORK_SIZE,
+        settings,
+        detailPriority,
+      );
+  const referenceTarget = referenceMode
+    ? prepareReferenceTarget(settings)
+    : null;
 
   for (let index = 0; index < target.length; index++) {
     const offset = index * 4;
@@ -698,7 +779,13 @@ function prepareImage(settings) {
     tangentX: threadTarget.tangentX,
     tangentY: threadTarget.tangentY,
     orientationConfidence: threadTarget.orientationConfidence,
+    referenceTarget,
   };
+}
+
+function prepareReferenceTarget(settings) {
+  const frame = createSourceFrame(settings, REFERENCE_WORK_SIZE);
+  return createReferenceTarget(frame.data, REFERENCE_WORK_SIZE);
 }
 
 function createSourceFrame(settings, size) {
@@ -869,6 +956,7 @@ function buildOpticalDensityTarget(
   settings,
   detailPriority,
 ) {
+  const referenceCalibrated = usesReferenceCalibratedRoute(settings.algorithm);
   const localMean = boxBlurFast(normalized, mask, size, 5);
   const edges = sobelMagnitude(normalized, mask, size);
   const target = new Float32Array(normalized.length);
@@ -884,16 +972,34 @@ function buildOpticalDensityTarget(
     const detail = Math.pow(clamp01(localDark * 4.5), 0.68);
     const edge = Math.pow(edges[i], 0.72);
     const structuralPriority = detailPriority?.[i] || 0;
-    const desiredCrossings = 4.1
-      + opticalDensity * 2.25
-      + detail * 1.6
-      + edge * 0.85
-      + structuralPriority * 1.35;
+    const darkness = clamp01(1 - normalized[i]);
+    const edgeToneWeight = referenceCalibrated
+      ? 0.3 + Math.pow(darkness, 0.62) * 0.95
+      : 1;
+    const desiredCrossings = referenceCalibrated
+      ? 3.05
+        + opticalDensity * 2.95
+        + detail * 2.2
+        + edge * edgeToneWeight * 0.85
+        + structuralPriority * 1.5
+      : 4.1
+        + opticalDensity * 2.25
+        + detail * 1.6
+        + edge * 0.85
+        + structuralPriority * 1.35;
     target[i] = desiredCrossings;
-    importance[i] = Math.min(
-      4.8,
-      0.8 + detail + edge * 2 + structuralPriority * 2.4,
-    );
+    importance[i] = referenceCalibrated
+      ? Math.min(
+          5.2,
+          0.72
+            + detail * 1.45
+            + edge * edgeToneWeight * 1.9
+            + structuralPriority * 2.6,
+        )
+      : Math.min(
+          4.8,
+          0.8 + detail + edge * 2 + structuralPriority * 2.4,
+        );
     rawTotal += desiredCrossings;
     pixelCount++;
   }
@@ -1503,7 +1609,8 @@ function drawResultBase(settings) {
 }
 
 function drawThreadLines(lines, settings, startIndex = 0) {
-  const opticalPreview = isOpticalAlgorithm(settings.algorithm);
+  const opticalPreview = isOpticalAlgorithm(settings.algorithm)
+    || isReferenceAlgorithm(settings.algorithm);
   renderStringArtLines(resultCtx, lines, state.points, {
     canvasSize: resultCanvas.width,
     workSize: WORK_SIZE,
@@ -1615,13 +1722,6 @@ function setExportEnabled(enabled) {
   txtButton.disabled = !enabled;
 }
 
-function setBuildModeEnabled(enabled) {
-  if (!buildModeLink) return;
-  buildModeLink.classList.toggle("is-disabled", !enabled);
-  buildModeLink.setAttribute("aria-disabled", String(!enabled));
-  buildModeLink.tabIndex = enabled ? 0 : -1;
-}
-
 async function persistLatestPattern(settings) {
   if (state.sequence.length < 2) return;
   try {
@@ -1638,9 +1738,7 @@ async function persistLatestPattern(settings) {
       threadMm: settings.threadMm,
       createdAt: new Date().toISOString(),
     });
-    if (!destroyed) setBuildModeEnabled(true);
   } catch (error) {
-    if (!destroyed) setBuildModeEnabled(false);
     console.warn("Не удалось сохранить схему для режима сборки", error);
   }
 }
@@ -1688,6 +1786,9 @@ function smoothStep(edge0, edge1, value) {
 function waitFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
+
+imageInput.disabled = false;
+schemeInput.disabled = false;
 
 return cleanup;
 }

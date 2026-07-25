@@ -1,16 +1,13 @@
 "use client";
 
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Pause,
-  Play,
-  RotateCcw,
-  Upload,
-  Volume2,
-} from "lucide-react";
-import Link from "next/link";
+import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
+import Pause from "lucide-react/dist/esm/icons/pause.mjs";
+import Play from "lucide-react/dist/esm/icons/play.mjs";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
+import Upload from "lucide-react/dist/esm/icons/upload.mjs";
+import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
 import { useEffect, useReducer, useRef, useState } from "react";
 
 import { buildSessionReducer, initialBuildSessionState } from "../../core/build-session.js";
@@ -185,11 +182,12 @@ export default function BuildMode() {
       <section className="build-workspace">
         <header className="build-header">
           <div>
-            <Link className="back-link" href="/">
+            <a className="back-link" href="/">
               <ArrowLeft aria-hidden="true" size={18} />
               Генератор
-            </Link>
+            </a>
             <h1>Режим сборки</h1>
+            <p>Следуйте последовательности точек и сохраняйте прогресс автоматически.</p>
           </div>
           <label className="file-button">
             <Upload aria-hidden="true" size={18} />
@@ -298,7 +296,7 @@ export default function BuildMode() {
           </div>
         )}
 
-        {message && <p className="build-message">{message}</p>}
+        {message && <p className="build-message" aria-live="polite">{message}</p>}
       </section>
 
       <aside className="build-controls">
