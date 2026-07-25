@@ -78,6 +78,8 @@ export function mountStringArtApp(root = document) {
       startClientY: 0,
       startOffsetX: 0,
       startOffsetY: 0,
+      pointers: new Map(),
+      gesture: null,
     },
   };
 
@@ -97,6 +99,8 @@ export function mountStringArtApp(root = document) {
     destroyed = true;
     state.cancelled = true;
     state.crop.dragging = false;
+    state.crop.pointers.clear();
+    state.crop.gesture = null;
     listenerController.abort();
     if (cropPreviewFrame) cancelAnimationFrame(cropPreviewFrame);
     if (state.cancelActiveRun) state.cancelActiveRun();
@@ -197,25 +201,49 @@ export function mountStringArtApp(root = document) {
 
   listen(sourceCanvas, "pointerdown", (event) => {
     if (!state.image || state.running) return;
-    sourceCanvas.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    try {
+      sourceCanvas.setPointerCapture(event.pointerId);
+    } catch {
+      // Some mobile browsers reject capture while a second touch is joining.
+    }
     state.crop.dragging = true;
-    state.crop.pointerId = event.pointerId;
-    state.crop.startClientX = event.clientX;
-    state.crop.startClientY = event.clientY;
-    state.crop.startOffsetX = state.crop.offsetX;
-    state.crop.startOffsetY = state.crop.offsetY;
+    state.crop.pointers.set(event.pointerId, {
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    if (state.crop.pointers.size >= 2) {
+      beginPinchGesture();
+    } else {
+      beginPanGesture(event.pointerId, event);
+    }
   });
 
   listen(sourceCanvas, "pointermove", (event) => {
     if (
       !state.crop.dragging
-      || state.crop.pointerId !== event.pointerId
+      || !state.crop.pointers.has(event.pointerId)
       || !state.image
       || state.running
     ) {
       return;
     }
     const pointerEvent = event.getCoalescedEvents?.().at(-1) || event;
+    state.crop.pointers.set(event.pointerId, {
+      clientX: pointerEvent.clientX,
+      clientY: pointerEvent.clientY,
+    });
+    if (state.crop.pointers.size >= 2) {
+      if (state.crop.gesture?.type !== "pinch") beginPinchGesture();
+      updatePinchGesture();
+      return;
+    }
+    if (
+      state.crop.gesture?.type !== "pan"
+      || state.crop.pointerId !== event.pointerId
+    ) {
+      beginPanGesture(event.pointerId, pointerEvent);
+    }
     const rect = sourceCanvas.getBoundingClientRect();
     const scale = WORK_SIZE / rect.width;
     state.crop.offsetX = state.crop.startOffsetX
@@ -226,8 +254,8 @@ export function mountStringArtApp(root = document) {
     drawPreparedPreview();
   });
 
-  listen(sourceCanvas, "pointerup", stopDragging);
-  listen(sourceCanvas, "pointercancel", stopDragging);
+  listen(sourceCanvas, "pointerup", finishCropPointer);
+  listen(sourceCanvas, "pointercancel", finishCropPointer);
 
   listen(sourceCanvas, "wheel", (event) => {
     if (!state.image || state.running) return;
@@ -272,8 +300,6 @@ export function mountStringArtApp(root = document) {
     try {
       const result = await runReferenceWorker(settings, prepared.target, renderedLines);
       state.cancelled = result.cancelled;
-      drawResultBase(settings);
-      drawThreadLines(renderedLines, settings);
       updateSummary(settings, renderedLines.length);
       sequenceOutput.value = formatSequence(
         state.sequence,
@@ -615,26 +641,103 @@ export function mountStringArtApp(root = document) {
     state.crop.offsetY = 0;
     state.crop.dragging = false;
     state.crop.pointerId = null;
+    state.crop.pointers.clear();
+    state.crop.gesture = null;
     zoomInput.value = "1";
     updateZoomControl();
   }
 
-  function stopDragging(event) {
-    if (
-      !state.crop.dragging
-      || (event && state.crop.pointerId !== event.pointerId)
-    ) {
+  function beginPanGesture(pointerId, pointer) {
+    state.crop.gesture = { type: "pan" };
+    state.crop.pointerId = pointerId;
+    state.crop.startClientX = pointer.clientX;
+    state.crop.startClientY = pointer.clientY;
+    state.crop.startOffsetX = state.crop.offsetX;
+    state.crop.startOffsetY = state.crop.offsetY;
+  }
+
+  function beginPinchGesture() {
+    const [first, second] = [...state.crop.pointers.values()];
+    if (!first || !second) return;
+    const rect = sourceCanvas.getBoundingClientRect();
+    const midpoint = getPointerMidpoint(first, second);
+    state.crop.gesture = {
+      type: "pinch",
+      startDistance: Math.max(1, getPointerDistance(first, second)),
+      startZoom: state.crop.zoom,
+      startOffsetX: state.crop.offsetX,
+      startOffsetY: state.crop.offsetY,
+      startAnchor: canvasPointToWorkPoint(midpoint, rect),
+    };
+    state.crop.pointerId = null;
+  }
+
+  function updatePinchGesture() {
+    const [first, second] = [...state.crop.pointers.values()];
+    const gesture = state.crop.gesture;
+    if (!first || !second || gesture?.type !== "pinch") return;
+
+    const rect = sourceCanvas.getBoundingClientRect();
+    const currentAnchor = canvasPointToWorkPoint(
+      getPointerMidpoint(first, second),
+      rect,
+    );
+    const nextZoom = clampNumber(
+      gesture.startZoom
+        * (getPointerDistance(first, second) / gesture.startDistance),
+      1,
+      4,
+    );
+    const ratio = nextZoom / gesture.startZoom;
+    state.crop.zoom = nextZoom;
+    state.crop.offsetX = currentAnchor.x - WORK_SIZE / 2
+      - (gesture.startAnchor.x - WORK_SIZE / 2 - gesture.startOffsetX) * ratio;
+    state.crop.offsetY = currentAnchor.y - WORK_SIZE / 2
+      - (gesture.startAnchor.y - WORK_SIZE / 2 - gesture.startOffsetY) * ratio;
+    zoomInput.value = nextZoom.toFixed(2);
+    clampCropToImage();
+    updateZoomControl();
+    drawPreparedPreview();
+  }
+
+  function finishCropPointer(event) {
+    if (!state.crop.pointers.has(event.pointerId)) return;
+    state.crop.pointers.delete(event.pointerId);
+    if (sourceCanvas.hasPointerCapture(event.pointerId)) {
+      try {
+        sourceCanvas.releasePointerCapture(event.pointerId);
+      } catch {
+        // The browser may already have released capture after touch cancellation.
+      }
+    }
+    if (state.crop.pointers.size >= 2) {
+      beginPinchGesture();
       return;
     }
-    if (
-      event
-      && sourceCanvas.hasPointerCapture(event.pointerId)
-    ) {
-      sourceCanvas.releasePointerCapture(event.pointerId);
+    if (state.crop.pointers.size === 1) {
+      const [pointerId, pointer] = state.crop.pointers.entries().next().value;
+      beginPanGesture(pointerId, pointer);
+      return;
     }
+
     state.crop.dragging = false;
     state.crop.pointerId = null;
+    state.crop.gesture = null;
     invalidateResult();
+  }
+
+  function getPointerMidpoint(first, second) {
+    return {
+      clientX: (first.clientX + second.clientX) / 2,
+      clientY: (first.clientY + second.clientY) / 2,
+    };
+  }
+
+  function getPointerDistance(first, second) {
+    return Math.hypot(
+      second.clientX - first.clientX,
+      second.clientY - first.clientY,
+    );
   }
 
   function canvasPointToWorkPoint(event, rect) {
@@ -726,7 +829,9 @@ export function mountStringArtApp(root = document) {
   }
 
   function drawResultBase(settings) {
-    renderStringArtBase(resultCtx, settings.points, resultCanvas.width);
+    renderStringArtBase(resultCtx, settings.points, resultCanvas.width, {
+      showLabels: false,
+    });
   }
 
   function drawThreadLines(lines, settings, startIndex = 0) {
@@ -739,7 +844,7 @@ export function mountStringArtApp(root = document) {
   }
 
   function drawNails(context, points, canvasSize) {
-    renderNails(context, points, canvasSize);
+    renderNails(context, points, canvasSize, { showLabels: false });
   }
 
   function buildCirclePoints(count, radius, centerX, centerY) {
