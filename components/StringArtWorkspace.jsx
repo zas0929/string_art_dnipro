@@ -1,6 +1,10 @@
 "use client";
 
-import { ImagePlus, Play, RotateCcw, Sparkles, Upload } from "lucide-react";
+import ImagePlus from "lucide-react/dist/esm/icons/image-plus.mjs";
+import Play from "lucide-react/dist/esm/icons/play.mjs";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
+import Sparkles from "lucide-react/dist/esm/icons/sparkles.mjs";
+import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 
 export default function StringArtWorkspace() {
   return (
@@ -13,27 +17,17 @@ export default function StringArtWorkspace() {
         <div className="topbar-actions">
           <label className="file-button">
             <Upload aria-hidden="true" size={18} strokeWidth={2} />
-            <input id="schemeInput" type="file" accept=".txt,.csv,text/plain,text/csv" />
+            <input id="schemeInput" type="file" accept=".txt,.csv,text/plain,text/csv" disabled />
             Загрузить схему
           </label>
           <label className="file-button">
             <ImagePlus aria-hidden="true" size={18} strokeWidth={2} />
-            <input id="imageInput" type="file" accept="image/*" />
+            <input id="imageInput" type="file" accept="image/*" disabled />
             Загрузить фото
           </label>
           <button id="buildButton" type="button" disabled>
             <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
             Построить
-          </button>
-          <button
-            id="improveButton"
-            className="improve-button"
-            type="button"
-            title="Экспериментально улучшить слабые участки"
-            disabled
-          >
-            <Sparkles aria-hidden="true" size={18} strokeWidth={2} />
-            <span id="improveButtonLabel">Улучшить участки</span>
           </button>
         </div>
       </div>
@@ -41,6 +35,16 @@ export default function StringArtWorkspace() {
       <div className="stage">
         <div className="canvas-column">
           <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
+          <button
+            id="improveButton"
+            className="improve-button canvas-action"
+            type="button"
+            title="Экспериментально улучшить слабые участки"
+            disabled
+          >
+            <Sparkles aria-hidden="true" size={18} strokeWidth={2} />
+            <span id="improveButtonLabel">Улучшить участки</span>
+          </button>
         </div>
         <div className="canvas-column">
           <canvas id="sourceCanvas" width="760" height="760" aria-label="Исходное фото и выбранный кадр" />

@@ -22,13 +22,36 @@ export async function loadBuildProgress(patternId) {
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Локальное хранилище не ответило вовремя"));
+    }, 3000);
+    const finish = (callback, value) => {
+      if (settled) {
+        if (value && typeof value.close === "function") value.close();
+        return;
+      }
+      settled = true;
+      clearTimeout(timeout);
+      callback(value);
+    };
+
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
         request.result.createObjectStore(STORE_NAME);
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Не удалось открыть локальное хранилище"));
+    request.onsuccess = () => finish(resolve, request.result);
+    request.onerror = () => finish(
+      reject,
+      request.error || new Error("Не удалось открыть локальное хранилище"),
+    );
+    request.onblocked = () => finish(
+      reject,
+      new Error("Локальное хранилище заблокировано другой вкладкой"),
+    );
   });
 }
 

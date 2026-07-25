@@ -21,7 +21,7 @@ import {
   renderStringArtBase,
   renderStringArtLines,
 } from "./core/string-art-renderer.js";
-import { loadLatestPattern, saveLatestPattern } from "./storage/local-project-store.js";
+import { saveLatestPattern } from "./storage/local-project-store.js";
 
 const mountedApps = new WeakMap();
 
@@ -72,8 +72,6 @@ const linesOut = getElement("linesOut");
 const stepOut = getElement("stepOut");
 const lengthOut = getElement("lengthOut");
 const sequenceOutput = getElement("sequenceOutput");
-const buildModeLink = root.querySelector("#buildModeLink");
-
 const state = {
   image: null,
   prepared: null,
@@ -124,14 +122,6 @@ mountedApps.set(root, cleanup);
 
 drawEmpty();
 updateEnhancementControls();
-if (buildModeLink) {
-  void loadLatestPattern()
-    .then((pattern) => {
-      if (!destroyed) setBuildModeEnabled(Boolean(pattern));
-    })
-    .catch(() => setBuildModeEnabled(false));
-}
-
 listen(imageInput, "change", async (event) => {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
@@ -1615,13 +1605,6 @@ function setExportEnabled(enabled) {
   txtButton.disabled = !enabled;
 }
 
-function setBuildModeEnabled(enabled) {
-  if (!buildModeLink) return;
-  buildModeLink.classList.toggle("is-disabled", !enabled);
-  buildModeLink.setAttribute("aria-disabled", String(!enabled));
-  buildModeLink.tabIndex = enabled ? 0 : -1;
-}
-
 async function persistLatestPattern(settings) {
   if (state.sequence.length < 2) return;
   try {
@@ -1638,9 +1621,7 @@ async function persistLatestPattern(settings) {
       threadMm: settings.threadMm,
       createdAt: new Date().toISOString(),
     });
-    if (!destroyed) setBuildModeEnabled(true);
   } catch (error) {
-    if (!destroyed) setBuildModeEnabled(false);
     console.warn("Не удалось сохранить схему для режима сборки", error);
   }
 }
@@ -1688,6 +1669,9 @@ function smoothStep(edge0, edge1, value) {
 function waitFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
+
+imageInput.disabled = false;
+schemeInput.disabled = false;
 
 return cleanup;
 }

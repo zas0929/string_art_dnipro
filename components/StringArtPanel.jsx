@@ -1,7 +1,8 @@
 "use client";
 
-import { FileImage, FileText, ListChecks } from "lucide-react";
-import Link from "next/link";
+import FileImage from "lucide-react/dist/esm/icons/file-image.mjs";
+import FileText from "lucide-react/dist/esm/icons/file-text.mjs";
+import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 
 export default function StringArtPanel() {
   return (
@@ -95,16 +96,10 @@ export default function StringArtPanel() {
         </button>
       </div>
 
-      <Link
-        id="buildModeLink"
-        className="command-link is-disabled"
-        href="/build"
-        aria-disabled="true"
-        tabIndex={-1}
-      >
+      <a id="buildModeLink" className="command-link" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
         Режим сборки
-      </Link>
+      </a>
 
       <div className="summary">
         <h2>Инструкция</h2>

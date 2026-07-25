@@ -402,6 +402,10 @@ button:disabled {
   background: transparent;
 }
 
+.canvas-action {
+  width: 100%;
+}
+
 .stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
