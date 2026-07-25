@@ -43,6 +43,7 @@ export default function StringArtPanel() {
             <option value="portrait-v4">Портрет v4 · оптическая модель</option>
             <option value="portrait-v5">Портрет v5 · стабильный</option>
             <option value="portrait-v6">Портрет v6 · экспериментальный</option>
+            <option value="reference-v7">Reference v7 · эталонное ядро</option>
           </select>
         </label>
         <div id="enhancementControls" className="enhancement-controls is-disabled">

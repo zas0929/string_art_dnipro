@@ -13,6 +13,7 @@ test("generator and build mode share working navigation", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
   await expect(page.locator("#algorithmInput")).toContainText("Портрет v6");
+  await expect(page.locator("#algorithmInput")).toContainText("Reference v7");
 
   const buildModeLink = page.getByRole("link", { name: "Режим сборки" });
   await expect(buildModeLink).toBeVisible();
