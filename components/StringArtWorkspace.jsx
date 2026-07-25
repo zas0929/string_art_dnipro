@@ -1,7 +1,9 @@
 "use client";
 
 import ImagePlus from "lucide-react/dist/esm/icons/image-plus.mjs";
+import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
+import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 
@@ -14,15 +16,15 @@ export default function StringArtWorkspace() {
           <p>Создать картину в стиле String Art по фото</p>
         </div>
         <div className="topbar-actions">
-          <label className="file-button">
-            <Upload aria-hidden="true" size={18} strokeWidth={2} />
-            <input id="schemeInput" type="file" accept=".txt,.csv,text/plain,text/csv" disabled />
-            Загрузить схему
-          </label>
-          <label className="file-button">
+          <label className="file-button photo-upload">
             <ImagePlus aria-hidden="true" size={18} strokeWidth={2} />
             <input id="imageInput" type="file" accept="image/*" disabled />
             Загрузить фото
+          </label>
+          <label className="file-button scheme-upload">
+            <Upload aria-hidden="true" size={18} strokeWidth={2} />
+            <input id="schemeInput" type="file" accept=".txt,.csv,text/plain,text/csv" disabled />
+            Загрузить схему
           </label>
           <button id="buildButton" type="button" disabled>
             <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
@@ -32,10 +34,7 @@ export default function StringArtWorkspace() {
       </div>
 
       <div className="stage">
-        <div className="canvas-column">
-          <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
-        </div>
-        <div className="canvas-column">
+        <div className="canvas-column source-column">
           <canvas id="sourceCanvas" width="760" height="760" aria-label="Исходное фото и выбранный кадр" />
           <div className="crop-controls">
             <div className="crop-control-heading">
@@ -43,6 +42,16 @@ export default function StringArtWorkspace() {
               <output id="zoomValue" htmlFor="zoomInput">100%</output>
             </div>
             <div className="crop-control-row">
+              <button
+                id="zoomOutButton"
+                className="zoom-step-button"
+                type="button"
+                title="Уменьшить масштаб"
+                aria-label="Уменьшить масштаб"
+                disabled
+              >
+                <Minus aria-hidden="true" size={17} strokeWidth={2.2} />
+              </button>
               <input
                 id="zoomInput"
                 type="range"
@@ -53,6 +62,16 @@ export default function StringArtWorkspace() {
                 aria-label="Масштаб фото"
                 disabled
               />
+              <button
+                id="zoomInButton"
+                className="zoom-step-button"
+                type="button"
+                title="Увеличить масштаб"
+                aria-label="Увеличить масштаб"
+                disabled
+              >
+                <Plus aria-hidden="true" size={17} strokeWidth={2.2} />
+              </button>
               <button
                 id="resetCropButton"
                 className="crop-reset-button"
@@ -65,6 +84,13 @@ export default function StringArtWorkspace() {
               </button>
             </div>
           </div>
+          <button id="mobileBuildButton" className="mobile-build-button" type="button" disabled>
+            <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
+            Построить макет
+          </button>
+        </div>
+        <div className="canvas-column result-column">
+          <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
         </div>
       </div>
 

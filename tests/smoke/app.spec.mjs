@@ -27,14 +27,36 @@ test("generator and build mode share working navigation", async ({ page }) => {
 });
 
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chrome", "Desktop generation smoke test");
-
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("/");
   await waitForGenerator(page);
+  if (testInfo.project.name === "mobile-chrome") {
+    await expect.poll(() => canvasTop(page, "#sourceCanvas")).toBeLessThan(
+      await canvasTop(page, "#resultCanvas"),
+    );
+  }
+
   await page.locator("#linesInput").fill("100");
   await page.locator("#imageInput").setInputFiles(path.resolve("test-photo.png"));
-  await expect(page.getByRole("button", { name: "Построить" })).toBeEnabled();
-  await page.getByRole("button", { name: "Построить" }).click();
+  await page.getByRole("button", { name: "Увеличить масштаб" }).click();
+  await expect(page.locator("#zoomValue")).toHaveText("105%");
+  await page.getByRole("button", { name: "Увеличить масштаб" }).click();
+  await page.getByRole("button", { name: "Уменьшить масштаб" }).click();
+  await expect(page.locator("#zoomValue")).toHaveText("105%");
+
+  const sourceBox = await page.locator("#sourceCanvas").boundingBox();
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 24, sourceBox.y + sourceBox.height / 2 + 18);
+  await page.mouse.up();
+
+  const buildButtonName = testInfo.project.name === "mobile-chrome"
+    ? "Построить макет"
+    : "Построить";
+  const buildButton = page.getByRole("button", { name: buildButtonName });
+  await expect(buildButton).toBeEnabled();
+  await buildButton.click();
 
   await expect(page.locator("#status")).toHaveText(
     "Готово. Инструкция построена.",
@@ -46,6 +68,10 @@ test("the single reference core generates a route from a photo", async ({ page }
     pointCount: 240,
     lineCount: 100,
   });
+  if (testInfo.project.name === "mobile-chrome") {
+    await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
+  }
+  expect(pageErrors).toEqual([]);
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
@@ -147,6 +173,17 @@ async function hasHorizontalOverflow(page) {
   return page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
   );
+}
+
+async function canvasTop(page, selector) {
+  return page.locator(selector).evaluate((element) => element.getBoundingClientRect().top);
+}
+
+async function resultIsNearViewportTop(page) {
+  return page.locator("#resultCanvas").evaluate((element) => {
+    const top = element.getBoundingClientRect().top;
+    return top >= -2 && top < window.innerHeight * 0.25;
+  });
 }
 
 async function waitForGenerator(page) {

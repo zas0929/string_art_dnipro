@@ -475,7 +475,6 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         canvasSize: BUILD_CANVAS_SIZE,
         workSize: STRING_ART_WORK_SIZE,
         threadMm: pattern.threadMm ?? 0.19,
-        opticalPreview: true,
         startIndex: renderCache.renderedLines,
         endIndex: completedLines,
       });
