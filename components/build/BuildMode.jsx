@@ -466,11 +466,9 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
     }
 
     const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
-    if (completedLines < renderCache.renderedLines) {
-      renderStringArtBase(renderCache.base, renderCache.displayPoints.length, BUILD_CANVAS_SIZE);
-      renderCache.renderedLines = 0;
-    }
-    if (completedLines > renderCache.renderedLines) {
+    const linesToAdd = completedLines - renderCache.renderedLines;
+    const canExtendCurrentFrame = linesToAdd >= 0 && linesToAdd <= 120;
+    if (canExtendCurrentFrame && linesToAdd > 0) {
       renderStringArtLines(renderCache.base, renderCache.allLines, renderCache.workPoints, {
         canvasSize: BUILD_CANVAS_SIZE,
         workSize: STRING_ART_WORK_SIZE,
@@ -481,15 +479,19 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       renderCache.renderedLines = completedLines;
     }
 
-    const { baseCanvas, displayPoints } = renderCache;
+    const { displayPoints } = renderCache;
     const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
     const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
-    const animationStartedAt = performance.now();
+    let activeBaseCanvas = renderCache.baseCanvas;
+    let animationStartedAt = performance.now();
+    let active = true;
     let animationFrame = 0;
+    let rebuildFrame = 0;
+    let rebuildTimer = 0;
 
     const render = (now) => {
       context.clearRect(0, 0, BUILD_CANVAS_SIZE, BUILD_CANVAS_SIZE);
-      context.drawImage(baseCanvas, 0, 0);
+      context.drawImage(activeBaseCanvas, 0, 0);
 
       if (from && to) {
         const duration = Math.max(300, speedMs * 0.72);
@@ -523,8 +525,61 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       if (playback === "playing" && to) animationFrame = requestAnimationFrame(render);
     };
 
-    render(animationStartedAt);
-    return () => cancelAnimationFrame(animationFrame);
+    const restartAnimation = () => {
+      cancelAnimationFrame(animationFrame);
+      animationStartedAt = performance.now();
+      render(animationStartedAt);
+    };
+
+    restartAnimation();
+
+    if (!canExtendCurrentFrame) {
+      rebuildTimer = window.setTimeout(() => {
+        if (!active) return;
+        const nextCanvas = document.createElement("canvas");
+        nextCanvas.width = BUILD_CANVAS_SIZE;
+        nextCanvas.height = BUILD_CANVAS_SIZE;
+        const nextContext = nextCanvas.getContext("2d");
+        if (!nextContext) return;
+
+        renderStringArtBase(
+          nextContext,
+          renderCache.displayPoints.length,
+          BUILD_CANVAS_SIZE,
+        );
+        let cursor = 0;
+        const renderChunk = () => {
+          if (!active) return;
+          const chunkEnd = Math.min(cursor + 160, completedLines);
+          renderStringArtLines(nextContext, renderCache.allLines, renderCache.workPoints, {
+            canvasSize: BUILD_CANVAS_SIZE,
+            workSize: STRING_ART_WORK_SIZE,
+            threadMm: pattern.threadMm ?? 0.19,
+            startIndex: cursor,
+            endIndex: chunkEnd,
+          });
+          cursor = chunkEnd;
+          if (cursor < completedLines) {
+            rebuildFrame = requestAnimationFrame(renderChunk);
+            return;
+          }
+
+          renderCache.baseCanvas = nextCanvas;
+          renderCache.base = nextContext;
+          renderCache.renderedLines = completedLines;
+          activeBaseCanvas = nextCanvas;
+          restartAnimation();
+        };
+        renderChunk();
+      }, 60);
+    }
+
+    return () => {
+      active = false;
+      window.clearTimeout(rebuildTimer);
+      cancelAnimationFrame(rebuildFrame);
+      cancelAnimationFrame(animationFrame);
+    };
   }, [pattern, playback, speedMs, stepIndex]);
 
   return (

@@ -146,6 +146,42 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 });
 
+test("build canvas survives repeated mobile seeking", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chrome", "Mobile-only canvas assertion");
+
+  const sequence = Array.from(
+    { length: 1601 },
+    (_, index) => ((index * 73) % 240) + 1,
+  );
+  const longScheme = [
+    "Points______Lines/n1____0/",
+    ...sequence.map((point, index) => `${point}____  ${index + 1}`),
+  ].join("\n");
+
+  await page.goto("/build");
+  await page.getByLabel("Загрузить схему").setInputFiles({
+    name: "long-mobile-scheme.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(longScheme),
+  });
+  await expect(page.getByText("Шаг 1 из 1601")).toBeVisible();
+
+  const seek = page.locator(".build-seek");
+  await setRangeValue(seek, 1200);
+  await expect(page.getByText("Шаг 1201 из 1601")).toBeVisible();
+  await page.waitForTimeout(900);
+  const forwardFrame = await canvasSignature(page);
+
+  await setRangeValue(seek, 350);
+  await expect(page.getByText("Шаг 351 из 1601")).toBeVisible();
+  await page.waitForTimeout(700);
+  const backwardFrame = await canvasSignature(page);
+  expect(backwardFrame.hash).not.toBe(forwardFrame.hash);
+
+  await setRangeValue(seek, 1200);
+  await expect.poll(() => canvasSignature(page), { timeout: 5_000 }).toEqual(forwardFrame);
+});
+
 async function readLatestPattern(page) {
   return page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
@@ -206,6 +242,42 @@ async function resultIsNearViewportTop(page) {
   return page.locator("#resultCanvas").evaluate((element) => {
     const top = element.getBoundingClientRect().top;
     return top >= -2 && top < window.innerHeight * 0.25;
+  });
+}
+
+async function setRangeValue(locator, value) {
+  await locator.evaluate((input, nextValue) => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    ).set;
+    setter.call(input, String(nextValue));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
+async function canvasSignature(page) {
+  return page.locator(".build-canvas").evaluate((canvas) => {
+    const { data } = canvas.getContext("2d").getImageData(
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+    let hash = 2166136261;
+    let darkSamples = 0;
+    for (let index = 0; index < data.length; index += 68) {
+      const luminance = data[index] + data[index + 1] + data[index + 2];
+      if (luminance < 420) darkSamples += 1;
+      hash ^= data[index];
+      hash = Math.imul(hash, 16777619);
+      hash ^= data[index + 1];
+      hash = Math.imul(hash, 16777619);
+      hash ^= data[index + 2];
+      hash = Math.imul(hash, 16777619);
+    }
+    return { hash: hash >>> 0, darkSamples };
   });
 }
 
