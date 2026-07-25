@@ -385,11 +385,16 @@ button:disabled {
   pointer-events: none;
 }
 
-#buildButton {
+#buildButton,
+.mobile-build-button {
   background: var(--accent);
   color: #091109;
   border-color: transparent;
   font-weight: 760;
+}
+
+.mobile-build-button {
+  display: none;
 }
 
 .stage {
@@ -403,6 +408,11 @@ button:disabled {
   min-width: 0;
   display: grid;
   gap: 10px;
+}
+
+.result-column {
+  order: -1;
+  scroll-margin-top: 12px;
 }
 
 canvas {
@@ -457,8 +467,16 @@ canvas {
   gap: 10px;
 }
 
+.zoom-step-button {
+  flex: 0 0 34px;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
 #zoomInput {
   appearance: none;
+  flex: 1 1 auto;
   min-width: 0;
   height: 28px;
   margin: 0;
@@ -664,7 +682,7 @@ textarea {
 
   .topbar-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     width: 100%;
   }
 
@@ -673,8 +691,14 @@ textarea {
     width: 100%;
   }
 
-  .topbar-actions > .file-button:first-child {
-    grid-column: 1 / -1;
+  #buildButton {
+    display: none;
+  }
+
+  .mobile-build-button {
+    display: inline-flex;
+    width: 100%;
+    min-height: 46px;
   }
 
   h1 {
@@ -683,6 +707,22 @@ textarea {
 
   .stage {
     grid-template-columns: 1fr;
+  }
+
+  .source-column {
+    order: 1;
+  }
+
+  .result-column {
+    order: 2;
+  }
+
+  .crop-control-row {
+    gap: 8px;
+  }
+
+  .crop-reset-button {
+    padding: 0 9px;
   }
 
   .build-workspace,

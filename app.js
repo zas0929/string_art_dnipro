@@ -43,8 +43,12 @@ export function mountStringArtApp(root = document) {
   const skipInput = getElement("skipInput");
   const zoomInput = getElement("zoomInput");
   const zoomValue = getElement("zoomValue");
+  const zoomOutButton = getElement("zoomOutButton");
+  const zoomInButton = getElement("zoomInButton");
   const resetCropButton = getElement("resetCropButton");
   const buildButton = getElement("buildButton");
+  const mobileBuildButton = getElement("mobileBuildButton");
+  const buildButtons = [buildButton, mobileBuildButton];
   const pngButton = getElement("pngButton");
   const txtButton = getElement("txtButton");
   const statusText = getElement("status");
@@ -69,8 +73,11 @@ export function mountStringArtApp(root = document) {
       offsetX: 0,
       offsetY: 0,
       dragging: false,
-      lastX: 0,
-      lastY: 0,
+      pointerId: null,
+      startClientX: 0,
+      startClientY: 0,
+      startOffsetX: 0,
+      startOffsetY: 0,
     },
   };
 
@@ -115,9 +122,8 @@ export function mountStringArtApp(root = document) {
       resetCrop();
       drawPreparedPreview();
       drawInitialResult();
-      zoomInput.disabled = false;
-      resetCropButton.disabled = false;
-      buildButton.disabled = false;
+      setCropControlsDisabled(false);
+      setBuildButtonsDisabled(false);
       setExportEnabled(false);
       setStatus("Фото загружено. Перетащите фото для выбора кадра или измените масштаб.");
     } catch {
@@ -140,10 +146,12 @@ export function mountStringArtApp(root = document) {
     }
   });
 
-  listen(buildButton, "click", () => {
-    if (!state.image || state.running) return;
-    void generate();
-  });
+  for (const button of buildButtons) {
+    listen(button, "click", () => {
+      if (!state.image || state.running) return;
+      void generate();
+    });
+  }
 
   listen(pngButton, "click", () => {
     downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png"));
@@ -167,12 +175,17 @@ export function mountStringArtApp(root = document) {
 
   listen(zoomInput, "input", () => {
     if (!state.image || state.running) return;
-    const hasGeneratedResult = state.sequence.length > 1;
-    state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
-    clampCropToImage();
-    updateZoomControl();
-    invalidateResult(hasGeneratedResult);
-    drawPreparedPreview();
+    setZoom(clampNumber(zoomInput.value, 1, 4));
+  });
+
+  listen(zoomOutButton, "click", () => {
+    if (!state.image || state.running) return;
+    setZoom(state.crop.zoom - 0.05);
+  });
+
+  listen(zoomInButton, "click", () => {
+    if (!state.image || state.running) return;
+    setZoom(state.crop.zoom + 0.05);
   });
 
   listen(resetCropButton, "click", () => {
@@ -186,19 +199,30 @@ export function mountStringArtApp(root = document) {
     if (!state.image || state.running) return;
     sourceCanvas.setPointerCapture(event.pointerId);
     state.crop.dragging = true;
-    state.crop.lastX = event.clientX;
-    state.crop.lastY = event.clientY;
+    state.crop.pointerId = event.pointerId;
+    state.crop.startClientX = event.clientX;
+    state.crop.startClientY = event.clientY;
+    state.crop.startOffsetX = state.crop.offsetX;
+    state.crop.startOffsetY = state.crop.offsetY;
   });
 
   listen(sourceCanvas, "pointermove", (event) => {
-    if (!state.crop.dragging || !state.image || state.running) return;
+    if (
+      !state.crop.dragging
+      || state.crop.pointerId !== event.pointerId
+      || !state.image
+      || state.running
+    ) {
+      return;
+    }
+    const pointerEvent = event.getCoalescedEvents?.().at(-1) || event;
     const rect = sourceCanvas.getBoundingClientRect();
     const scale = WORK_SIZE / rect.width;
-    state.crop.offsetX += (event.clientX - state.crop.lastX) * scale;
-    state.crop.offsetY += (event.clientY - state.crop.lastY) * scale;
+    state.crop.offsetX = state.crop.startOffsetX
+      + (pointerEvent.clientX - state.crop.startClientX) * scale;
+    state.crop.offsetY = state.crop.startOffsetY
+      + (pointerEvent.clientY - state.crop.startClientY) * scale;
     clampCropToImage();
-    state.crop.lastX = event.clientX;
-    state.crop.lastY = event.clientY;
     drawPreparedPreview();
   });
 
@@ -218,23 +242,14 @@ export function mountStringArtApp(root = document) {
     );
     if (nextZoom === previousZoom) return;
 
-    const hasGeneratedResult = state.sequence.length > 1;
-    state.crop.zoom = nextZoom;
-    zoomInput.value = nextZoom.toFixed(2);
-    updateZoomControl();
-    state.crop.offsetX = before.x - WORK_SIZE / 2
-      - ((before.x - WORK_SIZE / 2 - state.crop.offsetX) * nextZoom) / previousZoom;
-    state.crop.offsetY = before.y - WORK_SIZE / 2
-      - ((before.y - WORK_SIZE / 2 - state.crop.offsetY) * nextZoom) / previousZoom;
-    clampCropToImage();
-    invalidateResult(hasGeneratedResult);
-    drawPreparedPreview();
+    setZoom(nextZoom, before);
   }, { passive: false });
 
   async function generate() {
     state.cancelled = false;
     state.running = true;
-    buildButton.disabled = true;
+    setBuildButtonsDisabled(true);
+    setCropControlsDisabled(true);
     setExportEnabled(false);
     progress.value = 0;
     setStatus("Подготавливаю расчет...");
@@ -273,6 +288,7 @@ export function mountStringArtApp(root = document) {
           : "Готово. Инструкция построена.",
       );
       setExportEnabled(state.sequence.length > 1);
+      if (!state.cancelled) scrollToResultOnMobile();
     } catch (error) {
       setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
       setExportEnabled(state.sequence.length > 1);
@@ -282,8 +298,9 @@ export function mountStringArtApp(root = document) {
       }
       state.activeWorker = null;
       state.cancelActiveRun = null;
-      buildButton.disabled = !state.image;
+      setBuildButtonsDisabled(!state.image);
       state.running = false;
+      setCropControlsDisabled(!state.image);
     }
   }
 
@@ -442,9 +459,8 @@ export function mountStringArtApp(root = document) {
     linesInput.value = String(lineCount);
     imageInput.value = "";
     state.image = null;
-    buildButton.disabled = true;
-    zoomInput.disabled = true;
-    resetCropButton.disabled = true;
+    setBuildButtonsDisabled(true);
+    setCropControlsDisabled(true);
     state.cancelled = false;
     state.sequence = sequence.map((point) => point - 1);
     state.sequenceDisplayStart = 1;
@@ -565,6 +581,32 @@ export function mountStringArtApp(root = document) {
       "--zoom-progress",
       `${Math.max(0, Math.min(1, progressRatio)) * 100}%`,
     );
+    zoomOutButton.disabled = !state.image || state.running || state.crop.zoom <= 1;
+    zoomInButton.disabled = !state.image || state.running || state.crop.zoom >= 4;
+  }
+
+  function setZoom(value, anchor = null) {
+    const previousZoom = state.crop.zoom;
+    const nextZoom = clampNumber(value, 1, 4);
+    if (Math.abs(nextZoom - previousZoom) < 0.0001) {
+      zoomInput.value = nextZoom.toFixed(2);
+      updateZoomControl();
+      return;
+    }
+
+    const anchorX = anchor?.x ?? WORK_SIZE / 2;
+    const anchorY = anchor?.y ?? WORK_SIZE / 2;
+    const ratio = nextZoom / previousZoom;
+    state.crop.offsetX = anchorX - WORK_SIZE / 2
+      - (anchorX - WORK_SIZE / 2 - state.crop.offsetX) * ratio;
+    state.crop.offsetY = anchorY - WORK_SIZE / 2
+      - (anchorY - WORK_SIZE / 2 - state.crop.offsetY) * ratio;
+    state.crop.zoom = nextZoom;
+    zoomInput.value = nextZoom.toFixed(2);
+    clampCropToImage();
+    updateZoomControl();
+    invalidateResult(state.sequence.length > 1);
+    drawPreparedPreview();
   }
 
   function resetCrop() {
@@ -572,13 +614,26 @@ export function mountStringArtApp(root = document) {
     state.crop.offsetX = 0;
     state.crop.offsetY = 0;
     state.crop.dragging = false;
+    state.crop.pointerId = null;
     zoomInput.value = "1";
     updateZoomControl();
   }
 
-  function stopDragging() {
-    if (!state.crop.dragging) return;
+  function stopDragging(event) {
+    if (
+      !state.crop.dragging
+      || (event && state.crop.pointerId !== event.pointerId)
+    ) {
+      return;
+    }
+    if (
+      event
+      && sourceCanvas.hasPointerCapture(event.pointerId)
+    ) {
+      sourceCanvas.releasePointerCapture(event.pointerId);
+    }
     state.crop.dragging = false;
+    state.crop.pointerId = null;
     invalidateResult();
   }
 
@@ -769,6 +824,31 @@ export function mountStringArtApp(root = document) {
   function setExportEnabled(enabled) {
     pngButton.disabled = !enabled;
     txtButton.disabled = !enabled;
+  }
+
+  function setBuildButtonsDisabled(disabled) {
+    for (const button of buildButtons) button.disabled = disabled;
+  }
+
+  function setCropControlsDisabled(disabled) {
+    zoomInput.disabled = disabled;
+    resetCropButton.disabled = disabled;
+    if (disabled) {
+      zoomOutButton.disabled = true;
+      zoomInButton.disabled = true;
+    } else {
+      updateZoomControl();
+    }
+  }
+
+  function scrollToResultOnMobile() {
+    if (!window.matchMedia("(max-width: 720px)").matches) return;
+    requestAnimationFrame(() => {
+      resultCanvas.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   }
 
   async function persistLatestPattern(settings) {
