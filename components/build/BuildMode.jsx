@@ -5,12 +5,18 @@ import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
+import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
+import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useEffect, useReducer, useRef, useState } from "react";
 
-import { buildSessionReducer, initialBuildSessionState } from "../../core/build-session.js";
+import {
+  buildSessionReducer,
+  findRecentPointMatches,
+  initialBuildSessionState,
+} from "../../core/build-session.js";
 import { parseSchemeText } from "../../core/scheme-format.js";
 import {
   createCirclePoints,
@@ -28,6 +34,7 @@ import {
 export default function BuildMode() {
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
+  const [lostDialogOpen, setLostDialogOpen] = useState(false);
   const primedSpeechRef = useRef(null);
 
   useEffect(() => {
@@ -157,6 +164,17 @@ export default function BuildMode() {
     }
   };
 
+  const openLostDialog = () => {
+    dispatch({ type: "PAUSE" });
+    setLostDialogOpen(true);
+  };
+
+  const restoreLostPosition = (stepIndex) => {
+    dispatch({ type: "SEEK", stepIndex });
+    setLostDialogOpen(false);
+    setMessage(`Позиция восстановлена: выполнено соединений — ${stepIndex}.`);
+  };
+
   if (!state.hydrated) {
     return <main className="build-loading">Загружаю проект...</main>;
   }
@@ -267,6 +285,11 @@ export default function BuildMode() {
               </div>
             )}
 
+            <button className="lost-position-button" type="button" onClick={openLostDialog}>
+              <MapPin aria-hidden="true" size={18} />
+              Я потерялся
+            </button>
+
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
@@ -338,7 +361,145 @@ export default function BuildMode() {
           </dl>
         )}
       </aside>
+
+      {lostDialogOpen && (
+        <LostPositionDialog
+          sequence={state.pattern.sequence}
+          pointCount={state.pattern.pointCount}
+          onClose={() => setLostDialogOpen(false)}
+          onRestore={restoreLostPosition}
+        />
+      )}
     </main>
+  );
+}
+
+function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
+  const [points, setPoints] = useState(["", "", ""]);
+  const [matches, setMatches] = useState(null);
+  const [error, setError] = useState("");
+  const firstInputRef = useRef(null);
+
+  useEffect(() => {
+    firstInputRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const updatePoint = (index, value) => {
+    setPoints((current) => current.map(
+      (point, pointIndex) => pointIndex === index ? value : point,
+    ));
+    setMatches(null);
+    setError("");
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const parsedPoints = points.map((point) => Number.parseInt(point, 10));
+    if (
+      parsedPoints.some(
+        (point) => !Number.isInteger(point) || point < 1 || point > pointCount,
+      )
+    ) {
+      setError(`Введите три номера от 1 до ${pointCount}.`);
+      setMatches(null);
+      return;
+    }
+    setError("");
+    setMatches(findRecentPointMatches(sequence, parsedPoints));
+  };
+
+  return (
+    <div
+      className="lost-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className="lost-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="lost-dialog-title"
+      >
+        <button
+          className="lost-dialog-close"
+          type="button"
+          title="Закрыть"
+          aria-label="Закрыть"
+          onClick={onClose}
+        >
+          <X aria-hidden="true" size={20} />
+        </button>
+        <h2 id="lost-dialog-title">Найти мое место</h2>
+        <p>Введите три последние точки в том порядке, как вы их соединяли.</p>
+
+        <form onSubmit={handleSubmit}>
+          <div className="lost-point-inputs">
+            {points.map((point, index) => (
+              <label key={index}>
+                Точка {index + 1}
+                <input
+                  ref={index === 0 ? firstInputRef : undefined}
+                  type="number"
+                  min="1"
+                  max={pointCount}
+                  inputMode="numeric"
+                  value={point}
+                  aria-label={`${index + 1}-я последняя точка`}
+                  onChange={(event) => updatePoint(index, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <button className="lost-search-button" type="submit">
+            Найти
+          </button>
+        </form>
+
+        {error && <p className="lost-dialog-error" role="alert">{error}</p>}
+        {matches?.length === 0 && (
+          <p className="lost-dialog-empty" role="status">
+            Такая последовательность не найдена. Проверьте номера и их порядок.
+          </p>
+        )}
+        {matches?.length > 0 && (
+          <div className="lost-match-section" aria-live="polite">
+            <strong>
+              {matches.length === 1
+                ? "Позиция найдена"
+                : `Найдено вариантов: ${matches.length}`}
+            </strong>
+            <div className="lost-match-list">
+              {matches.map((match) => (
+                <button
+                  key={match.stepIndex}
+                  className="lost-match"
+                  type="button"
+                  onClick={() => onRestore(match.stepIndex)}
+                >
+                  <span>
+                    Выполнено соединений: <strong>{match.stepIndex}</strong>
+                  </span>
+                  <small>
+                    {match.previousPoint === null ? "Начало" : match.previousPoint}
+                    {" · "}
+                    {points.join(" → ")}
+                    {" · "}
+                    {match.nextPoint === null ? "Готово" : match.nextPoint}
+                  </small>
+                  <em>Продолжить отсюда</em>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 

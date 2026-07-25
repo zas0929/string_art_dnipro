@@ -7,6 +7,29 @@ export const initialBuildSessionState = {
   voiceEnabled: true,
 };
 
+export function findRecentPointMatches(sequence, recentPoints) {
+  if (!Array.isArray(sequence) || !Array.isArray(recentPoints) || recentPoints.length === 0) {
+    return [];
+  }
+  const needle = recentPoints.map((point) => Number.parseInt(point, 10));
+  if (needle.some((point) => !Number.isInteger(point) || point < 1)) return [];
+
+  const matches = [];
+  for (let endIndex = needle.length - 1; endIndex < sequence.length; endIndex++) {
+    const startIndex = endIndex - needle.length + 1;
+    const matchesNeedle = needle.every(
+      (point, offset) => sequence[startIndex + offset] === point,
+    );
+    if (!matchesNeedle) continue;
+    matches.push({
+      stepIndex: endIndex,
+      previousPoint: sequence[startIndex - 1] ?? null,
+      nextPoint: sequence[endIndex + 1] ?? null,
+    });
+  }
+  return matches;
+}
+
 export function buildSessionReducer(state, action) {
   switch (action.type) {
     case "HYDRATE_EMPTY":

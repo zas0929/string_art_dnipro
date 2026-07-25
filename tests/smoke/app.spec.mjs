@@ -131,6 +131,19 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
   await expect(page.locator(".nail-readout strong").first()).toHaveText("50");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("25");
+
+  await page.getByRole("button", { name: "Я потерялся" }).click();
+  await expect(page.getByRole("dialog", { name: "Найти мое место" })).toBeVisible();
+  await page.getByLabel("1-я последняя точка").fill("1");
+  await page.getByLabel("2-я последняя точка").fill("50");
+  await page.getByLabel("3-я последняя точка").fill("25");
+  await page.getByRole("button", { name: "Найти", exact: true }).click();
+  await expect(page.getByText("Позиция найдена")).toBeVisible();
+  await page.getByRole("button", { name: /Выполнено соединений: 2/ }).click();
+  await expect(page.getByRole("dialog", { name: "Найти мое место" })).toBeHidden();
+  await expect(page.getByText("Шаг 3 из 3")).toBeVisible();
+  await expect(page.locator(".nail-readout strong").first()).toHaveText("25");
+  await expect(page.locator(".nail-readout.is-next strong")).toHaveText("43");
 });
 
 test("generator and build mode do not overflow a mobile viewport", async ({ page }, testInfo) => {

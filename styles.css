@@ -206,6 +206,149 @@ textarea {
   opacity: 0.35;
 }
 
+.lost-position-button {
+  width: max-content;
+  min-height: 38px;
+  margin: 0 auto 14px;
+  color: var(--muted);
+}
+
+.lost-dialog-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(4 5 7 / 76%);
+}
+
+.lost-dialog {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 24px;
+  border: 1px solid #454b56;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 42%);
+}
+
+.lost-dialog h2 {
+  margin: 0 42px 6px 0;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.lost-dialog p {
+  margin: 0 36px 20px 0;
+  font-size: 14px;
+}
+
+.lost-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+}
+
+.lost-dialog form {
+  display: grid;
+  gap: 14px;
+}
+
+.lost-point-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lost-point-inputs label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.lost-point-inputs input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  outline: none;
+  background: #121419;
+  color: var(--text);
+  text-align: center;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lost-point-inputs input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(130 214 127 / 12%);
+}
+
+.lost-search-button {
+  width: 100%;
+  background: var(--accent);
+  color: #091109;
+  border-color: transparent;
+  font-weight: 760;
+}
+
+.lost-dialog .lost-dialog-error,
+.lost-dialog .lost-dialog-empty {
+  margin: 16px 0 0;
+}
+
+.lost-dialog-error {
+  color: var(--danger);
+}
+
+.lost-match-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.lost-match-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(320px, 42dvh);
+  overflow: auto;
+}
+
+.lost-match {
+  display: grid;
+  justify-items: start;
+  width: 100%;
+  min-height: 0;
+  gap: 5px;
+  padding: 12px;
+  white-space: normal;
+  text-align: left;
+}
+
+.lost-match span {
+  color: var(--text);
+}
+
+.lost-match small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lost-match em {
+  color: var(--accent);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .build-complete,
 .empty-build-state {
   grid-column: 1 / -1;
@@ -766,6 +909,21 @@ textarea {
     width: 28px;
     height: 28px;
     font-size: 10px;
+  }
+
+  .lost-position-button {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .lost-dialog-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .lost-dialog {
+    max-height: calc(100dvh - 20px);
+    padding: 20px 16px 16px;
   }
 
   .build-canvas-wrap {
