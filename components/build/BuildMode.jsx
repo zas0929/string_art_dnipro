@@ -285,11 +285,6 @@ export default function BuildMode() {
               </div>
             )}
 
-            <button className="lost-position-button" type="button" onClick={openLostDialog}>
-              <MapPin aria-hidden="true" size={18} />
-              Я потерялся
-            </button>
-
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
@@ -311,6 +306,11 @@ export default function BuildMode() {
                 <ChevronRight aria-hidden="true" size={20} />
               </button>
             </div>
+
+            <button className="lost-position-button" type="button" onClick={openLostDialog}>
+              <MapPin aria-hidden="true" size={18} />
+              Я потерялся
+            </button>
           </>
         ) : (
           <div className="empty-build-state">
@@ -578,6 +578,7 @@ function speakBuildPoint(point, reportError) {
 }
 
 const BUILD_CANVAS_SIZE = 760;
+const SEEK_PREVIEW_LINE_LIMIT = 480;
 
 function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
   const canvasRef = useRef(null);
@@ -629,6 +630,8 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
     const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
     const linesToAdd = completedLines - renderCache.renderedLines;
     const canExtendCurrentFrame = linesToAdd >= 0 && linesToAdd <= 120;
+    let needsExactRebuild = !canExtendCurrentFrame;
+    let previewFrame = null;
     if (canExtendCurrentFrame && linesToAdd > 0) {
       renderStringArtLines(renderCache.base, renderCache.allLines, renderCache.workPoints, {
         canvasSize: BUILD_CANVAS_SIZE,
@@ -638,12 +641,24 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         endIndex: completedLines,
       });
       renderCache.renderedLines = completedLines;
+    } else if (needsExactRebuild) {
+      previewFrame = createSeekPreviewFrame(
+        renderCache,
+        completedLines,
+        pattern.threadMm ?? 0.19,
+      );
+      if (previewFrame.exact) {
+        renderCache.baseCanvas = previewFrame.canvas;
+        renderCache.base = previewFrame.context;
+        renderCache.renderedLines = completedLines;
+        needsExactRebuild = false;
+      }
     }
 
     const { displayPoints } = renderCache;
     const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
     const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
-    let activeBaseCanvas = renderCache.baseCanvas;
+    let activeBaseCanvas = previewFrame?.canvas ?? renderCache.baseCanvas;
     let animationStartedAt = performance.now();
     let active = true;
     let animationFrame = 0;
@@ -694,7 +709,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
 
     restartAnimation();
 
-    if (!canExtendCurrentFrame) {
+    if (needsExactRebuild) {
       rebuildTimer = window.setTimeout(() => {
         if (!active) return;
         const nextCanvas = document.createElement("canvas");
@@ -754,4 +769,42 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       />
     </div>
   );
+}
+
+function createSeekPreviewFrame(renderCache, completedLines, threadMm) {
+  const canvas = document.createElement("canvas");
+  canvas.width = BUILD_CANVAS_SIZE;
+  canvas.height = BUILD_CANVAS_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) return { canvas, context: renderCache.base, exact: false };
+
+  renderStringArtBase(
+    context,
+    renderCache.displayPoints.length,
+    BUILD_CANVAS_SIZE,
+  );
+  if (completedLines <= SEEK_PREVIEW_LINE_LIMIT) {
+    renderStringArtLines(context, renderCache.allLines, renderCache.workPoints, {
+      canvasSize: BUILD_CANVAS_SIZE,
+      workSize: STRING_ART_WORK_SIZE,
+      threadMm,
+      endIndex: completedLines,
+    });
+    return { canvas, context, exact: true };
+  }
+
+  const stride = completedLines / SEEK_PREVIEW_LINE_LIMIT;
+  const sampledLines = Array.from(
+    { length: SEEK_PREVIEW_LINE_LIMIT },
+    (_, index) => renderCache.allLines[
+      Math.min(completedLines - 1, Math.floor((index + 0.5) * stride))
+    ],
+  );
+  renderStringArtLines(context, sampledLines, renderCache.workPoints, {
+    canvasSize: BUILD_CANVAS_SIZE,
+    workSize: STRING_ART_WORK_SIZE,
+    threadMm,
+    lineAlpha: Math.min(0.42, 0.16 * Math.sqrt(stride)),
+  });
+  return { canvas, context, exact: false };
 }

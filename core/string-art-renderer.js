@@ -49,6 +49,7 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   const canvasSize = options.canvasSize ?? context.canvas.width;
   const workSize = options.workSize ?? STRING_ART_WORK_SIZE;
   const threadMm = options.threadMm ?? 0.19;
+  const lineAlpha = options.lineAlpha ?? 0.16;
   const startIndex = options.startIndex ?? 0;
   const endIndex = Math.min(options.endIndex ?? lines.length, lines.length);
   const scale = canvasSize / workSize;
@@ -57,7 +58,7 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   context.beginPath();
   context.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2 - 20, 0, Math.PI * 2);
   context.clip();
-  context.globalAlpha = 0.16;
+  context.globalAlpha = lineAlpha;
   context.strokeStyle = "#050506";
   context.lineWidth = Math.max(0.65, threadMm * 4.6);
 

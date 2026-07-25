@@ -187,6 +187,10 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
 
   await setRangeValue(seek, 350);
   await expect(page.getByText("Шаг 351 из 1601")).toBeVisible();
+  const immediateBackwardFrame = await canvasSignature(page);
+  expect(immediateBackwardFrame.darkSamples).toBeLessThan(
+    forwardFrame.darkSamples * 0.75,
+  );
   await page.waitForTimeout(700);
   const backwardFrame = await canvasSignature(page);
   expect(backwardFrame.hash).not.toBe(forwardFrame.hash);

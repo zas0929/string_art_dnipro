@@ -209,7 +209,7 @@ textarea {
 .lost-position-button {
   width: max-content;
   min-height: 38px;
-  margin: 0 auto 14px;
+  margin: 14px auto 0;
   color: var(--muted);
 }
 
@@ -913,7 +913,7 @@ textarea {
 
   .lost-position-button {
     width: 100%;
-    margin-bottom: 12px;
+    margin: 10px 0 0;
   }
 
   .lost-dialog-backdrop {
