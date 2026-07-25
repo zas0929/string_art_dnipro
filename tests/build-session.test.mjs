@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildSessionReducer, initialBuildSessionState } from "../core/build-session.js";
+import {
+  buildSessionReducer,
+  findRecentPointMatches,
+  initialBuildSessionState,
+} from "../core/build-session.js";
 
 const pattern = { id: "test", sequence: [1, 50, 25], lineCount: 2 };
 
@@ -51,4 +55,16 @@ test("seeks to any connection and clamps the requested step", () => {
   state = buildSessionReducer(state, { type: "SEEK", stepIndex: 0 });
   assert.equal(state.stepIndex, 0);
   assert.equal(state.playback, "paused");
+});
+
+test("finds every route position matching the last entered points", () => {
+  const matches = findRecentPointMatches(
+    [1, 50, 25, 43, 12, 50, 25, 43, 99],
+    [50, 25, 43],
+  );
+  assert.deepEqual(matches, [
+    { stepIndex: 3, previousPoint: 1, nextPoint: 12 },
+    { stepIndex: 7, previousPoint: 12, nextPoint: 99 },
+  ]);
+  assert.deepEqual(findRecentPointMatches([1, 2, 3], [8, 9, 10]), []);
 });
