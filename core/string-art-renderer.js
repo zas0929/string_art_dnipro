@@ -12,7 +12,12 @@ export function createCirclePoints(count, radius, cx, cy) {
   return points;
 }
 
-export function renderStringArtBase(context, pointCount, canvasSize = context.canvas.width) {
+export function renderStringArtBase(
+  context,
+  pointCount,
+  canvasSize = context.canvas.width,
+  options = {},
+) {
   const center = canvasSize / 2;
   const radius = center - 20;
   context.clearRect(0, 0, canvasSize, canvasSize);
@@ -32,7 +37,12 @@ export function renderStringArtBase(context, pointCount, canvasSize = context.ca
   context.beginPath();
   context.arc(center, center, radius, 0, Math.PI * 2);
   context.stroke();
-  renderNails(context, createCirclePoints(pointCount, radius, center, center), canvasSize);
+  renderNails(
+    context,
+    createCirclePoints(pointCount, radius, center, center),
+    canvasSize,
+    options,
+  );
 }
 
 export function renderStringArtLines(context, lines, points, options = {}) {
@@ -65,18 +75,20 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   context.restore();
 }
 
-export function renderNails(context, points, canvasSize) {
+export function renderNails(context, points, canvasSize, options = {}) {
   context.save();
   context.fillStyle = "#2e333b";
   context.strokeStyle = "#f3f5f7";
   context.lineWidth = 1;
   const dot = canvasSize > 500 ? 2.1 : 1.2;
   const labelEvery = Math.max(1, Math.ceil(points.length / 30));
+  const showLabels = options.showLabels ?? true;
 
   points.forEach((point, index) => {
     context.beginPath();
     context.arc(point.x, point.y, dot, 0, Math.PI * 2);
     context.fill();
+    if (!showLabels) return;
     const pointNumber = index + 1;
     if (pointNumber !== 1 && pointNumber !== points.length && pointNumber % labelEvery !== 0) return;
 

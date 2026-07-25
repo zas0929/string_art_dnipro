@@ -29,6 +29,16 @@ test("generator and build mode share working navigation", async ({ page }) => {
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const originalClearRect = CanvasRenderingContext2D.prototype.clearRect;
+    window.__resultCanvasClearCount = 0;
+    CanvasRenderingContext2D.prototype.clearRect = function (...args) {
+      if (this.canvas?.id === "resultCanvas") {
+        window.__resultCanvasClearCount += 1;
+      }
+      return originalClearRect.apply(this, args);
+    };
+  });
   await page.goto("/");
   await waitForGenerator(page);
   if (testInfo.project.name === "mobile-chrome") {
@@ -44,6 +54,13 @@ test("the single reference core generates a route from a photo", async ({ page }
   await page.getByRole("button", { name: "Увеличить масштаб" }).click();
   await page.getByRole("button", { name: "Уменьшить масштаб" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
+  if (testInfo.project.name === "mobile-chrome") {
+    await pinchOut(page, "#sourceCanvas");
+    await expect.poll(async () => {
+      const value = await page.locator("#zoomValue").textContent();
+      return Number.parseInt(value, 10);
+    }).toBeGreaterThan(105);
+  }
 
   const sourceBox = await page.locator("#sourceCanvas").boundingBox();
   await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
@@ -56,6 +73,9 @@ test("the single reference core generates a route from a photo", async ({ page }
     : "Построить";
   const buildButton = page.getByRole("button", { name: buildButtonName });
   await expect(buildButton).toBeEnabled();
+  await page.evaluate(() => {
+    window.__resultCanvasClearCount = 0;
+  });
   await buildButton.click();
 
   await expect(page.locator("#status")).toHaveText(
@@ -63,6 +83,9 @@ test("the single reference core generates a route from a photo", async ({ page }
     { timeout: 30_000 },
   );
   await expect(page.locator("#sequenceOutput")).toHaveValue(/^1 -> 50 ->/);
+  await expect.poll(
+    () => page.evaluate(() => window.__resultCanvasClearCount),
+  ).toBe(1);
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
     algorithm: "reference-v7",
     pointCount: 240,
@@ -183,6 +206,31 @@ async function resultIsNearViewportTop(page) {
   return page.locator("#resultCanvas").evaluate((element) => {
     const top = element.getBoundingClientRect().top;
     return top >= -2 && top < window.innerHeight * 0.25;
+  });
+}
+
+async function pinchOut(page, selector) {
+  await page.locator(selector).evaluate((canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const emit = (type, pointerId, clientX) => {
+      canvas.dispatchEvent(new PointerEvent(type, {
+        bubbles: true,
+        cancelable: true,
+        pointerId,
+        pointerType: "touch",
+        clientX,
+        clientY: centerY,
+        buttons: type === "pointerup" ? 0 : 1,
+      }));
+    };
+    emit("pointerdown", 11, centerX - 28);
+    emit("pointerdown", 12, centerX + 28);
+    emit("pointermove", 11, centerX - 64);
+    emit("pointermove", 12, centerX + 64);
+    emit("pointerup", 11, centerX - 64);
+    emit("pointerup", 12, centerX + 64);
   });
 }
 
