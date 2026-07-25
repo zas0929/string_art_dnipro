@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
 
 const scheme = [
   "Points______Lines/n1____0/",
@@ -12,8 +13,7 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
-  await expect(page.locator("#algorithmInput")).toContainText("Портрет v6");
-  await expect(page.locator("#algorithmInput")).toContainText("Reference v7");
+  await expect(page.getByLabel("Минимальный пропуск точек")).toHaveValue("15");
 
   const buildModeLink = page.getByRole("link", { name: "Режим сборки" });
   await expect(buildModeLink).toBeVisible();
@@ -24,6 +24,28 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await expect(page.getByText("Нет активной схемы")).toBeVisible();
   await page.getByRole("link", { name: "Генератор" }).click();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chrome", "Desktop generation smoke test");
+
+  await page.goto("/");
+  await waitForGenerator(page);
+  await page.locator("#linesInput").fill("100");
+  await page.locator("#imageInput").setInputFiles(path.resolve("test-photo.png"));
+  await expect(page.getByRole("button", { name: "Построить" })).toBeEnabled();
+  await page.getByRole("button", { name: "Построить" }).click();
+
+  await expect(page.locator("#status")).toHaveText(
+    "Готово. Инструкция построена.",
+    { timeout: 30_000 },
+  );
+  await expect(page.locator("#sequenceOutput")).toHaveValue(/^1 -> 50 ->/);
+  await expect.poll(() => readLatestPattern(page)).toMatchObject({
+    algorithm: "reference-v7",
+    pointCount: 240,
+    lineCount: 100,
+  });
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
