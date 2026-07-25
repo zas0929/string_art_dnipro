@@ -1,4 +1,20 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import { getOpticalThreadCoverage } from "./core/line-kernel.js";
+import { neutralizeConnectedLightBackground } from "./core/neutral-background.js";
+import {
+  buildDetailPriorityMap,
+  composeAnalysisPreviewGray,
+  enhanceAnalysisGray,
+} from "./core/photo-enhancement.js";
+import {
+  SUPPORTED_ALGORITHMS,
+  canRefineAlgorithm,
+  isStableV5Algorithm,
+  isMultiScaleAlgorithm,
+  isOpticalAlgorithm,
+  usesAutomaticNeutralBackground,
+  usesImprovedOpticalKernel,
+} from "./core/algorithm-mode.js";
 import {
   createCirclePoints,
   renderNails,
@@ -35,9 +51,18 @@ const threadInput = getElement("threadInput");
 const opacityInput = getElement("opacityInput");
 const skipInput = getElement("skipInput");
 const algorithmInput = getElement("algorithmInput");
+const enhancementControls = getElement("enhancementControls");
+const enhanceInput = getElement("enhanceInput");
+const contrastInput = getElement("contrastInput");
+const contrastValue = getElement("contrastValue");
+const sharpnessInput = getElement("sharpnessInput");
+const sharpnessValue = getElement("sharpnessValue");
 const zoomInput = getElement("zoomInput");
+const zoomValue = getElement("zoomValue");
 const resetCropButton = getElement("resetCropButton");
 const buildButton = getElement("buildButton");
+const improveButton = getElement("improveButton");
+const improveButtonLabel = getElement("improveButtonLabel");
 const pngButton = getElement("pngButton");
 const txtButton = getElement("txtButton");
 const statusText = getElement("status");
@@ -59,6 +84,8 @@ const state = {
   running: false,
   activeWorker: null,
   cancelActiveRun: null,
+  originalSequenceBeforeImprove: null,
+  lastGeneratedSettings: null,
   crop: {
     zoom: 1,
     offsetX: 0,
@@ -70,8 +97,10 @@ const state = {
 };
 
 const WORK_SIZE = 560;
+const LIVE_PREVIEW_SIZE = 360;
 const listenerController = new AbortController();
 let destroyed = false;
+let cropPreviewFrame = 0;
 
 const listen = (target, type, handler, options = {}) => {
   target.addEventListener(type, handler, { ...options, signal: listenerController.signal });
@@ -83,6 +112,7 @@ const cleanup = () => {
   state.cancelled = true;
   state.crop.dragging = false;
   listenerController.abort();
+  if (cropPreviewFrame) cancelAnimationFrame(cropPreviewFrame);
   if (state.cancelActiveRun) state.cancelActiveRun();
   else if (state.activeWorker) state.activeWorker.terminate();
   state.activeWorker = null;
@@ -93,6 +123,7 @@ const cleanup = () => {
 mountedApps.set(root, cleanup);
 
 drawEmpty();
+updateEnhancementControls();
 if (buildModeLink) {
   void loadLatestPattern()
     .then((pattern) => {
@@ -110,9 +141,14 @@ listen(imageInput, "change", async (event) => {
   state.image = image;
   state.sequence = [];
   state.sequenceDisplayStart = 0;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   resetCrop();
   drawPreparedPreview();
   drawInitialResult();
+  zoomInput.disabled = false;
+  resetCropButton.disabled = false;
   setStatus("Фото загружено. Перетащите подготовленное фото для кадра или измените зум.");
   setExportEnabled(false);
   buildButton.disabled = false;
@@ -139,24 +175,58 @@ listen(buildButton, "click", () => {
   generate();
 });
 
+listen(improveButton, "click", () => {
+  if (state.running) return;
+  if (state.originalSequenceBeforeImprove) {
+    restoreSequenceBeforeImprove();
+    return;
+  }
+  void improveWeakSegments();
+});
+
 listen(pngButton, "click", () => downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png")));
 listen(txtButton, "click", () => downloadText("string-art-scheme.txt", formatSchemeText(state.sequence)));
 
-for (const input of [pointsInput, sizeInput, zoomInput]) {
+for (const input of [pointsInput, sizeInput]) {
   listen(input, "input", () => {
     if (!state.image || state.running) return;
-    if (input === zoomInput) state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
     clampCropToImage();
     invalidateResult();
     drawPreparedPreview();
   });
 }
 
+listen(zoomInput, "input", () => {
+  if (!state.image || state.running) return;
+  const hasGeneratedResult = state.sequence.length > 1;
+  state.crop.zoom = clampNumber(zoomInput.value, 1, 4);
+  clampCropToImage();
+  updateZoomControl();
+  invalidateResult(hasGeneratedResult);
+  drawPreparedPreview();
+});
+
 listen(algorithmInput, "change", () => {
   if (!state.image || state.running) return;
   invalidateResult();
   drawPreparedPreview();
 });
+
+listen(enhanceInput, "change", () => {
+  updateEnhancementControls();
+  if (!state.image || state.running) return;
+  invalidateResult();
+  drawPreparedPreview();
+});
+
+for (const input of [contrastInput, sharpnessInput]) {
+  listen(input, "input", () => {
+    updateEnhancementControls();
+    if (!state.image || state.running || !enhanceInput.checked) return;
+    invalidateResult();
+    drawPreparedPreview();
+  });
+}
 
 listen(resetCropButton, "click", () => {
   if (!state.image || state.running) return;
@@ -196,12 +266,14 @@ listen(sourceCanvas, "wheel", (event) => {
   const previousZoom = state.crop.zoom;
   const nextZoom = clampNumber(previousZoom * (event.deltaY < 0 ? 1.08 : 0.92), 1, 4);
   if (nextZoom === previousZoom) return;
+  const hasGeneratedResult = state.sequence.length > 1;
   state.crop.zoom = nextZoom;
   zoomInput.value = nextZoom.toFixed(2);
+  updateZoomControl();
   state.crop.offsetX = before.x - WORK_SIZE / 2 - ((before.x - WORK_SIZE / 2 - state.crop.offsetX) * nextZoom) / previousZoom;
   state.crop.offsetY = before.y - WORK_SIZE / 2 - ((before.y - WORK_SIZE / 2 - state.crop.offsetY) * nextZoom) / previousZoom;
   clampCropToImage();
-  invalidateResult();
+  invalidateResult(hasGeneratedResult);
   drawPreparedPreview();
 }, { passive: false });
 
@@ -209,6 +281,9 @@ async function generate() {
   state.cancelled = false;
   state.running = true;
   buildButton.disabled = true;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   setExportEnabled(false);
   progress.value = 0;
   setStatus("Подготавливаю расчет...");
@@ -220,7 +295,7 @@ async function generate() {
   state.sequence = [0];
   state.sequenceDisplayStart = 0;
 
-  const isOpticalModel = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
+  const isOpticalModel = isOpticalAlgorithm(settings.algorithm);
   const residual = new Float32Array(prepared.target);
   const drawn = new Float32Array(prepared.target.length);
   const lineCache = new Map();
@@ -292,6 +367,8 @@ async function generate() {
       ? "Построение остановлено. Инструкция сохранена частично."
       : "Готово. Инструкция построена.");
     setExportEnabled(state.sequence.length > 1);
+    if (!state.cancelled) state.lastGeneratedSettings = settings;
+    updateImproveButton();
   } catch (error) {
     setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
     setExportEnabled(state.sequence.length > 1);
@@ -301,13 +378,14 @@ async function generate() {
     state.cancelActiveRun = null;
     buildButton.disabled = !state.image;
     state.running = false;
+    updateImproveButton();
   }
 }
 
 function runOpticalWorker(settings, prepared, renderedLines) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL("./workers/optical-worker.js", import.meta.url), { type: "module" });
-    const isMultiScaleModel = settings.algorithm === "portrait-v5";
+    const isMultiScaleModel = isMultiScaleAlgorithm(settings.algorithm);
     let settled = false;
 
     const finish = (result, error = null) => {
@@ -351,27 +429,219 @@ function runOpticalWorker(settings, prepared, renderedLines) {
     worker.postMessage({
       type: "start",
       points: state.points,
-      settings: {
-        lines: settings.lines,
-        minSkip: settings.minSkip,
-        workSize: WORK_SIZE,
-      },
+      settings: getOpticalWorkerSettings(settings),
       target: prepared.target,
       importance: prepared.importance,
-      plannerOptions: {
-        scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
-        lookaheadInterval: isMultiScaleModel ? 8 : 0,
-        detailBoost: isMultiScaleModel ? 0.08 : 0,
-        targetNailDistance: isMultiScaleModel ? 75.5 : 76,
-        distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
-        distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
-      },
+      plannerOptions: getOpticalPlannerOptions(settings.algorithm),
     });
   });
 }
 
+async function improveWeakSegments() {
+  const settings = state.lastGeneratedSettings;
+  if (
+    !settings
+    || !canRefineAlgorithm(settings.algorithm)
+    || !state.prepared
+    || state.sequence.length < 3
+  ) {
+    updateImproveButton();
+    return;
+  }
+
+  const originalSequence = state.sequence.slice();
+  state.running = true;
+  buildButton.disabled = true;
+  updateImproveButton();
+  setExportEnabled(false);
+  progress.value = 0;
+  setStatus("Ищу слабые участки...");
+
+  try {
+    const result = await runRefineWorker(settings, state.prepared, originalSequence);
+    if (result.cancelled) return;
+
+    if (result.optimization.accepted > 0) {
+      state.originalSequenceBeforeImprove = originalSequence;
+      state.sequence = result.sequence;
+      renderSequenceResult(settings);
+      setStatus(
+        `Экспериментальное улучшение готово: заменено участков ${result.optimization.accepted}.`,
+      );
+      void persistLatestPattern(settings);
+    } else {
+      setStatus("Подходящих замен не найдено. Исходный макет сохранён.");
+      setExportEnabled(true);
+    }
+  } catch (error) {
+    setStatus(
+      `Ошибка улучшения: ${error instanceof Error ? error.message : "неизвестная ошибка"}`,
+    );
+    setExportEnabled(true);
+  } finally {
+    state.activeWorker = null;
+    state.cancelActiveRun = null;
+    state.running = false;
+    buildButton.disabled = !state.image;
+    updateImproveButton();
+  }
+}
+
+function runRefineWorker(settings, prepared, sequence) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(
+      new URL("./workers/optical-worker.js", import.meta.url),
+      { type: "module" },
+    );
+    let settled = false;
+
+    const finish = (result, error = null) => {
+      if (settled) return;
+      settled = true;
+      worker.terminate();
+      if (state.activeWorker === worker) state.activeWorker = null;
+      if (state.cancelActiveRun === cancel) state.cancelActiveRun = null;
+      if (error) reject(error);
+      else resolve(result);
+    };
+    const cancel = () => finish({ cancelled: true });
+
+    state.activeWorker = worker;
+    state.cancelActiveRun = cancel;
+
+    worker.addEventListener("message", (event) => {
+      const message = event.data;
+      if (message?.type === "refine-progress") {
+        progress.value = message.total ? message.attempted / message.total : 0;
+        setStatus(
+          `Проверено слабых участков: ${message.attempted} / ${message.total}`
+          + ` · найдено замен: ${message.accepted}`,
+        );
+      } else if (message?.type === "refined") {
+        finish({
+          cancelled: false,
+          sequence: Array.from(message.sequence),
+          optimization: message.optimization,
+        });
+      } else if (message?.type === "error") {
+        finish(null, new Error(message.message));
+      }
+    });
+
+    worker.addEventListener("error", (event) => {
+      finish(null, new Error(event.message || "Web Worker не смог улучшить маршрут"));
+    });
+
+    worker.postMessage({
+      type: "refine",
+      points: state.points,
+      settings: {
+        ...getOpticalWorkerSettings(settings),
+        postOptimizeWindows: Math.min(
+          120,
+          Math.max(36, Math.round(settings.lines * 0.025)),
+        ),
+        postOptimizeShortlist: 10,
+      },
+      target: prepared.target,
+      importance: prepared.importance,
+      plannerOptions: getOpticalPlannerOptions(settings.algorithm),
+      sequence: Int32Array.from(sequence),
+    });
+  });
+}
+
+function getOpticalWorkerSettings(settings) {
+  const improvedKernel = usesImprovedOpticalKernel(settings.algorithm);
+  return {
+    lines: settings.lines,
+    minSkip: settings.minSkip,
+    workSize: WORK_SIZE,
+    legacyV5: isStableV5Algorithm(settings.algorithm),
+    subpixel: improvedKernel,
+    lineCoverage: improvedKernel ? getOpticalThreadCoverage(settings.threadMm) : 1,
+  };
+}
+
+function getOpticalPlannerOptions(algorithm) {
+  const isMultiScaleModel = isMultiScaleAlgorithm(algorithm);
+  const improvedRouteModel = usesImprovedOpticalKernel(algorithm);
+  return {
+    scaleFactors: isMultiScaleModel ? [1, 2, 4] : [1],
+    lookaheadInterval: isMultiScaleModel ? 8 : 0,
+    detailBoost: isMultiScaleModel ? 0.08 : 0,
+    targetNailDistance: isMultiScaleModel ? 75.5 : 76,
+    distancePenaltyStrength: isMultiScaleModel ? 0.000055 : 0.00004,
+    distanceFeedbackStrength: isMultiScaleModel ? 0.0024 : 0.002,
+    nailBalanceMultiplier: improvedRouteModel ? 1.4 : 1,
+    directionBalanceStrength: improvedRouteModel ? 0.0011 : 0.0005,
+    directionBalanceLimit: improvedRouteModel ? 0.035 : 0.015,
+    parallelPenaltyImmediate: improvedRouteModel ? 0.055 : 0.025,
+    parallelPenaltyHistory: improvedRouteModel ? 0.0045 : 0.003,
+    parallelPenaltyLimit: improvedRouteModel ? 0.095 : 0.055,
+    repeatBiasStep: improvedRouteModel ? 0.11 : 0.085,
+    repeatBiasLimit: improvedRouteModel ? 0.34 : 0.28,
+  };
+}
+
+function renderSequenceResult(settings) {
+  const renderedLines = [];
+  for (let index = 1; index < state.sequence.length; index++) {
+    renderedLines.push([state.sequence[index - 1], state.sequence[index]]);
+  }
+  drawResultBase(settings);
+  drawThreadLines(renderedLines, settings);
+  updateSummary(settings, renderedLines.length);
+  sequenceOutput.value = formatSequence(state.sequence, state.sequenceDisplayStart);
+  progress.value = 1;
+  setExportEnabled(true);
+}
+
+function restoreSequenceBeforeImprove() {
+  if (!state.originalSequenceBeforeImprove || !state.lastGeneratedSettings) return;
+  state.sequence = state.originalSequenceBeforeImprove;
+  state.originalSequenceBeforeImprove = null;
+  renderSequenceResult(state.lastGeneratedSettings);
+  setStatus("Экспериментальное улучшение отменено. Восстановлен исходный макет.");
+  updateImproveButton();
+  void persistLatestPattern(state.lastGeneratedSettings);
+}
+
+function updateImproveButton() {
+  const canImprove = Boolean(
+    state.image
+    && state.prepared
+    && canRefineAlgorithm(state.lastGeneratedSettings?.algorithm)
+    && state.sequence.length > 2,
+  );
+  const canRevert = Boolean(state.originalSequenceBeforeImprove);
+  improveButton.disabled = state.running || (!canImprove && !canRevert);
+  improveButton.classList.toggle("is-revert", canRevert);
+  improveButtonLabel.textContent = canRevert
+    ? "Вернуть исходный"
+    : "Улучшить участки";
+  improveButton.title = canRevert
+    ? "Отменить экспериментальное улучшение"
+    : "Экспериментально улучшить слабые участки";
+}
+
+function updateEnhancementControls() {
+  const enabled = enhanceInput.checked;
+  enhancementControls.classList.toggle("is-disabled", !enabled);
+  contrastInput.disabled = !enabled;
+  sharpnessInput.disabled = !enabled;
+  sourceCanvas.setAttribute(
+    "aria-label",
+    enabled
+      ? "Предпросмотр карты деталей для расчёта"
+      : "Исходное фото и выбранный кадр",
+  );
+  contrastValue.textContent = `${clampInt(contrastInput.value, 0, 100)}%`;
+  sharpnessValue.textContent = `${clampInt(sharpnessInput.value, 0, 100)}%`;
+}
+
 function readSettings() {
-  const algorithm = ["portrait-v4", "portrait-v5"].includes(algorithmInput.value)
+  const algorithm = SUPPORTED_ALGORITHMS.includes(algorithmInput.value)
     ? algorithmInput.value
     : "portrait-v5";
   return {
@@ -384,64 +654,44 @@ function readSettings() {
     offsetY: state.crop.offsetY,
     lineStrength: clampNumber(opacityInput.value, 4, 36) / 255,
     minSkip: clampInt(skipInput.value, 2, 80),
+    enhancePhoto: enhanceInput.checked,
+    contrast: clampNumber(contrastInput.value, 0, 100) / 100,
+    sharpness: clampNumber(sharpnessInput.value, 0, 100) / 100,
     algorithm,
   };
 }
 
 function prepareImage(settings) {
-  const temp = document.createElement("canvas");
-  temp.width = WORK_SIZE;
-  temp.height = WORK_SIZE;
-  const ctx = temp.getContext("2d", { willReadFrequently: true });
-  ctx.fillStyle = "white";
-  ctx.fillRect(0, 0, WORK_SIZE, WORK_SIZE);
-
-  const fit = getImageFit(state.image, WORK_SIZE, settings);
-  ctx.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
-
-  const imageData = ctx.getImageData(0, 0, WORK_SIZE, WORK_SIZE);
-  const data = imageData.data;
-  const gray = new Float32Array(WORK_SIZE * WORK_SIZE);
-  const mask = new Uint8Array(WORK_SIZE * WORK_SIZE);
+  const frame = createSourceFrame(settings, WORK_SIZE);
+  const { analysisGray, detailPriority } = buildAnalysisMaps(frame, settings);
   const target = new Float32Array(WORK_SIZE * WORK_SIZE);
-  const radius = WORK_SIZE / 2 - 8;
-  const cx = WORK_SIZE / 2;
-  const cy = WORK_SIZE / 2;
+  const analysisPreview = settings.enhancePhoto
+    ? renderAnalysisPreview(frame, analysisGray, detailPriority)
+    : null;
+  const threadTarget = buildThreadTarget(
+    analysisGray,
+    frame.mask,
+    WORK_SIZE,
+    settings,
+    detailPriority,
+  );
 
-  for (let y = 0; y < WORK_SIZE; y++) {
-    for (let x = 0; x < WORK_SIZE; x++) {
-      const idx = y * WORK_SIZE + x;
-      const offset = idx * 4;
-      const dx = x - cx;
-      const dy = y - cy;
-      const inside = dx * dx + dy * dy <= radius * radius;
-      mask[idx] = inside ? 1 : 0;
-      gray[idx] = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+  for (let index = 0; index < target.length; index++) {
+    const offset = index * 4;
+    const inside = frame.mask[index] === 1;
+    target[index] = inside ? threadTarget.target[index] : 0;
+    if (!inside) {
+      frame.data[offset] = 18;
+      frame.data[offset + 1] = 18;
+      frame.data[offset + 2] = 18;
+      frame.data[offset + 3] = 255;
     }
   }
 
-  const analysisGray = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5"
-    ? replaceConnectedLightBackground(gray, data, mask, WORK_SIZE)
-    : gray;
-  const threadTarget = buildThreadTarget(analysisGray, mask, WORK_SIZE, settings);
-  for (let y = 0; y < WORK_SIZE; y++) {
-    for (let x = 0; x < WORK_SIZE; x++) {
-      const idx = y * WORK_SIZE + x;
-      const offset = idx * 4;
-      const inside = mask[idx] === 1;
-      target[idx] = inside ? threadTarget.target[idx] : 0;
-      if (!inside) {
-        data[offset] = 18;
-        data[offset + 1] = 18;
-        data[offset + 2] = 18;
-        data[offset + 3] = 255;
-      }
-    }
-  }
-
-  ctx.putImageData(imageData, 0, 0);
+  frame.ctx.putImageData(frame.imageData, 0, 0);
   return {
-    canvas: temp,
+    canvas: frame.canvas,
+    analysisPreview,
     target,
     importance: threadTarget.importance,
     detailWeight: threadTarget.detailWeight,
@@ -451,58 +701,122 @@ function prepareImage(settings) {
   };
 }
 
-function replaceConnectedLightBackground(gray, rgba, mask, size) {
-  const background = new Uint8Array(gray.length);
-  const queue = new Int32Array(gray.length);
-  let head = 0;
-  let tail = 0;
+function createSourceFrame(settings, size) {
+  const temp = document.createElement("canvas");
+  temp.width = size;
+  temp.height = size;
+  const ctx = temp.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, size, size);
 
-  const isNeutralLight = (idx) => {
-    const offset = idx * 4;
-    const red = rgba[offset];
-    const green = rgba[offset + 1];
-    const blue = rgba[offset + 2];
-    const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-    return gray[idx] >= 205 && chroma <= 34;
+  const scale = size / WORK_SIZE;
+  const fit = getImageFit(state.image, size, {
+    ...settings,
+    offsetX: settings.offsetX * scale,
+    offsetY: settings.offsetY * scale,
+  });
+  ctx.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
+
+  const imageData = ctx.getImageData(0, 0, size, size);
+  const data = imageData.data;
+  const gray = new Float32Array(size * size);
+  const mask = new Uint8Array(size * size);
+  const radius = size / 2 - 8 * scale;
+  const center = size / 2;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = y * size + x;
+      const offset = idx * 4;
+      const dx = x - center;
+      const dy = y - center;
+      const inside = dx * dx + dy * dy <= radius * radius;
+      mask[idx] = inside ? 1 : 0;
+      gray[idx] = 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+    }
+  }
+
+  return {
+    canvas: temp,
+    ctx,
+    imageData,
+    data,
+    gray,
+    mask,
+    size,
   };
-
-  const enqueue = (idx) => {
-    if (background[idx] || !isNeutralLight(idx)) return;
-    background[idx] = 1;
-    queue[tail++] = idx;
-  };
-
-  for (let x = 0; x < size; x++) {
-    enqueue(x);
-    enqueue((size - 1) * size + x);
-  }
-  for (let y = 1; y < size - 1; y++) {
-    enqueue(y * size);
-    enqueue(y * size + size - 1);
-  }
-
-  while (head < tail) {
-    const idx = queue[head++];
-    const x = idx % size;
-    const y = Math.floor(idx / size);
-    if (x > 0) enqueue(idx - 1);
-    if (x < size - 1) enqueue(idx + 1);
-    if (y > 0) enqueue(idx - size);
-    if (y < size - 1) enqueue(idx + size);
-  }
-
-  const adjusted = new Float32Array(gray);
-  for (let i = 0; i < adjusted.length; i++) {
-    if (mask[i] && background[i]) adjusted[i] = Math.min(adjusted[i], 145);
-  }
-  return adjusted;
 }
 
-function buildThreadTarget(gray, mask, size, settings) {
+function buildAnalysisMaps(frame, settings) {
+  const { data, gray, mask, size } = frame;
+  const baseAnalysisGray = isOpticalAlgorithm(settings.algorithm)
+    ? neutralizeConnectedLightBackground(gray, data, mask, size, {
+        automatic: usesAutomaticNeutralBackground(settings.algorithm),
+      }).gray
+    : gray;
+  const analysisGray = settings.enhancePhoto
+    ? enhanceAnalysisGray(baseAnalysisGray, mask, size, {
+        contrast: settings.contrast,
+        sharpness: settings.sharpness * 0.25,
+      })
+    : baseAnalysisGray;
+  const detailPriority = settings.enhancePhoto
+    ? buildDetailPriorityMap(
+        baseAnalysisGray,
+        mask,
+        size,
+        settings.sharpness,
+      )
+    : null;
+
+  return { analysisGray, detailPriority };
+}
+
+function renderAnalysisPreview(frame, analysisGray, detailPriority) {
+  const preview = document.createElement("canvas");
+  preview.width = frame.size;
+  preview.height = frame.size;
+  const previewCtx = preview.getContext("2d");
+  const previewImage = previewCtx.createImageData(frame.size, frame.size);
+  const previewGray = composeAnalysisPreviewGray(
+    analysisGray,
+    detailPriority,
+    frame.mask,
+  );
+
+  for (let index = 0; index < previewGray.length; index++) {
+    const offset = index * 4;
+    const value = previewGray[index];
+    previewImage.data[offset] = value;
+    previewImage.data[offset + 1] = value;
+    previewImage.data[offset + 2] = value;
+    previewImage.data[offset + 3] = 255;
+  }
+  previewCtx.putImageData(previewImage, 0, 0);
+  return preview;
+}
+
+function createLiveAnalysisPreview(settings) {
+  const frame = createSourceFrame(settings, LIVE_PREVIEW_SIZE);
+  const { analysisGray, detailPriority } = buildAnalysisMaps(frame, settings);
+  return renderAnalysisPreview(
+    frame,
+    analysisGray,
+    detailPriority,
+  );
+}
+
+function buildThreadTarget(gray, mask, size, settings, detailPriority = null) {
   const { algorithm } = settings;
   const normalized = normalizeByPercentiles(gray, mask);
-  if (algorithm === "portrait-v4" || algorithm === "portrait-v5") {
-    return buildOpticalDensityTarget(normalized, mask, size, settings);
+  if (isOpticalAlgorithm(algorithm)) {
+    return buildOpticalDensityTarget(
+      normalized,
+      mask,
+      size,
+      settings,
+      detailPriority,
+    );
   }
 
   const smooth = boxBlurValues(normalized, mask, size, 3);
@@ -548,7 +862,13 @@ function buildThreadTarget(gray, mask, size, settings) {
   };
 }
 
-function buildOpticalDensityTarget(normalized, mask, size, settings) {
+function buildOpticalDensityTarget(
+  normalized,
+  mask,
+  size,
+  settings,
+  detailPriority,
+) {
   const localMean = boxBlurFast(normalized, mask, size, 5);
   const edges = sobelMagnitude(normalized, mask, size);
   const target = new Float32Array(normalized.length);
@@ -563,9 +883,17 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
     const localDark = Math.max(0, localMean[i] - normalized[i]);
     const detail = Math.pow(clamp01(localDark * 4.5), 0.68);
     const edge = Math.pow(edges[i], 0.72);
-    const desiredCrossings = 4.1 + opticalDensity * 2.25 + detail * 1.6 + edge * 0.85;
+    const structuralPriority = detailPriority?.[i] || 0;
+    const desiredCrossings = 4.1
+      + opticalDensity * 2.25
+      + detail * 1.6
+      + edge * 0.85
+      + structuralPriority * 1.35;
     target[i] = desiredCrossings;
-    importance[i] = Math.min(3.6, 0.8 + detail + edge * 2);
+    importance[i] = Math.min(
+      4.8,
+      0.8 + detail + edge * 2 + structuralPriority * 2.4,
+    );
     rawTotal += desiredCrossings;
     pixelCount++;
   }
@@ -573,7 +901,12 @@ function buildOpticalDensityTarget(normalized, mask, size, settings) {
   // The reference sequence averages about 1.45 radii of thread per chord.
   // Scaling the target to the requested line budget keeps the signed residual
   // meaningful through the final steps instead of exhausting dark pixels early.
-  const expectedMeanCrossings = (settings.lines * radius * 1.45) / Math.max(1, pixelCount);
+  const lineCoverage = usesImprovedOpticalKernel(settings.algorithm)
+    ? getOpticalThreadCoverage(settings.threadMm)
+    : 1;
+  const expectedMeanCrossings = (
+    settings.lines * radius * 1.45 * lineCoverage
+  ) / Math.max(1, pixelCount);
   const densityScale = expectedMeanCrossings / Math.max(0.001, rawTotal / Math.max(1, pixelCount));
   for (let i = 0; i < target.length; i++) {
     if (mask[i]) target[i] *= densityScale;
@@ -963,10 +1296,15 @@ function importScheme(text) {
   imageInput.value = "";
   state.image = null;
   buildButton.disabled = true;
+  zoomInput.disabled = true;
+  resetCropButton.disabled = true;
   state.prepared = null;
   state.cancelled = false;
   state.sequence = sequence.map((point) => point - 1);
   state.sequenceDisplayStart = 1;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   state.points = buildCirclePoints(pointCount, WORK_SIZE / 2 - 8, WORK_SIZE / 2, WORK_SIZE / 2);
 
   const renderedLines = [];
@@ -999,9 +1337,82 @@ function drawSchemePlaceholder(pointCount, lineCount) {
 }
 
 function drawPreparedPreview() {
-  const settings = readSettings();
-  const prepared = prepareImage(settings);
-  drawSourceFromPrepared(prepared, settings);
+  if (!state.image || cropPreviewFrame) return;
+  cropPreviewFrame = requestAnimationFrame(() => {
+    cropPreviewFrame = 0;
+    if (destroyed || !state.image) return;
+    drawInteractiveSourcePreview();
+  });
+}
+
+function drawInteractiveSourcePreview() {
+  if (enhanceInput.checked) {
+    const preview = createLiveAnalysisPreview(readSettings());
+    sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+    sourceCtx.drawImage(preview, 0, 0, sourceCanvas.width, sourceCanvas.height);
+    drawSourceNails();
+    return;
+  }
+
+  const canvasScale = sourceCanvas.width / WORK_SIZE;
+  const fit = getImageFit(state.image, WORK_SIZE, {
+    zoom: state.crop.zoom,
+    offsetX: state.crop.offsetX,
+    offsetY: state.crop.offsetY,
+  });
+  const cropRadius = (WORK_SIZE / 2 - 8) * canvasScale;
+
+  sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.fillStyle = "#050506";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.save();
+  sourceCtx.beginPath();
+  sourceCtx.arc(
+    sourceCanvas.width / 2,
+    sourceCanvas.height / 2,
+    cropRadius,
+    0,
+    Math.PI * 2,
+  );
+  sourceCtx.clip();
+  sourceCtx.fillStyle = "#fff";
+  sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.imageSmoothingEnabled = true;
+  sourceCtx.imageSmoothingQuality = "high";
+  sourceCtx.drawImage(
+    state.image,
+    fit.x * canvasScale,
+    fit.y * canvasScale,
+    fit.width * canvasScale,
+    fit.height * canvasScale,
+  );
+  sourceCtx.restore();
+
+  drawSourceNails();
+}
+
+function drawSourceNails() {
+  const pointCount = clampInt(pointsInput.value, 60, 600);
+  drawNails(
+    sourceCtx,
+    buildCirclePoints(
+      pointCount,
+      sourceCanvas.width / 2 - 16,
+      sourceCanvas.width / 2,
+      sourceCanvas.height / 2,
+    ),
+    sourceCanvas.width,
+  );
+}
+
+function updateZoomControl() {
+  const progressRatio = (state.crop.zoom - 1) / 3;
+  zoomValue.value = `${Math.round(state.crop.zoom * 100)}%`;
+  zoomValue.textContent = zoomValue.value;
+  zoomInput.style.setProperty(
+    "--zoom-progress",
+    `${Math.max(0, Math.min(1, progressRatio)) * 100}%`,
+  );
 }
 
 function resetCrop() {
@@ -1010,6 +1421,7 @@ function resetCrop() {
   state.crop.offsetY = 0;
   state.crop.dragging = false;
   zoomInput.value = "1";
+  updateZoomControl();
 }
 
 function stopDragging() {
@@ -1049,9 +1461,12 @@ function clampCropToImage() {
   state.crop.offsetY = Math.max(-maxY, Math.min(maxY, state.crop.offsetY));
 }
 
-function invalidateResult() {
+function invalidateResult(redrawBase = true) {
   state.sequence = [];
   state.sequenceDisplayStart = 0;
+  state.originalSequenceBeforeImprove = null;
+  state.lastGeneratedSettings = null;
+  updateImproveButton();
   setExportEnabled(false);
   sequenceOutput.value = "";
   pointsOut.textContent = "-";
@@ -1060,14 +1475,20 @@ function invalidateResult() {
   lengthOut.textContent = "-";
   progress.value = 0;
   setStatus("Кадр изменён. Нажмите «Построить», чтобы пересчитать инструкцию.");
-  if (state.image) drawInitialResult();
+  if (state.image && redrawBase) drawInitialResult();
 }
 
 function drawSourceFromPrepared(prepared, settings) {
   sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
   sourceCtx.fillStyle = "#050506";
   sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-  sourceCtx.drawImage(prepared.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
+  sourceCtx.drawImage(
+    prepared.analysisPreview || prepared.canvas,
+    0,
+    0,
+    sourceCanvas.width,
+    sourceCanvas.height,
+  );
   drawNails(sourceCtx, buildCirclePoints(settings.points, sourceCanvas.width / 2 - 16, sourceCanvas.width / 2, sourceCanvas.height / 2), sourceCanvas.width);
 }
 
@@ -1082,7 +1503,7 @@ function drawResultBase(settings) {
 }
 
 function drawThreadLines(lines, settings, startIndex = 0) {
-  const opticalPreview = settings.algorithm === "portrait-v4" || settings.algorithm === "portrait-v5";
+  const opticalPreview = isOpticalAlgorithm(settings.algorithm);
   renderStringArtLines(resultCtx, lines, state.points, {
     canvasSize: resultCanvas.width,
     workSize: WORK_SIZE,

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileImage, FileText, ListChecks, RotateCcw } from "lucide-react";
+import { FileImage, FileText, ListChecks } from "lucide-react";
 import Link from "next/link";
 
 export default function StringArtPanel() {
@@ -40,17 +40,48 @@ export default function StringArtPanel() {
           Режим
           <select id="algorithmInput" defaultValue="portrait-v5">
             <option value="portrait-v4">Портрет v4 · оптическая модель</option>
-            <option value="portrait-v5">Портрет v5 · мульти-масштаб</option>
+            <option value="portrait-v5">Портрет v5 · стабильный</option>
+            <option value="portrait-v6">Портрет v6 · экспериментальный</option>
           </select>
         </label>
-        <label>
-          Зум фото
-          <input id="zoomInput" type="range" min="1" max="4" step="0.01" defaultValue="1" />
-        </label>
-        <button id="resetCropButton" type="button">
-          <RotateCcw aria-hidden="true" size={18} strokeWidth={2} />
-          Сбросить кадр
-        </button>
+        <div id="enhancementControls" className="enhancement-controls is-disabled">
+          <label className="toggle-control">
+            <input id="enhanceInput" type="checkbox" />
+            <span>Усилить детали макета</span>
+          </label>
+          <label>
+            <span className="range-label">
+              Тональный контраст
+              <output id="contrastValue" htmlFor="contrastInput">25%</output>
+            </span>
+            <input
+              id="contrastInput"
+              type="range"
+              aria-label="Тональный контраст"
+              min="0"
+              max="100"
+              step="1"
+              defaultValue="25"
+              disabled
+            />
+          </label>
+          <label>
+            <span className="range-label">
+              Приоритет деталей
+              <output id="sharpnessValue" htmlFor="sharpnessInput">55%</output>
+            </span>
+            <input
+              id="sharpnessInput"
+              type="range"
+              aria-label="Приоритет деталей"
+              min="0"
+              max="100"
+              step="1"
+              defaultValue="55"
+              disabled
+            />
+          </label>
+        </div>
       </div>
 
       <div className="actions">

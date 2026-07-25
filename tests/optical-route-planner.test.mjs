@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  createSubpixelLineKernel,
+  getOpticalThreadCoverage,
+} from "../core/line-kernel.js";
 import { OpticalRoutePlanner } from "../core/optical-route-planner.js";
 
 test("multiscale planner is deterministic and avoids immediate backtracking", () => {
@@ -14,9 +18,82 @@ test("multiscale planner is deterministic and avoids immediate backtracking", ()
   }
 });
 
-function buildSequence() {
-  const size = 32;
-  const pointCount = 24;
+test("reference-calibrated route profile improves route balance", () => {
+  const benchmark = {
+    pointCount: 96,
+    size: 64,
+    subpixelCoverage: getOpticalThreadCoverage(0.19),
+  };
+  const baselineRun = buildRoute({}, 800, benchmark);
+  const calibratedRun = buildRoute({
+    nailBalanceMultiplier: 1.4,
+    directionBalanceStrength: 0.0011,
+    directionBalanceLimit: 0.035,
+    parallelPenaltyImmediate: 0.055,
+    parallelPenaltyHistory: 0.0045,
+    parallelPenaltyLimit: 0.095,
+    repeatBiasStep: 0.11,
+    repeatBiasLimit: 0.34,
+  }, 800, benchmark);
+  const baseline = analyzeRoute(baselineRun.sequence, benchmark.pointCount);
+  const calibrated = analyzeRoute(calibratedRun.sequence, benchmark.pointCount);
+
+  assert.ok(
+    calibrated.directionCv < baseline.directionCv,
+    `expected more even directions: ${JSON.stringify({ baseline, calibrated })}`,
+  );
+  assert.ok(
+    calibrated.nailVisitCv <= baseline.nailVisitCv,
+    `expected more even nail usage: ${JSON.stringify({ baseline, calibrated })}`,
+  );
+  assert.ok(
+    calibrated.nearParallelRatio <= baseline.nearParallelRatio + 0.006,
+    `expected no material increase in parallel steps: ${JSON.stringify({ baseline, calibrated })}`,
+  );
+  assert.ok(
+    calibratedRun.residualError <= baselineRun.residualError * 1.02,
+    `expected image error within 2% of baseline: ${JSON.stringify({ baselineRun, calibratedRun })}`,
+  );
+});
+
+test("optional weak-segment refinement is deterministic and reversible by sequence", () => {
+  const configuration = {
+    pointCount: 72,
+    size: 56,
+    subpixelCoverage: getOpticalThreadCoverage(0.19),
+    optimize: {
+      windowLimit: 36,
+      shortlistSize: 8,
+    },
+  };
+  const first = buildRoute({}, 420, configuration);
+  const second = buildRoute({}, 420, configuration);
+
+  assert.deepEqual(first.sequenceBeforeOptimization, second.sequenceBeforeOptimization);
+  assert.deepEqual(first.sequence, second.sequence);
+  assert.deepEqual(first.optimization, second.optimization);
+  assert.equal(first.sequence.length, first.sequenceBeforeOptimization.length);
+  assert.ok(
+    first.optimization.accepted > 0,
+    `expected at least one optional replacement: ${JSON.stringify(first.optimization)}`,
+  );
+  assert.ok(
+    first.residualError < first.residualErrorBeforeOptimization,
+    `expected lower mathematical residual: ${JSON.stringify(first)}`,
+  );
+  for (let index = 1; index < first.sequence.length - 1; index++) {
+    assert.notEqual(first.sequence[index - 1], first.sequence[index + 1]);
+  }
+});
+
+function buildSequence(plannerOptions = {}, lineCount = 80, configuration = {}) {
+  return buildRoute(plannerOptions, lineCount, configuration).sequence;
+}
+
+function buildRoute(plannerOptions = {}, lineCount = 80, configuration = {}) {
+  const size = configuration.size ?? 32;
+  const pointCount = configuration.pointCount ?? 24;
+  const modelCoverage = configuration.subpixelCoverage ?? 1;
   const points = Array.from({ length: pointCount }, (_, index) => {
     const angle = index / pointCount * Math.PI * 2;
     return {
@@ -32,7 +109,9 @@ function buildSequence() {
       const index = y * size + x;
       const dx = (x - size / 2) / size;
       const dy = (y - size * 0.44) / size;
-      target[index] = 2.5 + Math.exp(-(dx * dx * 18 + dy * dy * 26)) * 4;
+      target[index] = (
+        2.5 + Math.exp(-(dx * dx * 18 + dy * dy * 26)) * 4
+      ) * modelCoverage;
       importance[index] = 1 + Math.exp(-(dx * dx * 28 + dy * dy * 38));
     }
   }
@@ -40,24 +119,105 @@ function buildSequence() {
   const lineCache = new Map();
   const planner = new OpticalRoutePlanner({
     points,
-    lineCount: 80,
+    lineCount,
     minSkip: 2,
     size,
     target,
     importance,
-    getLineSamples: (from, to) => getLineSamples(from, to, points, size, lineCache),
+    getLineSamples: (from, to) => {
+      const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+      if (lineCache.has(key)) return lineCache.get(key);
+      const kernel = configuration.subpixelCoverage
+        ? createSubpixelLineKernel(
+            points[from],
+            points[to],
+            size,
+            configuration.subpixelCoverage,
+          )
+        : getLineSamples(from, to, points, size, lineCache);
+      lineCache.set(key, kernel);
+      return kernel;
+    },
     scaleFactors: [1, 2, 4],
     lookaheadInterval: 4,
     detailBoost: 0.08,
-    targetNailDistance: 7.5,
+    targetNailDistance: pointCount * 0.3125,
+    ...plannerOptions,
   });
 
-  for (let line = 0; line < 80; line++) {
-    const next = planner.findNext(line / 80);
+  for (let line = 0; line < lineCount; line++) {
+    const next = planner.findNext(line / lineCount);
     assert.notEqual(next, -1);
     planner.commit(next);
   }
-  return planner.sequence;
+  const sequenceBeforeOptimization = planner.sequence.slice();
+  const residualErrorBeforeOptimization = calculateResidualError(planner.scales[0]);
+  const optimization = configuration.optimize
+    ? planner.optimizeWeakVertices(configuration.optimize)
+    : null;
+  const residualError = calculateResidualError(planner.scales[0]);
+
+  return {
+    sequence: planner.sequence,
+    sequenceBeforeOptimization,
+    residualError,
+    residualErrorBeforeOptimization,
+    optimization,
+  };
+}
+
+function calculateResidualError(fineScale) {
+  let weightedError = 0;
+  let totalImportance = 0;
+  for (let index = 0; index < fineScale.residual.length; index++) {
+    const pixelImportance = fineScale.importance[index];
+    weightedError += pixelImportance * fineScale.residual[index] ** 2;
+    totalImportance += pixelImportance;
+  }
+  return weightedError / Math.max(1, totalImportance);
+}
+
+function analyzeRoute(sequence, pointCount) {
+  const visits = new Uint32Array(pointCount);
+  const directionBins = new Uint32Array(18);
+  const directions = [];
+  let nearParallel = 0;
+
+  for (let index = 1; index < sequence.length; index++) {
+    const from = sequence[index - 1];
+    const to = sequence[index];
+    visits[to]++;
+    const fromAngle = from / pointCount * Math.PI * 2;
+    const toAngle = to / pointCount * Math.PI * 2;
+    let direction = Math.atan2(
+      Math.sin(toAngle) - Math.sin(fromAngle),
+      Math.cos(toAngle) - Math.cos(fromAngle),
+    ) % Math.PI;
+    if (direction < 0) direction += Math.PI;
+    const bin = Math.min(directionBins.length - 1, Math.floor(direction / Math.PI * directionBins.length));
+    directionBins[bin]++;
+    if (directions.length > 0) {
+      const directDelta = Math.abs(direction - directions[directions.length - 1]);
+      const angleDelta = Math.min(directDelta, Math.PI - directDelta);
+      if (angleDelta < Math.PI / 36) nearParallel++;
+    }
+    directions.push(direction);
+  }
+
+  return {
+    nearParallelRatio: nearParallel / Math.max(1, directions.length - 1),
+    directionCv: coefficientOfVariation(directionBins),
+    nailVisitCv: coefficientOfVariation(visits),
+  };
+}
+
+function coefficientOfVariation(values) {
+  let total = 0;
+  for (const value of values) total += value;
+  const average = total / Math.max(1, values.length);
+  let variance = 0;
+  for (const value of values) variance += (value - average) ** 2;
+  return Math.sqrt(variance / Math.max(1, values.length)) / Math.max(1e-9, average);
 }
 
 function getLineSamples(from, to, points, size, cache) {
