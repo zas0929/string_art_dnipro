@@ -143,7 +143,7 @@ export default function BuildMode() {
         sequence,
         pointCount: Math.max(...sequence),
         lineCount: sequence.length - 1,
-        algorithm: "portrait-v5",
+        algorithm: "reference-v7",
         threadMm: 0.19,
         createdAt: new Date().toISOString(),
       };

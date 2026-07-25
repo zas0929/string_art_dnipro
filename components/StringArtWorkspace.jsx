@@ -3,7 +3,6 @@
 import ImagePlus from "lucide-react/dist/esm/icons/image-plus.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
-import Sparkles from "lucide-react/dist/esm/icons/sparkles.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 
 export default function StringArtWorkspace() {
@@ -35,16 +34,6 @@ export default function StringArtWorkspace() {
       <div className="stage">
         <div className="canvas-column">
           <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
-          <button
-            id="improveButton"
-            className="improve-button canvas-action"
-            type="button"
-            title="Экспериментально улучшить слабые участки"
-            disabled
-          >
-            <Sparkles aria-hidden="true" size={18} strokeWidth={2} />
-            <span id="improveButtonLabel">Улучшить участки</span>
-          </button>
         </div>
         <div className="canvas-column">
           <canvas id="sourceCanvas" width="760" height="760" aria-label="Исходное фото и выбранный кадр" />

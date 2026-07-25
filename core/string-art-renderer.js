@@ -1,5 +1,3 @@
-import { getOpticalThreadCoverage } from "./line-kernel.js";
-
 export const STRING_ART_WORK_SIZE = 560;
 
 export function createCirclePoints(count, radius, cx, cy) {
@@ -41,7 +39,6 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   const canvasSize = options.canvasSize ?? context.canvas.width;
   const workSize = options.workSize ?? STRING_ART_WORK_SIZE;
   const threadMm = options.threadMm ?? 0.19;
-  const opticalPreview = options.opticalPreview ?? true;
   const startIndex = options.startIndex ?? 0;
   const endIndex = Math.min(options.endIndex ?? lines.length, lines.length);
   const scale = canvasSize / workSize;
@@ -50,11 +47,9 @@ export function renderStringArtLines(context, lines, points, options = {}) {
   context.beginPath();
   context.arc(canvasSize / 2, canvasSize / 2, canvasSize / 2 - 20, 0, Math.PI * 2);
   context.clip();
-  context.globalAlpha = opticalPreview ? 0.16 : 0.075 + threadMm * 0.32;
+  context.globalAlpha = 0.16;
   context.strokeStyle = "#050506";
-  context.lineWidth = opticalPreview
-    ? getOpticalThreadCoverage(threadMm)
-    : Math.max(0.42, threadMm * 3.6);
+  context.lineWidth = Math.max(0.65, threadMm * 4.6);
 
   // Each line is stroked separately so intersections accumulate optical density.
   for (let index = startIndex; index < endIndex; index++) {

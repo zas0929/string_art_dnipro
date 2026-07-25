@@ -392,20 +392,6 @@ button:disabled {
   font-weight: 760;
 }
 
-.improve-button {
-  background: #242932;
-  border-color: #454d59;
-}
-
-.improve-button.is-revert {
-  color: var(--muted);
-  background: transparent;
-}
-
-.canvas-action {
-  width: 100%;
-}
-
 .stage {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -576,45 +562,6 @@ progress {
   gap: 12px;
 }
 
-.enhancement-controls {
-  display: grid;
-  gap: 11px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-}
-
-.enhancement-controls.is-disabled > label:not(.toggle-control) {
-  opacity: 0.45;
-}
-
-.toggle-control {
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.toggle-control input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  padding: 0;
-  accent-color: var(--accent);
-}
-
-.range-label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.range-label output {
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
 label {
   display: grid;
   gap: 6px;
@@ -727,10 +674,6 @@ textarea {
   }
 
   .topbar-actions > .file-button:first-child {
-    grid-column: 1 / -1;
-  }
-
-  .topbar-actions > .improve-button {
     grid-column: 1 / -1;
   }
 
