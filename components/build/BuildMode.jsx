@@ -11,6 +11,7 @@ import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
+import VolumeX from "lucide-react/dist/esm/icons/volume-x.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useEffect, useReducer, useRef, useState } from "react";
 
@@ -212,17 +213,28 @@ export default function BuildMode() {
       />
       <section className="build-workspace">
         <header className="build-header">
-          <div>
-            <a className="back-link" href="/">
-              <ArrowLeft aria-hidden="true" size={18} />
-              Генератор
-            </a>
-            <h1>Режим сборки</h1>
+          <a className="back-link" href="/">
+            <ArrowLeft aria-hidden="true" size={18} />
+            Генератор
+          </a>
+          <div className="build-header-actions">
+            <button
+              className="voice-icon-toggle"
+              type="button"
+              title={state.voiceEnabled ? "Выключить озвучивание" : "Включить озвучивание"}
+              aria-label={state.voiceEnabled ? "Выключить озвучивание точек" : "Включить озвучивание точек"}
+              aria-pressed={state.voiceEnabled}
+              onClick={() => dispatch({ type: "SET_VOICE", enabled: !state.voiceEnabled })}
+            >
+              {state.voiceEnabled
+                ? <Volume2 aria-hidden="true" size={20} />
+                : <VolumeX aria-hidden="true" size={20} />}
+            </button>
+            <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
+              <Upload aria-hidden="true" size={18} />
+              Загрузить схему
+            </label>
           </div>
-          <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
-            <Upload aria-hidden="true" size={18} />
-            Загрузить схему
-          </label>
         </header>
 
         {state.pattern ? (
@@ -248,10 +260,6 @@ export default function BuildMode() {
               aria-label="Перейти к шагу"
               onChange={(event) => dispatch({ type: "SEEK", stepIndex: event.target.value })}
             />
-            <div className="build-seek-limits" aria-hidden="true">
-              <span>0</span>
-              <span>{total}</span>
-            </div>
 
             <div className="build-route" aria-live="polite">
               {complete ? (
@@ -262,13 +270,11 @@ export default function BuildMode() {
                 </div>
               ) : (
                 <>
-                  <div className="nail-readout">
-                    <span>От точки</span>
+                  <div className="nail-readout" aria-label={`От точки ${fromPoint}`}>
                     <strong>{fromPoint}</strong>
                   </div>
                   <ChevronRight className="route-arrow" aria-hidden="true" size={52} />
-                  <div className="nail-readout is-next">
-                    <span>К точке</span>
+                  <div className="nail-readout is-next" aria-label={`К точке ${toPoint}`}>
                     <strong>{toPoint}</strong>
                   </div>
                 </>
@@ -376,14 +382,6 @@ export default function BuildMode() {
       </section>
 
       <aside className="build-controls">
-        <label className="voice-toggle">
-          <span><Volume2 aria-hidden="true" size={18} /> Озвучивать точки</span>
-          <input
-            type="checkbox"
-            checked={state.voiceEnabled}
-            onChange={(event) => dispatch({ type: "SET_VOICE", enabled: event.target.checked })}
-          />
-        </label>
         <button
           type="button"
           onClick={() => dispatch({ type: "RESET" })}
