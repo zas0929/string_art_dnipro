@@ -3,9 +3,11 @@
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
+import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
 import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
+import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
@@ -175,6 +177,10 @@ export default function BuildMode() {
     setMessage(`Позиция восстановлена: выполнено соединений — ${stepIndex}.`);
   };
 
+  const changeSpeed = (delta) => {
+    dispatch({ type: "SET_SPEED", speedMs: state.speedMs + delta });
+  };
+
   if (!state.hydrated) {
     return <main className="build-loading">Загружаю проект...</main>;
   }
@@ -197,6 +203,13 @@ export default function BuildMode() {
 
   return (
     <main className="build-page">
+      <input
+        id="buildSchemeInput"
+        className="build-scheme-input"
+        type="file"
+        accept=".txt,.csv,text/plain,text/csv"
+        onChange={handleSchemeUpload}
+      />
       <section className="build-workspace">
         <header className="build-header">
           <div>
@@ -205,11 +218,9 @@ export default function BuildMode() {
               Генератор
             </a>
             <h1>Режим сборки</h1>
-            <p>Следуйте последовательности точек и сохраняйте прогресс автоматически.</p>
           </div>
-          <label className="file-button">
+          <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
             <Upload aria-hidden="true" size={18} />
-            <input type="file" accept=".txt,.csv,text/plain,text/csv" onChange={handleSchemeUpload} />
             Загрузить схему
           </label>
         </header>
@@ -307,6 +318,48 @@ export default function BuildMode() {
               </button>
             </div>
 
+            <div className="build-speed-control">
+              <div className="build-speed-heading">
+                <label htmlFor="buildSpeedInput">Пауза между точками</label>
+                <output htmlFor="buildSpeedInput">
+                  {(state.speedMs / 1000).toFixed(2)} сек
+                </output>
+              </div>
+              <div className="build-speed-row">
+                <button
+                  type="button"
+                  title="Быстрее"
+                  aria-label="Уменьшить паузу"
+                  disabled={state.speedMs <= 500}
+                  onClick={() => changeSpeed(-250)}
+                >
+                  <Minus aria-hidden="true" size={18} />
+                </button>
+                <input
+                  id="buildSpeedInput"
+                  type="range"
+                  min="500"
+                  max="5000"
+                  step="250"
+                  value={state.speedMs}
+                  aria-label={`Пауза между точками: ${(state.speedMs / 1000).toFixed(2)} сек`}
+                  onChange={(event) => dispatch({
+                    type: "SET_SPEED",
+                    speedMs: event.target.value,
+                  })}
+                />
+                <button
+                  type="button"
+                  title="Медленнее"
+                  aria-label="Увеличить паузу"
+                  disabled={state.speedMs >= 5000}
+                  onClick={() => changeSpeed(250)}
+                >
+                  <Plus aria-hidden="true" size={18} />
+                </button>
+              </div>
+            </div>
+
             <button className="lost-position-button" type="button" onClick={openLostDialog}>
               <MapPin aria-hidden="true" size={18} />
               Я потерялся
@@ -323,18 +376,6 @@ export default function BuildMode() {
       </section>
 
       <aside className="build-controls">
-        <h2>Управление</h2>
-        <label>
-          Пауза после номера: {(state.speedMs / 1000).toFixed(2)} сек
-          <input
-            type="range"
-            min="500"
-            max="5000"
-            step="250"
-            value={state.speedMs}
-            onChange={(event) => dispatch({ type: "SET_SPEED", speedMs: event.target.value })}
-          />
-        </label>
         <label className="voice-toggle">
           <span><Volume2 aria-hidden="true" size={18} /> Озвучивать точки</span>
           <input
@@ -360,6 +401,10 @@ export default function BuildMode() {
             <div><dt>Сохранено</dt><dd>{state.stepIndex} шагов</dd></div>
           </dl>
         )}
+        <label className="file-button mobile-scheme-upload" htmlFor="buildSchemeInput">
+          <Upload aria-hidden="true" size={18} />
+          Загрузить схему
+        </label>
       </aside>
 
       {lostDialogOpen && (
