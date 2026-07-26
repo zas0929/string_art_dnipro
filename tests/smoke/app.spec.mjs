@@ -7,6 +7,13 @@ const scheme = [
   "25____  2",
   "43____  3",
 ].join("\n");
+const printScheme = [
+  "Points______Lines/n1____0/",
+  ...Array.from(
+    { length: 205 },
+    (_, index) => `${((index * 73) % 240) + 1}____  ${index + 1}`,
+  ),
+].join("\n");
 
 test("generator and build mode share working navigation", async ({ page }) => {
   await page.goto("/");
@@ -150,6 +157,49 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("43");
 });
 
+test("Print opens a configurable A4 instruction from the latest scheme", async ({ page }) => {
+  test.slow();
+  await page.goto("/");
+  await waitForGenerator(page);
+  await page.locator("#schemeInput").setInputFiles({
+    name: "print-scheme.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(printScheme),
+  });
+
+  await expect(page.getByRole("button", { name: "Print" })).toBeEnabled();
+  await page.getByRole("button", { name: "Print" }).click();
+  await expect(page).toHaveURL(/\/print$/);
+  await expect(page.getByRole("heading", { name: "Инструкция для печати" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole("button", { name: "PDF обложки" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "PDF инструкции" })).toBeVisible();
+  await expect(page.locator(".cover-sheet")).toBeVisible();
+  await expect(page.locator(".instruction-sheet")).toHaveCount(2);
+  await expect(page.locator(".instruction-sheet").first().locator(".instruction-row")).toHaveCount(204);
+  await expect(page.locator(".instruction-row")).toHaveCount(205);
+  await expect(page.locator(".instruction-row").first()).toHaveText("1 крок - 1");
+
+  await page.getByLabel("Язык инструкции").selectOption("en");
+  await expect(page.locator(".cover-sheet h2")).toHaveText("Instructions");
+  await expect(page.locator(".instruction-row").first()).toHaveText("1 step - 1");
+  await page.getByLabel("Пункт про наліпки").uncheck();
+  await expect(page.locator(".cover-sheet li")).toHaveCount(2);
+  await expect(page.locator(".cover-sheet li").first()).toContainText("Find nail number 1");
+
+  await page.evaluate(() => document.body.classList.add("print-cover-only"));
+  const coverPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+  expect(countPdfPages(coverPdf)).toBe(1);
+  await page.evaluate(() => document.body.classList.remove("print-cover-only"));
+
+  await page.getByLabel("Превью").selectOption("none");
+  await expect(page.locator(".cover-image")).toHaveClass(/is-empty/);
+  await page.getByLabel("С шага").fill("205");
+  await expect(page.locator(".instruction-row")).toHaveCount(1);
+  await expect(page.locator(".instruction-row").first()).toHaveText("205 step - 13");
+});
+
 test("generator and build mode do not overflow a mobile viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile-only layout assertion");
 
@@ -228,6 +278,10 @@ async function readLatestPattern(page) {
       database.close();
     }
   });
+}
+
+function countPdfPages(buffer) {
+  return buffer.toString("latin1").match(/\/Type\s*\/Page\b/g)?.length || 0;
 }
 
 async function readBuildProgress(page) {
