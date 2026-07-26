@@ -3,6 +3,7 @@
 import FileImage from "lucide-react/dist/esm/icons/file-image.mjs";
 import FileText from "lucide-react/dist/esm/icons/file-text.mjs";
 import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
+import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 
 export default function StringArtPanel() {
   return (
@@ -43,6 +44,10 @@ export default function StringArtPanel() {
         <button id="txtButton" type="button" disabled>
           <FileText aria-hidden="true" size={17} strokeWidth={2} />
           TXT
+        </button>
+        <button id="printButton" type="button" disabled>
+          <Printer aria-hidden="true" size={17} strokeWidth={2} />
+          Print
         </button>
       </div>
 

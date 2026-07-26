@@ -51,6 +51,7 @@ export function mountStringArtApp(root = document) {
   const buildButtons = [buildButton, mobileBuildButton];
   const pngButton = getElement("pngButton");
   const txtButton = getElement("txtButton");
+  const printButton = getElement("printButton");
   const statusText = getElement("status");
   const progress = getElement("progress");
   const pointsOut = getElement("pointsOut");
@@ -61,6 +62,7 @@ export function mountStringArtApp(root = document) {
 
   const state = {
     image: null,
+    patternId: null,
     points: [],
     sequence: [],
     sequenceDisplayStart: 0,
@@ -121,6 +123,7 @@ export function mountStringArtApp(root = document) {
       const image = await loadImage(file);
       if (destroyed) return;
       state.image = image;
+      state.patternId = null;
       state.sequence = [];
       state.sequenceDisplayStart = 0;
       resetCrop();
@@ -162,6 +165,17 @@ export function mountStringArtApp(root = document) {
   });
   listen(txtButton, "click", () => {
     downloadText("string-art-scheme.txt", formatSchemeText(state.sequence));
+  });
+  listen(printButton, "click", async () => {
+    if (state.sequence.length < 2 || state.running) return;
+    printButton.disabled = true;
+    try {
+      await persistLatestPattern(readSettings());
+      window.location.assign("/print");
+    } catch {
+      setStatus("Не удалось подготовить инструкцию к печати.");
+      printButton.disabled = false;
+    }
   });
 
   listen(pointsInput, "input", () => {
@@ -485,6 +499,7 @@ export function mountStringArtApp(root = document) {
     linesInput.value = String(lineCount);
     imageInput.value = "";
     state.image = null;
+    state.patternId = null;
     setBuildButtonsDisabled(true);
     setCropControlsDisabled(true);
     state.cancelled = false;
@@ -929,6 +944,7 @@ export function mountStringArtApp(root = document) {
   function setExportEnabled(enabled) {
     pngButton.disabled = !enabled;
     txtButton.disabled = !enabled;
+    printButton.disabled = !enabled;
   }
 
   function setBuildButtonsDisabled(disabled) {
@@ -959,9 +975,13 @@ export function mountStringArtApp(root = document) {
   async function persistLatestPattern(settings) {
     if (state.sequence.length < 2) return;
     try {
-      const id = typeof crypto.randomUUID === "function"
+      const id = state.patternId || (typeof crypto.randomUUID === "function"
         ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
+      state.patternId = id;
+      const sourcePreviewDataUrl = state.image
+        ? createSourceFrame(settings, resultCanvas.width).canvas.toDataURL("image/jpeg", 0.9)
+        : null;
       await saveLatestPattern({
         id,
         name: "Последняя схема",
@@ -970,6 +990,8 @@ export function mountStringArtApp(root = document) {
         lineCount: state.sequence.length - 1,
         algorithm: ALGORITHM_ID,
         threadMm: settings.threadMm,
+        sourcePreviewDataUrl,
+        artworkPreviewDataUrl: resultCanvas.toDataURL("image/png"),
         createdAt: new Date().toISOString(),
       });
     } catch (error) {
