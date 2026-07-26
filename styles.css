@@ -50,6 +50,34 @@ textarea {
   gap: 16px;
 }
 
+.build-header .back-link {
+  margin-bottom: 0;
+}
+
+.build-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.voice-icon-toggle {
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.voice-icon-toggle[aria-pressed="true"] {
+  border-color: var(--line);
+  color: var(--accent);
+  background: #172019;
+}
+
+.voice-icon-toggle:hover {
+  border-color: var(--line);
+}
+
 .back-link {
   display: inline-flex;
   align-items: center;
@@ -93,22 +121,13 @@ textarea {
   cursor: ew-resize;
 }
 
-.build-seek-limits {
-  display: flex;
-  justify-content: space-between;
-  width: min(100%, 720px);
-  margin: 2px auto 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .build-route {
   display: grid;
-  grid-template-columns: minmax(140px, 260px) 52px minmax(140px, 260px);
+  grid-template-columns: minmax(120px, 220px) 44px minmax(120px, 220px);
   justify-content: center;
   align-items: center;
-  gap: 28px;
-  min-height: 260px;
+  gap: 24px;
+  min-height: 228px;
 }
 
 .nail-readout {
@@ -125,12 +144,8 @@ textarea {
   background: #172019;
 }
 
-.nail-readout span {
-  color: var(--muted);
-}
-
 .nail-readout strong {
-  font-size: clamp(54px, 7vw, 96px);
+  font-size: clamp(48px, 6vw, 80px);
   line-height: 1;
 }
 
@@ -438,25 +453,6 @@ textarea {
   padding: 24px;
   border-left: 1px solid var(--line);
   background: var(--panel);
-}
-
-.voice-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.voice-toggle span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.voice-toggle input {
-  width: 20px;
-  height: 20px;
-  accent-color: var(--accent);
 }
 
 .build-summary {
@@ -1269,8 +1265,12 @@ textarea {
   }
 
   .build-header {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .build-header-actions {
+    margin-left: auto;
   }
 
   .desktop-scheme-upload {
@@ -1284,9 +1284,10 @@ textarea {
   }
 
   .build-route {
-    grid-template-columns: minmax(112px, 1fr) 28px minmax(112px, 1fr);
+    grid-template-columns: minmax(96px, 138px) 24px minmax(96px, 138px);
+    justify-content: center;
     gap: 8px;
-    min-height: 190px;
+    min-height: 158px;
   }
 
   .route-history {
@@ -1331,7 +1332,7 @@ textarea {
   }
 
   .nail-readout strong {
-    font-size: 52px;
+    font-size: 46px;
   }
 
   .route-arrow {

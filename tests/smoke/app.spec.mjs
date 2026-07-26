@@ -27,7 +27,12 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await buildModeLink.click();
 
   await expect(page).toHaveURL(/\/build$/);
-  await expect(page.getByRole("heading", { name: "Режим сборки" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Генератор" })).toBeVisible();
+  const voiceButton = page.getByRole("button", { name: "Выключить озвучивание точек" });
+  await expect(voiceButton).toHaveAttribute("aria-pressed", "true");
+  await voiceButton.click();
+  await expect(page.getByRole("button", { name: "Включить озвучивание точек" }))
+    .toHaveAttribute("aria-pressed", "false");
   await expect(page.getByText("Нет активной схемы")).toBeVisible();
   await page.getByRole("link", { name: "Генератор" }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -212,7 +217,7 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 
   await page.getByRole("link", { name: "Режим сборки" }).click();
-  await expect(page.getByRole("heading", { name: "Режим сборки" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Генератор" })).toBeVisible();
   await expect(page.locator(".desktop-scheme-upload")).toBeHidden();
   await expect(page.locator(".mobile-scheme-upload")).toBeVisible();
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
