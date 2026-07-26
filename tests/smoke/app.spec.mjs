@@ -122,6 +122,10 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.getByText("Шаг 1 из 3")).toBeVisible();
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
+  await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
+  await page.getByRole("button", { name: "Уменьшить паузу" }).click();
+  await expect(page.locator("#buildSpeedInput")).toHaveValue("1250");
+  await expect(page.locator(".build-speed-heading output")).toHaveText("1.25 сек");
 
   await page.getByRole("button", { name: "Далее" }).click();
   await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
@@ -152,10 +156,15 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
   await page.goto("/");
   await waitForGenerator(page);
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
+  const buildLinkBox = await page.getByRole("link", { name: "Режим сборки" }).boundingBox();
+  const parametersBox = await page.getByRole("heading", { name: "Параметры" }).boundingBox();
+  expect(buildLinkBox.y + buildLinkBox.height).toBeLessThan(parametersBox.y);
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 
   await page.getByRole("link", { name: "Режим сборки" }).click();
   await expect(page.getByRole("heading", { name: "Режим сборки" })).toBeVisible();
+  await expect(page.locator(".desktop-scheme-upload")).toBeHidden();
+  await expect(page.locator(".mobile-scheme-upload")).toBeVisible();
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 });
 
@@ -187,6 +196,10 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
 
   await setRangeValue(seek, 350);
   await expect(page.getByText("Шаг 351 из 1601")).toBeVisible();
+  const immediateBackwardFrame = await canvasSignature(page);
+  expect(immediateBackwardFrame.darkSamples).toBeLessThan(
+    forwardFrame.darkSamples * 0.75,
+  );
   await page.waitForTimeout(700);
   const backwardFrame = await canvasSignature(page);
   expect(backwardFrame.hash).not.toBe(forwardFrame.hash);

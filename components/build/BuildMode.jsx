@@ -3,9 +3,11 @@
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
+import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
 import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
+import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
@@ -175,6 +177,10 @@ export default function BuildMode() {
     setMessage(`Позиция восстановлена: выполнено соединений — ${stepIndex}.`);
   };
 
+  const changeSpeed = (delta) => {
+    dispatch({ type: "SET_SPEED", speedMs: state.speedMs + delta });
+  };
+
   if (!state.hydrated) {
     return <main className="build-loading">Загружаю проект...</main>;
   }
@@ -197,6 +203,13 @@ export default function BuildMode() {
 
   return (
     <main className="build-page">
+      <input
+        id="buildSchemeInput"
+        className="build-scheme-input"
+        type="file"
+        accept=".txt,.csv,text/plain,text/csv"
+        onChange={handleSchemeUpload}
+      />
       <section className="build-workspace">
         <header className="build-header">
           <div>
@@ -205,11 +218,9 @@ export default function BuildMode() {
               Генератор
             </a>
             <h1>Режим сборки</h1>
-            <p>Следуйте последовательности точек и сохраняйте прогресс автоматически.</p>
           </div>
-          <label className="file-button">
+          <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
             <Upload aria-hidden="true" size={18} />
-            <input type="file" accept=".txt,.csv,text/plain,text/csv" onChange={handleSchemeUpload} />
             Загрузить схему
           </label>
         </header>
@@ -285,11 +296,6 @@ export default function BuildMode() {
               </div>
             )}
 
-            <button className="lost-position-button" type="button" onClick={openLostDialog}>
-              <MapPin aria-hidden="true" size={18} />
-              Я потерялся
-            </button>
-
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
@@ -311,6 +317,53 @@ export default function BuildMode() {
                 <ChevronRight aria-hidden="true" size={20} />
               </button>
             </div>
+
+            <div className="build-speed-control">
+              <div className="build-speed-heading">
+                <label htmlFor="buildSpeedInput">Пауза между точками</label>
+                <output htmlFor="buildSpeedInput">
+                  {(state.speedMs / 1000).toFixed(2)} сек
+                </output>
+              </div>
+              <div className="build-speed-row">
+                <button
+                  type="button"
+                  title="Быстрее"
+                  aria-label="Уменьшить паузу"
+                  disabled={state.speedMs <= 500}
+                  onClick={() => changeSpeed(-250)}
+                >
+                  <Minus aria-hidden="true" size={18} />
+                </button>
+                <input
+                  id="buildSpeedInput"
+                  type="range"
+                  min="500"
+                  max="5000"
+                  step="250"
+                  value={state.speedMs}
+                  aria-label={`Пауза между точками: ${(state.speedMs / 1000).toFixed(2)} сек`}
+                  onChange={(event) => dispatch({
+                    type: "SET_SPEED",
+                    speedMs: event.target.value,
+                  })}
+                />
+                <button
+                  type="button"
+                  title="Медленнее"
+                  aria-label="Увеличить паузу"
+                  disabled={state.speedMs >= 5000}
+                  onClick={() => changeSpeed(250)}
+                >
+                  <Plus aria-hidden="true" size={18} />
+                </button>
+              </div>
+            </div>
+
+            <button className="lost-position-button" type="button" onClick={openLostDialog}>
+              <MapPin aria-hidden="true" size={18} />
+              Я потерялся
+            </button>
           </>
         ) : (
           <div className="empty-build-state">
@@ -323,18 +376,6 @@ export default function BuildMode() {
       </section>
 
       <aside className="build-controls">
-        <h2>Управление</h2>
-        <label>
-          Пауза после номера: {(state.speedMs / 1000).toFixed(2)} сек
-          <input
-            type="range"
-            min="500"
-            max="5000"
-            step="250"
-            value={state.speedMs}
-            onChange={(event) => dispatch({ type: "SET_SPEED", speedMs: event.target.value })}
-          />
-        </label>
         <label className="voice-toggle">
           <span><Volume2 aria-hidden="true" size={18} /> Озвучивать точки</span>
           <input
@@ -360,6 +401,10 @@ export default function BuildMode() {
             <div><dt>Сохранено</dt><dd>{state.stepIndex} шагов</dd></div>
           </dl>
         )}
+        <label className="file-button mobile-scheme-upload" htmlFor="buildSchemeInput">
+          <Upload aria-hidden="true" size={18} />
+          Загрузить схему
+        </label>
       </aside>
 
       {lostDialogOpen && (
@@ -578,6 +623,7 @@ function speakBuildPoint(point, reportError) {
 }
 
 const BUILD_CANVAS_SIZE = 760;
+const SEEK_PREVIEW_LINE_LIMIT = 480;
 
 function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
   const canvasRef = useRef(null);
@@ -629,6 +675,8 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
     const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
     const linesToAdd = completedLines - renderCache.renderedLines;
     const canExtendCurrentFrame = linesToAdd >= 0 && linesToAdd <= 120;
+    let needsExactRebuild = !canExtendCurrentFrame;
+    let previewFrame = null;
     if (canExtendCurrentFrame && linesToAdd > 0) {
       renderStringArtLines(renderCache.base, renderCache.allLines, renderCache.workPoints, {
         canvasSize: BUILD_CANVAS_SIZE,
@@ -638,12 +686,24 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         endIndex: completedLines,
       });
       renderCache.renderedLines = completedLines;
+    } else if (needsExactRebuild) {
+      previewFrame = createSeekPreviewFrame(
+        renderCache,
+        completedLines,
+        pattern.threadMm ?? 0.19,
+      );
+      if (previewFrame.exact) {
+        renderCache.baseCanvas = previewFrame.canvas;
+        renderCache.base = previewFrame.context;
+        renderCache.renderedLines = completedLines;
+        needsExactRebuild = false;
+      }
     }
 
     const { displayPoints } = renderCache;
     const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
     const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
-    let activeBaseCanvas = renderCache.baseCanvas;
+    let activeBaseCanvas = previewFrame?.canvas ?? renderCache.baseCanvas;
     let animationStartedAt = performance.now();
     let active = true;
     let animationFrame = 0;
@@ -694,7 +754,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
 
     restartAnimation();
 
-    if (!canExtendCurrentFrame) {
+    if (needsExactRebuild) {
       rebuildTimer = window.setTimeout(() => {
         if (!active) return;
         const nextCanvas = document.createElement("canvas");
@@ -754,4 +814,42 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       />
     </div>
   );
+}
+
+function createSeekPreviewFrame(renderCache, completedLines, threadMm) {
+  const canvas = document.createElement("canvas");
+  canvas.width = BUILD_CANVAS_SIZE;
+  canvas.height = BUILD_CANVAS_SIZE;
+  const context = canvas.getContext("2d");
+  if (!context) return { canvas, context: renderCache.base, exact: false };
+
+  renderStringArtBase(
+    context,
+    renderCache.displayPoints.length,
+    BUILD_CANVAS_SIZE,
+  );
+  if (completedLines <= SEEK_PREVIEW_LINE_LIMIT) {
+    renderStringArtLines(context, renderCache.allLines, renderCache.workPoints, {
+      canvasSize: BUILD_CANVAS_SIZE,
+      workSize: STRING_ART_WORK_SIZE,
+      threadMm,
+      endIndex: completedLines,
+    });
+    return { canvas, context, exact: true };
+  }
+
+  const stride = completedLines / SEEK_PREVIEW_LINE_LIMIT;
+  const sampledLines = Array.from(
+    { length: SEEK_PREVIEW_LINE_LIMIT },
+    (_, index) => renderCache.allLines[
+      Math.min(completedLines - 1, Math.floor((index + 0.5) * stride))
+    ],
+  );
+  renderStringArtLines(context, sampledLines, renderCache.workPoints, {
+    canvasSize: BUILD_CANVAS_SIZE,
+    workSize: STRING_ART_WORK_SIZE,
+    threadMm,
+    lineAlpha: Math.min(0.42, 0.16 * Math.sqrt(stride)),
+  });
+  return { canvas, context, exact: false };
 }
