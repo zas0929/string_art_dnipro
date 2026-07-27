@@ -1,4 +1,5 @@
 import "./globals.css";
+import { LanguageProvider } from "../components/i18n/LanguageProvider.jsx";
 
 export const metadata = {
   title: "String Art Generator",
@@ -15,7 +16,9 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <LanguageProvider>{children}</LanguageProvider>
+      </body>
     </html>
   );
 }

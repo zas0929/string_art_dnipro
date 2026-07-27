@@ -30,7 +30,39 @@ textarea {
   font: inherit;
 }
 
+.language-switch {
+  position: absolute;
+  z-index: 20;
+  top: 16px;
+  right: 16px;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-self: center;
+  min-width: 92px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111318;
+}
+
+.language-switch button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.language-switch button.is-active {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
 .build-page {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   min-height: 100vh;
@@ -48,6 +80,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  padding-top: 42px;
 }
 
 .build-header .back-link {
@@ -450,7 +483,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: 24px;
+  padding: 72px 24px 24px;
   border-left: 1px solid var(--line);
   background: var(--panel);
 }
@@ -464,6 +497,7 @@ textarea {
 }
 
 .build-loading {
+  position: relative;
   display: grid;
   min-height: 100vh;
   place-items: center;
@@ -471,6 +505,7 @@ textarea {
 }
 
 .app {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   min-height: 100vh;
@@ -486,6 +521,7 @@ textarea {
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
+  padding-top: 42px;
 }
 
 .topbar-actions {
@@ -772,42 +808,6 @@ canvas {
   accent-color: var(--accent-2);
 }
 
-.background-controls {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(190px, auto) minmax(0, 1fr);
-  align-items: end;
-  gap: 14px;
-  padding-top: 2px;
-}
-
-.background-toggle {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 30px;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.background-toggle input {
-  width: 17px;
-  height: 17px;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
-.background-toggle:has(input:disabled) {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.background-shade-control input:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .result-variants {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -869,7 +869,7 @@ progress {
 .panel {
   border-left: 1px solid var(--line);
   background: var(--panel);
-  padding: 24px;
+  padding: 72px 24px 24px;
   display: flex;
   flex-direction: column;
   gap: 22px;
@@ -911,6 +911,7 @@ input[type="range"] {
 }
 
 .print-page {
+  position: relative;
   min-height: 100vh;
   padding: 24px;
   background: #101114;
@@ -926,7 +927,7 @@ input[type="range"] {
   gap: 20px;
   width: min(100%, 1280px);
   margin: 0 auto 28px;
-  padding: 18px;
+  padding: 60px 18px 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgb(25 27 32 / 96%);
@@ -1159,7 +1160,7 @@ input[type="range"] {
 
 .instruction-sheet {
   display: block;
-  padding: 10mm 12mm;
+  padding: 13mm 10mm 10mm 22mm;
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -1202,6 +1203,7 @@ input[type="range"] {
 
 .print-loading,
 .print-empty {
+  position: relative;
   display: grid;
   place-items: center;
   align-content: center;
@@ -1257,6 +1259,7 @@ textarea {
   .panel {
     border-left: 0;
     border-top: 1px solid var(--line);
+    padding: 24px;
   }
 
   .build-page {
@@ -1266,6 +1269,7 @@ textarea {
   .build-controls {
     border-top: 1px solid var(--line);
     border-left: 0;
+    padding: 24px;
   }
 
   .print-toolbar {
@@ -1368,11 +1372,6 @@ textarea {
     gap: 10px;
   }
 
-  .background-controls {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-
   .crop-reset-button {
     padding: 0 9px;
   }
@@ -1395,6 +1394,10 @@ textarea {
 
   .build-header-actions {
     margin-left: auto;
+  }
+
+  .build-header-actions .language-switch {
+    min-width: 82px;
   }
 
   .desktop-scheme-upload {
@@ -1515,6 +1518,10 @@ textarea {
     display: none;
   }
 
+  .language-switch {
+    display: none;
+  }
+
   .print-preview {
     display: block;
   }
@@ -1539,6 +1546,13 @@ textarea {
     overflow: hidden;
   }
 
+  body.print-instruction-only .print-page,
+  body.print-instruction-only .print-preview,
+  body.print-instruction-only .instruction-document,
+  body.print-instruction-only .instruction-pages {
+    display: contents;
+  }
+
   body.print-cover-only .cover-sheet {
     break-after: auto !important;
     page-break-after: auto !important;
@@ -1547,11 +1561,6 @@ textarea {
   .print-sheet {
     margin: 0;
     box-shadow: none;
-    break-after: page;
-    page-break-after: always;
-  }
-
-  .print-sheet:last-child {
     break-after: auto;
     page-break-after: auto;
   }

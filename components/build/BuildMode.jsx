@@ -14,6 +14,8 @@ import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
 import VolumeX from "lucide-react/dist/esm/icons/volume-x.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useEffect, useReducer, useRef, useState } from "react";
+import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
+import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 import {
   buildSessionReducer,
@@ -35,6 +37,7 @@ import {
 } from "../../storage/local-project-store.js";
 
 export default function BuildMode() {
+  const { t } = useLanguage();
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
@@ -63,7 +66,7 @@ export default function BuildMode() {
       })
       .catch((error) => {
         if (!active) return;
-        setMessage(`Could not restore the project: ${error.message}`);
+        setMessage(t("build.restoreError", { error: error.message }));
         dispatch({ type: "HYDRATE_EMPTY" });
       });
     return () => {
@@ -80,7 +83,7 @@ export default function BuildMode() {
         speedMs: state.speedMs,
         voiceEnabled: state.voiceEnabled,
         updatedAt: new Date().toISOString(),
-      }).catch((error) => setMessage(`Could not save your progress: ${error.message}`));
+      }).catch((error) => setMessage(t("build.saveError", { error: error.message })));
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [state.hydrated, state.pattern, state.stepIndex, state.speedMs, state.voiceEnabled]);
@@ -103,7 +106,7 @@ export default function BuildMode() {
     if (state.voiceEnabled) {
       const primedSpeech = primedSpeechRef.current?.stepIndex === state.stepIndex
         ? primedSpeechRef.current.run
-        : speakBuildPoint(nextPoint, setMessage);
+        : speakBuildPoint(nextPoint, setMessage, t);
       primedSpeechRef.current = null;
       speechWatchdog = window.setTimeout(
         () => scheduleAdvance(0),
@@ -135,7 +138,7 @@ export default function BuildMode() {
       if (nextPoint) {
         primedSpeechRef.current = {
           stepIndex: state.stepIndex,
-          run: speakBuildPoint(nextPoint, setMessage),
+          run: speakBuildPoint(nextPoint, setMessage, t),
         };
       }
     }
@@ -159,9 +162,9 @@ export default function BuildMode() {
       };
       await saveLatestPattern(pattern);
       dispatch({ type: "LOAD_PATTERN", pattern, progress: null });
-      setMessage("Pattern uploaded. Your progress will be saved automatically.");
+      setMessage(t("build.uploadSuccess"));
     } catch (error) {
-      setMessage(`Pattern error: ${error.message}`);
+      setMessage(t("build.patternError", { error: error.message }));
     } finally {
       event.target.value = "";
     }
@@ -175,7 +178,7 @@ export default function BuildMode() {
   const restoreLostPosition = (stepIndex) => {
     dispatch({ type: "SEEK", stepIndex });
     setLostDialogOpen(false);
-    setMessage(`Position restored: ${stepIndex} connections completed.`);
+    setMessage(t("build.restored", { count: stepIndex }));
   };
 
   const changeSpeed = (delta) => {
@@ -183,7 +186,12 @@ export default function BuildMode() {
   };
 
   if (!state.hydrated) {
-    return <main className="build-loading">Loading project...</main>;
+    return (
+      <main className="build-loading">
+        <LanguageSwitch />
+        <span>{t("build.loading")}</span>
+      </main>
+    );
   }
 
   const total = state.pattern ? state.pattern.sequence.length - 1 : 0;
@@ -204,6 +212,7 @@ export default function BuildMode() {
 
   return (
     <main className="build-page">
+      <LanguageSwitch />
       <input
         id="buildSchemeInput"
         className="build-scheme-input"
@@ -215,14 +224,14 @@ export default function BuildMode() {
         <header className="build-header">
           <a className="back-link" href="/">
             <ArrowLeft aria-hidden="true" size={18} />
-            Generator
+            {t("common.generator")}
           </a>
           <div className="build-header-actions">
             <button
               className="voice-icon-toggle"
               type="button"
-              title={state.voiceEnabled ? "Turn voice guidance off" : "Turn voice guidance on"}
-              aria-label={state.voiceEnabled ? "Turn pin voice guidance off" : "Turn pin voice guidance on"}
+              title={state.voiceEnabled ? t("build.voiceOff") : t("build.voiceOn")}
+              aria-label={state.voiceEnabled ? t("build.voiceOffAria") : t("build.voiceOnAria")}
               aria-pressed={state.voiceEnabled}
               onClick={() => dispatch({ type: "SET_VOICE", enabled: !state.voiceEnabled })}
             >
@@ -232,7 +241,7 @@ export default function BuildMode() {
             </button>
             <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
               <Upload aria-hidden="true" size={18} />
-              Upload pattern
+              {t("build.uploadPattern")}
             </label>
           </div>
         </header>
@@ -247,7 +256,10 @@ export default function BuildMode() {
             />
 
             <div className="build-progress-line">
-              <span>Step {Math.min(state.stepIndex + 1, total)} of {total}</span>
+              <span>{t("build.stepOf", {
+                current: Math.min(state.stepIndex + 1, total),
+                total,
+              })}</span>
               <strong>{progressPercent}%</strong>
             </div>
             <input
@@ -257,24 +269,24 @@ export default function BuildMode() {
               max={total}
               step="1"
               value={state.stepIndex}
-              aria-label="Go to step"
+              aria-label={t("build.goToStep")}
               onChange={(event) => dispatch({ type: "SEEK", stepIndex: event.target.value })}
             />
 
             <div className="build-route" aria-live="polite">
               {complete ? (
                 <div className="build-complete">
-                  <span>Pattern completed</span>
+                  <span>{t("build.completed")}</span>
                   <strong>{total}</strong>
-                  <small>connections completed</small>
+                  <small>{t("build.connectionsCompleted")}</small>
                 </div>
               ) : (
                 <>
-                  <div className="nail-readout" aria-label={`From pin ${fromPoint}`}>
+                  <div className="nail-readout" aria-label={t("build.fromPin", { point: fromPoint })}>
                     <strong>{fromPoint}</strong>
                   </div>
                   <ChevronRight className="route-arrow" aria-hidden="true" size={52} />
-                  <div className="nail-readout is-next" aria-label={`To pin ${toPoint}`}>
+                  <div className="nail-readout is-next" aria-label={t("build.toPin", { point: toPoint })}>
                     <strong>{toPoint}</strong>
                   </div>
                 </>
@@ -282,8 +294,8 @@ export default function BuildMode() {
             </div>
 
             {!complete && (
-              <div className="route-history" aria-label="Recent and upcoming pins">
-                <span className="route-history-label">Recent</span>
+              <div className="route-history" aria-label={t("build.routeAria")}>
+                <span className="route-history-label">{t("build.recent")}</span>
                 <ol>
                   {routeContext.map(({ offset, point }) => (
                     <li
@@ -292,20 +304,27 @@ export default function BuildMode() {
                       aria-current={offset === 0 ? "step" : undefined}
                       aria-label={point === null
                         ? undefined
-                        : `${offset < 0 ? "Previous" : offset === 0 ? "Current" : "Next"} pin ${point}`}
+                        : t(
+                          offset < 0
+                            ? "build.previousPin"
+                            : offset === 0
+                              ? "build.currentPin"
+                              : "build.nextPin",
+                          { point },
+                        )}
                     >
                       <span aria-hidden="true">{point ?? "·"}</span>
                     </li>
                   ))}
                 </ol>
-                <span className="route-history-label">Next</span>
+                <span className="route-history-label">{t("build.next")}</span>
               </div>
             )}
 
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
-                Back
+                {t("build.back")}
               </button>
               <button
                 className="primary-transport"
@@ -316,26 +335,26 @@ export default function BuildMode() {
                 {state.playback === "playing"
                   ? <Pause aria-hidden="true" size={20} fill="currentColor" />
                   : <Play aria-hidden="true" size={20} fill="currentColor" />}
-                {state.playback === "playing" ? "Pause" : "Start"}
+                {state.playback === "playing" ? t("build.pause") : t("build.start")}
               </button>
               <button type="button" onClick={() => dispatch({ type: "NEXT" })} disabled={complete}>
-                Next
+                {t("build.next")}
                 <ChevronRight aria-hidden="true" size={20} />
               </button>
             </div>
 
             <div className="build-speed-control">
               <div className="build-speed-heading">
-                <label htmlFor="buildSpeedInput">Pause between pins</label>
+                <label htmlFor="buildSpeedInput">{t("build.pauseBetween")}</label>
                 <output htmlFor="buildSpeedInput">
-                  {(state.speedMs / 1000).toFixed(2)} sec
+                  {t("build.seconds", { value: (state.speedMs / 1000).toFixed(2) })}
                 </output>
               </div>
               <div className="build-speed-row">
                 <button
                   type="button"
-                  title="Faster"
-                  aria-label="Shorten pause"
+                  title={t("build.faster")}
+                  aria-label={t("build.shortenPause")}
                   disabled={state.speedMs <= 500}
                   onClick={() => changeSpeed(-250)}
                 >
@@ -348,7 +367,7 @@ export default function BuildMode() {
                   max="5000"
                   step="250"
                   value={state.speedMs}
-                  aria-label={`Pause between pins: ${(state.speedMs / 1000).toFixed(2)} sec`}
+                  aria-label={t("build.seconds", { value: (state.speedMs / 1000).toFixed(2) })}
                   onChange={(event) => dispatch({
                     type: "SET_SPEED",
                     speedMs: event.target.value,
@@ -356,8 +375,8 @@ export default function BuildMode() {
                 />
                 <button
                   type="button"
-                  title="Slower"
-                  aria-label="Increase pause"
+                  title={t("build.slower")}
+                  aria-label={t("build.increasePause")}
                   disabled={state.speedMs >= 5000}
                   onClick={() => changeSpeed(250)}
                 >
@@ -368,13 +387,13 @@ export default function BuildMode() {
 
             <button className="lost-position-button" type="button" onClick={openLostDialog}>
               <MapPin aria-hidden="true" size={18} />
-              I&apos;m lost
+              {t("build.lost")}
             </button>
           </>
         ) : (
           <div className="empty-build-state">
-            <strong>No active pattern</strong>
-            <span>Generate an artwork or upload a pattern file.</span>
+            <strong>{t("build.noPattern")}</strong>
+            <span>{t("build.noPatternHint")}</span>
           </div>
         )}
 
@@ -388,20 +407,20 @@ export default function BuildMode() {
           disabled={!state.pattern || state.stepIndex === 0}
         >
           <RotateCcw aria-hidden="true" size={18} />
-          Start over
+          {t("build.startOver")}
         </button>
 
         {state.pattern && (
           <dl className="build-summary">
-            <div><dt>Name</dt><dd>{state.pattern.name}</dd></div>
-            <div><dt>Pins</dt><dd>{state.pattern.pointCount}</dd></div>
-            <div><dt>Lines</dt><dd>{total}</dd></div>
-            <div><dt>Saved</dt><dd>{state.stepIndex} steps</dd></div>
+            <div><dt>{t("build.name")}</dt><dd>{state.pattern.name}</dd></div>
+            <div><dt>{t("panel.pins")}</dt><dd>{state.pattern.pointCount}</dd></div>
+            <div><dt>{t("panel.lines")}</dt><dd>{total}</dd></div>
+            <div><dt>{t("build.saved")}</dt><dd>{t("build.steps", { count: state.stepIndex })}</dd></div>
           </dl>
         )}
         <label className="file-button mobile-scheme-upload" htmlFor="buildSchemeInput">
           <Upload aria-hidden="true" size={18} />
-          Upload pattern
+          {t("build.uploadPattern")}
         </label>
       </aside>
 
@@ -409,6 +428,7 @@ export default function BuildMode() {
         <LostPositionDialog
           sequence={state.pattern.sequence}
           pointCount={state.pattern.pointCount}
+          t={t}
           onClose={() => setLostDialogOpen(false)}
           onRestore={restoreLostPosition}
         />
@@ -417,7 +437,7 @@ export default function BuildMode() {
   );
 }
 
-function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
+function LostPositionDialog({ sequence, pointCount, onClose, onRestore, t }) {
   const [points, setPoints] = useState(["", "", ""]);
   const [matches, setMatches] = useState(null);
   const [error, setError] = useState("");
@@ -448,7 +468,7 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
         (point) => !Number.isInteger(point) || point < 1 || point > pointCount,
       )
     ) {
-      setError(`Enter three numbers from 1 to ${pointCount}.`);
+      setError(t("build.invalidPins", { count: pointCount }));
       setMatches(null);
       return;
     }
@@ -472,20 +492,20 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
         <button
           className="lost-dialog-close"
           type="button"
-          title="Close"
-          aria-label="Close"
+          title={t("common.close")}
+          aria-label={t("common.close")}
           onClick={onClose}
         >
           <X aria-hidden="true" size={20} />
         </button>
-        <h2 id="lost-dialog-title">Find my position</h2>
-        <p>Enter the last three pins in the order you connected them.</p>
+        <h2 id="lost-dialog-title">{t("build.findPosition")}</h2>
+        <p>{t("build.findHint")}</p>
 
         <form onSubmit={handleSubmit}>
           <div className="lost-point-inputs">
             {points.map((point, index) => (
               <label key={index}>
-                Pin {index + 1}
+                {t("build.pin", { number: index + 1 })}
                 <input
                   ref={index === 0 ? firstInputRef : undefined}
                   type="number"
@@ -493,29 +513,29 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
                   max={pointCount}
                   inputMode="numeric"
                   value={point}
-                  aria-label={`Recent pin ${index + 1}`}
+                  aria-label={t("build.recentPin", { number: index + 1 })}
                   onChange={(event) => updatePoint(index, event.target.value)}
                 />
               </label>
             ))}
           </div>
           <button className="lost-search-button" type="submit">
-            Find
+            {t("build.find")}
           </button>
         </form>
 
         {error && <p className="lost-dialog-error" role="alert">{error}</p>}
         {matches?.length === 0 && (
           <p className="lost-dialog-empty" role="status">
-            This sequence was not found. Check the pin numbers and their order.
+            {t("build.notFound")}
           </p>
         )}
         {matches?.length > 0 && (
           <div className="lost-match-section" aria-live="polite">
             <strong>
               {matches.length === 1
-                ? "Position found"
-                : `Matches found: ${matches.length}`}
+                ? t("build.positionFound")
+                : t("build.matchesFound", { count: matches.length })}
             </strong>
             <div className="lost-match-list">
               {matches.map((match) => (
@@ -526,16 +546,16 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
                   onClick={() => onRestore(match.stepIndex)}
                 >
                   <span>
-                    Completed connections: <strong>{match.stepIndex}</strong>
+                    {t("build.completedConnections", { count: match.stepIndex })}
                   </span>
                   <small>
-                    {match.previousPoint === null ? "Start" : match.previousPoint}
+                    {match.previousPoint === null ? t("build.routeStart") : match.previousPoint}
                     {" · "}
                     {points.join(" → ")}
                     {" · "}
-                    {match.nextPoint === null ? "Done" : match.nextPoint}
+                    {match.nextPoint === null ? t("build.routeDone") : match.nextPoint}
                   </small>
-                  <em>Continue from here</em>
+                  <em>{t("build.continueHere")}</em>
                 </button>
               ))}
             </div>
@@ -546,7 +566,7 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
   );
 }
 
-function speakBuildPoint(point, reportError) {
+function speakBuildPoint(point, reportError, t) {
   let settleSpeech;
   const finished = new Promise((resolve) => {
     settleSpeech = resolve;
@@ -563,7 +583,7 @@ function speakBuildPoint(point, reportError) {
     || !("speechSynthesis" in window)
     || !("SpeechSynthesisUtterance" in window)
   ) {
-    reportError("Voice guidance is unavailable in this browser. Build Mode will continue without it.");
+    reportError(t("build.voiceUnavailable"));
     settle("unavailable");
     return { started: false, finished };
   }
@@ -598,7 +618,7 @@ function speakBuildPoint(point, reportError) {
           return;
         }
         if (event.error !== "canceled" && event.error !== "interrupted") {
-          reportError("Could not start voice guidance. Build Mode will continue without it.");
+          reportError(t("build.voiceStartError"));
         }
         settle(event.error || "error");
       };
@@ -606,7 +626,7 @@ function speakBuildPoint(point, reportError) {
     };
 
     if (voiceAttempts.length === 0) {
-      reportError("No system voice was found. Build Mode will continue without voice guidance.");
+      reportError(t("build.voiceMissing"));
       settle("unavailable");
     } else {
       speech.resume();
@@ -614,7 +634,7 @@ function speakBuildPoint(point, reportError) {
     }
     return { started: true, finished };
   } catch {
-    reportError("Could not start voice guidance. Build Mode will continue without it.");
+    reportError(t("build.voiceStartError"));
     settle("error");
     return { started: false, finished };
   }
@@ -624,6 +644,7 @@ const BUILD_CANVAS_SIZE = 760;
 const SEEK_PREVIEW_LINE_LIMIT = 480;
 
 function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
+  const { t } = useLanguage();
   const canvasRef = useRef(null);
   const renderCacheRef = useRef(null);
 
@@ -808,7 +829,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         className="build-canvas"
         width={BUILD_CANVAS_SIZE}
         height={BUILD_CANVAS_SIZE}
-        aria-label="Artwork build visualization"
+        aria-label={t("build.canvasAria")}
       />
     </div>
   );

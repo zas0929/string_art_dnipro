@@ -14,6 +14,12 @@ import {
   renderStringArtLines,
 } from "./core/string-art-renderer.js";
 import { saveLatestPattern } from "./storage/local-project-store.js";
+import {
+  LANGUAGE_CHANGE_EVENT,
+  getStoredLanguage,
+  normalizeLanguage,
+  translate,
+} from "./core/i18n.js";
 
 const mountedApps = new WeakMap();
 const WORK_SIZE = 560;
@@ -53,9 +59,6 @@ export function mountStringArtApp(root = document) {
   const sharpnessValue = getElement("sharpnessValue");
   const clarityInput = getElement("clarityInput");
   const clarityValue = getElement("clarityValue");
-  const removeBackgroundInput = getElement("removeBackgroundInput");
-  const backgroundGrayInput = getElement("backgroundGrayInput");
-  const backgroundGrayValue = getElement("backgroundGrayValue");
   const resultVariants = getElement("resultVariants");
   const variantButtons = [...resultVariants.querySelectorAll("[data-lines]")];
   const buildButton = getElement("buildButton");
@@ -103,6 +106,8 @@ export function mountStringArtApp(root = document) {
   const listenerController = new AbortController();
   let destroyed = false;
   let cropPreviewFrame = 0;
+  let uiLanguage = getStoredLanguage();
+  let currentStatus = { key: "generator.uploadPrompt", params: {} };
 
   const listen = (target, type, handler, options = {}) => {
     target.addEventListener(type, handler, {
@@ -110,6 +115,19 @@ export function mountStringArtApp(root = document) {
       signal: listenerController.signal,
     });
   };
+
+  listen(window, LANGUAGE_CHANGE_EVENT, (event) => {
+    uiLanguage = normalizeLanguage(event.detail?.language);
+    renderCurrentStatus();
+    if (!state.image && state.sequence.length > 1) {
+      drawSchemePlaceholder(
+        state.resultSettings?.points ?? Math.max(...state.sequence) + 1,
+        state.resultLines.length,
+      );
+    } else if (!state.image) {
+      drawEmpty();
+    }
+  });
 
   const cleanup = () => {
     if (destroyed) return;
@@ -148,9 +166,9 @@ export function mountStringArtApp(root = document) {
       setCropControlsDisabled(false);
       setBuildButtonsDisabled(false);
       setExportEnabled(false);
-      setStatus("Photo uploaded. Drag it to adjust the crop or change the zoom.");
+      setStatus("generator.photoUploaded");
     } catch {
-      setStatus("Could not load the image.");
+      setStatus("generator.imageLoadError");
     }
   });
 
@@ -162,7 +180,9 @@ export function mountStringArtApp(root = document) {
       const text = await file.text();
       if (!destroyed) await importScheme(text);
     } catch (error) {
-      setStatus(`Pattern error: ${error instanceof Error ? error.message : "could not read the file"}`);
+      setStatus("generator.patternError", {
+        error: error instanceof Error ? error.message : t("generator.readFileError"),
+      });
       setExportEnabled(false);
     } finally {
       schemeInput.value = "";
@@ -189,7 +209,7 @@ export function mountStringArtApp(root = document) {
       await persistLatestPattern(readSettings());
       window.location.assign("/print");
     } catch {
-      setStatus("Could not prepare the print instructions.");
+      setStatus("generator.printError");
       printButton.disabled = false;
     }
   });
@@ -242,28 +262,12 @@ export function mountStringArtApp(root = document) {
     });
   }
 
-  listen(removeBackgroundInput, "change", () => {
-    backgroundGrayInput.disabled = !removeBackgroundInput.checked;
-    if (!state.image || state.running) return;
-    invalidateResult();
-    drawPreparedPreview();
-  });
-
-  listen(backgroundGrayInput, "input", () => {
-    const gray = clampInt(backgroundGrayInput.value, 0, 255);
-    backgroundGrayValue.value = `${Math.round(gray / 255 * 100)}%`;
-    backgroundGrayValue.textContent = backgroundGrayValue.value;
-    if (!state.image || state.running || !removeBackgroundInput.checked) return;
-    invalidateResult();
-    drawPreparedPreview();
-  });
-
   for (const button of variantButtons) {
     listen(button, "click", () => {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
       if (!state.availableVariants.has(lineCount)) return;
       selectResultVariant(lineCount);
-      setStatus(`Showing the ${lineCount}-line artwork.`);
+      setStatus("generator.showingVariant", { count: lineCount });
     });
   }
 
@@ -348,7 +352,7 @@ export function mountStringArtApp(root = document) {
     setCropControlsDisabled(true);
     setExportEnabled(false);
     progress.value = 0;
-    setStatus("Preparing the calculation...");
+    setStatus("generator.preparing");
 
     const settings = readSettings();
     const prepared = prepareImage(settings);
@@ -377,16 +381,14 @@ export function mountStringArtApp(root = document) {
       progress.value = state.cancelled
         ? renderedLines.length / settings.lines
         : 1;
-      setStatus(
-        state.cancelled
-          ? "Generation stopped. A partial pattern has been saved."
-          : "Done. Your pattern is ready.",
-      );
+      setStatus(state.cancelled ? "generator.stopped" : "generator.ready");
       if (!state.cancelled) configureResultVariants(renderedLines, settings);
       setExportEnabled(state.sequence.length > 1);
       if (!state.cancelled) scrollToResultOnMobile();
     } catch (error) {
-      setStatus(`Calculation error: ${error instanceof Error ? error.message : "unknown error"}`);
+      setStatus("generator.calculationError", {
+        error: error instanceof Error ? error.message : t("generator.unknownError"),
+      });
       setExportEnabled(state.sequence.length > 1);
     } finally {
       if (!destroyed && state.sequence.length > 1) {
@@ -438,7 +440,10 @@ export function mountStringArtApp(root = document) {
           }
           updateSummary(settings, message.completed);
           progress.value = message.completed / message.total;
-          setStatus(`Generated lines: ${message.completed} / ${message.total}`);
+          setStatus("generator.generated", {
+            completed: message.completed,
+            total: message.total,
+          });
         } else if (message?.type === "done") {
           finish({ cancelled: false });
         } else if (message?.type === "error") {
@@ -476,8 +481,6 @@ export function mountStringArtApp(root = document) {
       offsetY: state.crop.offsetY,
       sharpness: clampInt(sharpnessInput.value, 0, 100),
       clarity: clampInt(clarityInput.value, 0, 100),
-      removeBackground: removeBackgroundInput.checked,
-      backgroundGray: clampInt(backgroundGrayInput.value, 0, 255),
       algorithm: ALGORITHM_ID,
     };
   }
@@ -606,7 +609,7 @@ export function mountStringArtApp(root = document) {
     progress.value = 1;
     setExportEnabled(true);
     await persistLatestPattern(settings);
-    setStatus(`Pattern uploaded: ${lineCount} steps, ${lineCount} connections.`);
+    setStatus("generator.patternUploaded", { count: lineCount });
   }
 
   function drawSchemePlaceholder(pointCount, lineCount) {
@@ -618,13 +621,13 @@ export function mountStringArtApp(root = document) {
     sourceCtx.textBaseline = "middle";
     sourceCtx.font = "20px system-ui";
     sourceCtx.fillText(
-      "Pattern uploaded",
+      t("generator.patternCanvasTitle"),
       sourceCanvas.width / 2,
       sourceCanvas.height / 2 - 16,
     );
     sourceCtx.font = "14px system-ui";
     sourceCtx.fillText(
-      `${pointCount} pins · ${lineCount} connections`,
+      t("generator.patternCanvasSummary", { points: pointCount, lines: lineCount }),
       sourceCanvas.width / 2,
       sourceCanvas.height / 2 + 18,
     );
@@ -665,7 +668,6 @@ export function mountStringArtApp(root = document) {
       && (
         settings.sharpness > 0
         || settings.clarity > 0
-        || settings.removeBackground
       )
     ) {
       const frame = createSourceFrame(settings, WORK_SIZE);
@@ -891,7 +893,7 @@ export function mountStringArtApp(root = document) {
     stepOut.textContent = "-";
     lengthOut.textContent = "-";
     progress.value = 0;
-    setStatus("Settings changed. Select Generate to recalculate the pattern.");
+    setStatus("generator.settingsChanged");
     if (state.image && redrawBase) drawInitialResult();
   }
 
@@ -1075,12 +1077,12 @@ export function mountStringArtApp(root = document) {
     resultCtx.font = "20px system-ui";
     sourceCtx.font = "20px system-ui";
     resultCtx.fillText(
-      "String Art preview",
+      t("generator.resultCanvas"),
       resultCanvas.width / 2,
       resultCanvas.height / 2,
     );
     sourceCtx.fillText(
-      "Prepared photo",
+      t("generator.preparedPhoto"),
       sourceCanvas.width / 2,
       sourceCanvas.height / 2,
     );
@@ -1134,8 +1136,17 @@ export function mountStringArtApp(root = document) {
     });
   }
 
-  function setStatus(text) {
-    statusText.textContent = text;
+  function t(key, params) {
+    return translate(uiLanguage, key, params);
+  }
+
+  function renderCurrentStatus() {
+    statusText.textContent = t(currentStatus.key, currentStatus.params);
+  }
+
+  function setStatus(key, params = {}) {
+    currentStatus = { key, params };
+    renderCurrentStatus();
   }
 
   function setExportEnabled(enabled) {
@@ -1152,8 +1163,6 @@ export function mountStringArtApp(root = document) {
     zoomInput.disabled = disabled;
     sharpnessInput.disabled = disabled;
     clarityInput.disabled = disabled;
-    removeBackgroundInput.disabled = disabled;
-    backgroundGrayInput.disabled = disabled || !removeBackgroundInput.checked;
     resetCropButton.disabled = disabled;
     if (disabled) {
       zoomOutButton.disabled = true;
@@ -1193,8 +1202,6 @@ export function mountStringArtApp(root = document) {
         threadMm: settings.threadMm,
         sharpness: settings.sharpness,
         clarity: settings.clarity,
-        removeBackground: settings.removeBackground,
-        backgroundGray: settings.backgroundGray,
         sourcePreviewDataUrl,
         artworkPreviewDataUrl: resultCanvas.toDataURL("image/png"),
         createdAt: new Date().toISOString(),

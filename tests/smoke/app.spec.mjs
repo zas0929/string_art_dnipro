@@ -22,6 +22,40 @@ const variantScheme = [
   ),
 ].join("\n");
 
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.title.includes("UI language switches")) return;
+  await page.addInitScript(() => {
+    window.localStorage.setItem("string-art-ui-language", "en");
+  });
+});
+
+test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+  await page.goto("/");
+  await waitForGenerator(page);
+
+  await expect(page.getByRole("heading", { name: "Налаштування" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Режим складання" })).toBeVisible();
+  const switchBox = await page.locator(".language-switch").boundingBox();
+  const viewport = page.viewportSize();
+  expect(Math.round(switchBox.y)).toBe(16);
+  expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(16);
+  await expect(page.locator("#status")).toHaveText(
+    "Завантажте фото, щоб побачити майбутній макет",
+  );
+  await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect.poll(() => page.evaluate(
+    () => window.localStorage.getItem("string-art-ui-language"),
+  )).toBe("en");
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.goto("/build");
+  await expect(page.getByText("No active pattern")).toBeVisible();
+  await page.goto("/print");
+  await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
+});
+
 test("generator and build mode share working navigation", async ({ page }) => {
   await page.goto("/");
   await waitForGenerator(page);
@@ -79,11 +113,6 @@ test("the single reference core generates a route from a photo", async ({ page }
   await setRangeValue(page.locator("#clarityInput"), 20);
   await expect(page.locator("#sharpnessValue")).toHaveText("35%");
   await expect(page.locator("#clarityValue")).toHaveText("20%");
-  await expect(page.getByLabel("Background shade")).toBeDisabled();
-  await page.getByLabel("Replace background with gray").check();
-  await expect(page.getByLabel("Background shade")).toBeEnabled();
-  await setRangeValue(page.getByLabel("Background shade"), 160);
-  await expect(page.locator("#backgroundGrayValue")).toHaveText("63%");
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -127,8 +156,6 @@ test("the single reference core generates a route from a photo", async ({ page }
     lineCount: 100,
     sharpness: 35,
     clarity: 20,
-    removeBackground: true,
-    backgroundGray: 160,
   });
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
@@ -255,6 +282,10 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
   });
   await expect(page.getByRole("button", { name: "Cover PDF" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Instructions PDF" })).toBeVisible();
+  await expect(page.locator(".language-switch")).toBeVisible();
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".language-switch")).toBeHidden();
+  await page.emulateMedia({ media: null });
   await expect(page.locator(".cover-sheet")).toBeVisible();
   await expect(page.locator(".instruction-sheet")).toHaveCount(2);
   await expect(page.locator(".instruction-sheet").first().locator(".instruction-row")).toHaveCount(204);
@@ -274,6 +305,11 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
   const coverPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
   expect(countPdfPages(coverPdf)).toBe(1);
   await page.evaluate(() => document.body.classList.remove("print-cover-only"));
+
+  await page.evaluate(() => document.body.classList.add("print-instruction-only"));
+  const instructionPdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+  expect(countPdfPages(instructionPdf)).toBe(2);
+  await page.evaluate(() => document.body.classList.remove("print-instruction-only"));
 
   await page.getByLabel("Preview").selectOption("none");
   await expect(page.locator(".cover-image")).toHaveClass(/is-empty/);

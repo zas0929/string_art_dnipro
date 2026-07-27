@@ -4,37 +4,40 @@ import FileImage from "lucide-react/dist/esm/icons/file-image.mjs";
 import FileText from "lucide-react/dist/esm/icons/file-text.mjs";
 import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
+import { useLanguage } from "./i18n/LanguageProvider.jsx";
 
 export default function StringArtPanel() {
+  const { t } = useLanguage();
+
   return (
     <aside className="panel">
       <div className="control-group">
-        <h2>Settings</h2>
+        <h2>{t("panel.settings")}</h2>
         <label>
-          Pins
+          {t("panel.pins")}
           <input id="pointsInput" type="number" min="60" max="600" step="10" defaultValue="240" />
         </label>
         <label>
-          Lines
+          {t("panel.lines")}
           <input id="linesInput" type="number" min="100" max="8000" step="100" defaultValue="5000" />
         </label>
         <label>
-          Artwork size, cm
+          {t("panel.artworkSize")}
           <input id="sizeInput" type="number" min="10" max="200" step="1" defaultValue="47" />
         </label>
         <label>
-          Thread thickness, mm
+          {t("panel.threadThickness")}
           <select id="threadInput" defaultValue="0.19">
-            <option value="0.11">0.11 - thin</option>
-            <option value="0.16">0.16 - medium</option>
-            <option value="0.19">0.19 - standard</option>
-            <option value="0.22">0.22 - thick</option>
-            <option value="0.27">0.27 - extra thick</option>
-            <option value="0.3">0.30 - maximum</option>
+            <option value="0.11">0.11 - {t("panel.thin")}</option>
+            <option value="0.16">0.16 - {t("panel.medium")}</option>
+            <option value="0.19">0.19 - {t("panel.standard")}</option>
+            <option value="0.22">0.22 - {t("panel.thick")}</option>
+            <option value="0.27">0.27 - {t("panel.extraThick")}</option>
+            <option value="0.3">0.30 - {t("panel.maximum")}</option>
           </select>
         </label>
         <label>
-          Minimum pin gap
+          {t("panel.minimumGap")}
           <input id="skipInput" type="number" min="2" max="80" step="1" defaultValue="15" />
         </label>
       </div>
@@ -50,29 +53,29 @@ export default function StringArtPanel() {
         </button>
         <button id="printButton" type="button" disabled>
           <Printer aria-hidden="true" size={17} strokeWidth={2} />
-          Print
+          {t("panel.print")}
         </button>
       </div>
 
       <a id="buildModeLink" className="command-link" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
-        Build mode
+        {t("panel.buildMode")}
       </a>
 
       <div className="summary">
-        <h2>Pattern details</h2>
+        <h2>{t("panel.details")}</h2>
         <dl>
-          <div><dt>Pins</dt><dd id="pointsOut">-</dd></div>
-          <div><dt>Lines</dt><dd id="linesOut">-</dd></div>
-          <div><dt>Step</dt><dd id="stepOut">-</dd></div>
-          <div><dt>Thread length</dt><dd id="lengthOut">-</dd></div>
+          <div><dt>{t("panel.pins")}</dt><dd id="pointsOut">-</dd></div>
+          <div><dt>{t("panel.lines")}</dt><dd id="linesOut">-</dd></div>
+          <div><dt>{t("panel.step")}</dt><dd id="stepOut">-</dd></div>
+          <div><dt>{t("panel.threadLength")}</dt><dd id="lengthOut">-</dd></div>
         </dl>
         <textarea
           id="sequenceOutput"
           readOnly
           spellCheck="false"
-          placeholder="The pin sequence will appear here."
-          aria-label="Pin connection sequence"
+          placeholder={t("panel.sequencePlaceholder")}
+          aria-label={t("panel.sequenceLabel")}
         />
       </div>
     </aside>
