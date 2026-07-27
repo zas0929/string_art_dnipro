@@ -8,6 +8,8 @@ import {
   createInstructionPages,
 } from "../../core/print-instruction.js";
 import { loadLatestPattern } from "../../storage/local-project-store.js";
+import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
+import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 const COVER_COPY = {
   uk: {
@@ -31,6 +33,7 @@ const COVER_COPY = {
 };
 
 export default function PrintInstruction() {
+  const { language: uiLanguage, t } = useLanguage();
   const [pattern, setPattern] = useState(null);
   const [loading, setLoading] = useState(true);
   const [coverImage, setCoverImage] = useState("artwork");
@@ -57,6 +60,10 @@ export default function PrintInstruction() {
     };
   }, []);
 
+  useEffect(() => {
+    setLanguage(uiLanguage);
+  }, [uiLanguage]);
+
   const pages = useMemo(
     () => createInstructionPages(pattern?.sequence, {
       startStep,
@@ -79,17 +86,23 @@ export default function PrintInstruction() {
   };
 
   if (loading) {
-    return <main className="print-loading">Preparing instructions...</main>;
+    return (
+      <main className="print-loading">
+        <LanguageSwitch />
+        <span>{t("print.preparing")}</span>
+      </main>
+    );
   }
 
   if (!pattern) {
     return (
       <main className="print-empty">
-        <h1>No pattern available</h1>
-        <p>Upload a pattern or generate an artwork first.</p>
+        <LanguageSwitch />
+        <h1>{t("print.noPattern")}</h1>
+        <p>{t("print.noPatternHint")}</p>
         <a className="command-link" href="/">
           <ArrowLeft aria-hidden="true" size={18} />
-          Back to Generator
+          {t("print.back")}
         </a>
       </main>
     );
@@ -97,22 +110,23 @@ export default function PrintInstruction() {
 
   return (
     <main className="print-page">
+      <LanguageSwitch />
       <header className="print-toolbar">
         <div className="print-toolbar-title">
           <a className="back-link" href="/">
             <ArrowLeft aria-hidden="true" size={18} />
-            Generator
+            {t("common.generator")}
           </a>
-          <h1>Print Instructions</h1>
-          <p>{pattern.pointCount} pins · {pattern.lineCount} connections</p>
+          <h1>{t("print.title")}</h1>
+          <p>{t("print.summary", { pins: pattern.pointCount, lines: pattern.lineCount })}</p>
         </div>
 
         <div className="print-settings">
           <fieldset className="print-settings-group">
-            <legend>Cover</legend>
+            <legend>{t("print.cover")}</legend>
             <div className="print-settings-grid cover-settings-grid">
               <label>
-                Instruction language
+                {t("print.instructionLanguage")}
                 <select
                   value={language}
                   onChange={(event) => setLanguage(event.target.value)}
@@ -122,14 +136,14 @@ export default function PrintInstruction() {
                 </select>
               </label>
               <label>
-                Preview
+                {t("print.preview")}
                 <select
                   value={coverImage}
                   onChange={(event) => setCoverImage(event.target.value)}
                 >
-                  <option value="artwork">String Art preview</option>
-                  <option value="source" disabled={!pattern.sourcePreviewDataUrl}>Source photo</option>
-                  <option value="none">No image</option>
+                  <option value="artwork">{t("print.artworkPreview")}</option>
+                  <option value="source" disabled={!pattern.sourcePreviewDataUrl}>{t("print.sourcePhoto")}</option>
+                  <option value="none">{t("print.noImage")}</option>
                 </select>
               </label>
               <label className="print-check">
@@ -138,16 +152,16 @@ export default function PrintInstruction() {
                   checked={includeStickerStep}
                   onChange={(event) => setIncludeStickerStep(event.target.checked)}
                 />
-                Include sticker step
+                {t("print.includeSticker")}
               </label>
             </div>
           </fieldset>
 
           <fieldset className="print-settings-group">
-            <legend>Step table</legend>
+            <legend>{t("print.stepTable")}</legend>
             <div className="print-settings-grid instruction-settings-grid">
               <label>
-                Start at step
+                {t("print.startStep")}
                 <input
                   type="number"
                   min="1"
@@ -157,7 +171,7 @@ export default function PrintInstruction() {
                 />
               </label>
               <label>
-                End at step
+                {t("print.endStep")}
                 <input
                   type="number"
                   min="1"
@@ -167,7 +181,7 @@ export default function PrintInstruction() {
                 />
               </label>
               <label>
-                Rows per column
+                {t("print.rowsPerColumn")}
                 <input
                   type="number"
                   min="20"
@@ -182,7 +196,7 @@ export default function PrintInstruction() {
                   checked={stripedRows}
                   onChange={(event) => setStripedRows(event.target.checked)}
                 />
-                Striped rows
+                {t("print.stripedRows")}
               </label>
             </div>
           </fieldset>
@@ -191,11 +205,11 @@ export default function PrintInstruction() {
         <div className="print-actions">
           <button className="print-action secondary-print-action" type="button" onClick={() => printDocument("cover")}>
             <Printer aria-hidden="true" size={19} />
-            Cover PDF
+            {t("print.coverPdf")}
           </button>
           <button className="print-action" type="button" onClick={() => printDocument("instruction")}>
             <Printer aria-hidden="true" size={19} />
-            Instructions PDF
+            {t("print.instructionsPdf")}
           </button>
         </div>
       </header>
@@ -203,8 +217,8 @@ export default function PrintInstruction() {
       <div className="print-preview">
         <section className="print-document-section cover-document">
           <div className="print-document-heading">
-            <h2>Cover page</h2>
-            <span>Separate document · 1 page</span>
+            <h2>{t("print.coverPage")}</h2>
+            <span>{t("print.separateDocument")}</span>
           </div>
           <CoverSheet
             image={coverImage === "none" ? null : coverPreview}
@@ -216,10 +230,10 @@ export default function PrintInstruction() {
         <section className="print-document-section instruction-document">
           <div className="print-document-heading">
             <div>
-              <h2>Step table</h2>
-              <p>For double-sided printing, print even pages first, turn the paper over, then print odd pages.</p>
+              <h2>{t("print.stepTable")}</h2>
+              <p>{t("print.duplexHint")}</p>
             </div>
-            <span>{pages.length} pages</span>
+            <span>{t("print.pages", { count: pages.length })}</span>
           </div>
           <div className="instruction-pages">
             {pages.map((pageColumns, pageIndex) => (
