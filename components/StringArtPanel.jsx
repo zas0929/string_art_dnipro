@@ -16,7 +16,7 @@ export default function StringArtPanel() {
         </label>
         <label>
           Линий
-          <input id="linesInput" type="number" min="100" max="8000" step="100" defaultValue="4500" />
+          <input id="linesInput" type="number" min="100" max="8000" step="100" defaultValue="5000" />
         </label>
         <label>
           Размер картины, см

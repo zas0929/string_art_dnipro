@@ -84,6 +84,38 @@ export default function StringArtWorkspace() {
               </button>
             </div>
           </div>
+          <div className="enhancement-controls" aria-label="Обработка фото">
+            <div className="enhancement-control">
+              <div className="enhancement-control-heading">
+                <label htmlFor="sharpnessInput">Резкость</label>
+                <output id="sharpnessValue" htmlFor="sharpnessInput">0%</output>
+              </div>
+              <input
+                id="sharpnessInput"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                defaultValue="0"
+                disabled
+              />
+            </div>
+            <div className="enhancement-control">
+              <div className="enhancement-control-heading">
+                <label htmlFor="clarityInput">Чёткость</label>
+                <output id="clarityValue" htmlFor="clarityInput">0%</output>
+              </div>
+              <input
+                id="clarityInput"
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                defaultValue="0"
+                disabled
+              />
+            </div>
+          </div>
           <button id="mobileBuildButton" className="mobile-build-button" type="button" disabled>
             <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
             Построить макет
@@ -91,6 +123,26 @@ export default function StringArtWorkspace() {
         </div>
         <div className="canvas-column result-column">
           <canvas id="resultCanvas" width="760" height="760" aria-label="Макет картины из нитей" />
+          <div id="resultVariants" className="result-variants" aria-label="Варианты количества линий" hidden>
+            {[3500, 4000, 4500, 5000].map((lineCount) => (
+              <button
+                key={lineCount}
+                className="result-variant"
+                type="button"
+                data-lines={lineCount}
+                aria-label={`Показать макет на ${lineCount} линий`}
+                aria-pressed="false"
+              >
+                <canvas
+                  id={`resultVariant${lineCount}`}
+                  width="220"
+                  height="220"
+                  aria-hidden="true"
+                />
+                <span>{lineCount} линий</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
