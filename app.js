@@ -53,6 +53,9 @@ export function mountStringArtApp(root = document) {
   const sharpnessValue = getElement("sharpnessValue");
   const clarityInput = getElement("clarityInput");
   const clarityValue = getElement("clarityValue");
+  const removeBackgroundInput = getElement("removeBackgroundInput");
+  const backgroundGrayInput = getElement("backgroundGrayInput");
+  const backgroundGrayValue = getElement("backgroundGrayValue");
   const resultVariants = getElement("resultVariants");
   const variantButtons = [...resultVariants.querySelectorAll("[data-lines]")];
   const buildButton = getElement("buildButton");
@@ -238,6 +241,22 @@ export function mountStringArtApp(root = document) {
       drawPreparedPreview();
     });
   }
+
+  listen(removeBackgroundInput, "change", () => {
+    backgroundGrayInput.disabled = !removeBackgroundInput.checked;
+    if (!state.image || state.running) return;
+    invalidateResult();
+    drawPreparedPreview();
+  });
+
+  listen(backgroundGrayInput, "input", () => {
+    const gray = clampInt(backgroundGrayInput.value, 0, 255);
+    backgroundGrayValue.value = `${Math.round(gray / 255 * 100)}%`;
+    backgroundGrayValue.textContent = backgroundGrayValue.value;
+    if (!state.image || state.running || !removeBackgroundInput.checked) return;
+    invalidateResult();
+    drawPreparedPreview();
+  });
 
   for (const button of variantButtons) {
     listen(button, "click", () => {
@@ -457,6 +476,8 @@ export function mountStringArtApp(root = document) {
       offsetY: state.crop.offsetY,
       sharpness: clampInt(sharpnessInput.value, 0, 100),
       clarity: clampInt(clarityInput.value, 0, 100),
+      removeBackground: removeBackgroundInput.checked,
+      backgroundGray: clampInt(backgroundGrayInput.value, 0, 255),
       algorithm: ALGORITHM_ID,
     };
   }
@@ -641,7 +662,11 @@ export function mountStringArtApp(root = document) {
     sourceCtx.imageSmoothingQuality = "high";
     if (
       state.crop.pointers.size === 0
-      && (settings.sharpness > 0 || settings.clarity > 0)
+      && (
+        settings.sharpness > 0
+        || settings.clarity > 0
+        || settings.removeBackground
+      )
     ) {
       const frame = createSourceFrame(settings, WORK_SIZE);
       sourceCtx.drawImage(frame.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
@@ -1127,6 +1152,8 @@ export function mountStringArtApp(root = document) {
     zoomInput.disabled = disabled;
     sharpnessInput.disabled = disabled;
     clarityInput.disabled = disabled;
+    removeBackgroundInput.disabled = disabled;
+    backgroundGrayInput.disabled = disabled || !removeBackgroundInput.checked;
     resetCropButton.disabled = disabled;
     if (disabled) {
       zoomOutButton.disabled = true;
@@ -1166,6 +1193,8 @@ export function mountStringArtApp(root = document) {
         threadMm: settings.threadMm,
         sharpness: settings.sharpness,
         clarity: settings.clarity,
+        removeBackground: settings.removeBackground,
+        backgroundGray: settings.backgroundGray,
         sourcePreviewDataUrl,
         artworkPreviewDataUrl: resultCanvas.toDataURL("image/png"),
         createdAt: new Date().toISOString(),

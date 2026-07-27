@@ -28,6 +28,13 @@ test("generator and build mode share working navigation", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
   await expect(page.getByLabel("Minimum pin gap")).toHaveValue("15");
+  const threadThickness = page.getByLabel("Thread thickness, mm");
+  await expect(threadThickness).toHaveValue("0.19");
+  await expect(threadThickness.locator('option[value="0.22"]')).toHaveText("0.22 - thick");
+  await expect(threadThickness.locator('option[value="0.27"]')).toHaveText("0.27 - extra thick");
+  await expect(threadThickness.locator('option[value="0.3"]')).toHaveText("0.30 - maximum");
+  await threadThickness.selectOption("0.27");
+  await expect(threadThickness).toHaveValue("0.27");
 
   const buildModeLink = page.getByRole("link", { name: "Build mode" });
   await expect(buildModeLink).toBeVisible();
@@ -72,6 +79,11 @@ test("the single reference core generates a route from a photo", async ({ page }
   await setRangeValue(page.locator("#clarityInput"), 20);
   await expect(page.locator("#sharpnessValue")).toHaveText("35%");
   await expect(page.locator("#clarityValue")).toHaveText("20%");
+  await expect(page.getByLabel("Background shade")).toBeDisabled();
+  await page.getByLabel("Replace background with gray").check();
+  await expect(page.getByLabel("Background shade")).toBeEnabled();
+  await setRangeValue(page.getByLabel("Background shade"), 160);
+  await expect(page.locator("#backgroundGrayValue")).toHaveText("63%");
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -115,6 +127,8 @@ test("the single reference core generates a route from a photo", async ({ page }
     lineCount: 100,
     sharpness: 35,
     clarity: 20,
+    removeBackground: true,
+    backgroundGray: 160,
   });
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
