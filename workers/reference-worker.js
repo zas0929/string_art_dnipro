@@ -8,7 +8,7 @@ self.addEventListener("message", (event) => {
   } catch (error) {
     self.postMessage({
       type: "error",
-      message: error instanceof Error ? error.message : "Неизвестная ошибка расчета",
+      message: error instanceof Error ? error.message : "Unknown calculation error",
     });
   }
 });

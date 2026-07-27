@@ -63,7 +63,7 @@ export default function BuildMode() {
       })
       .catch((error) => {
         if (!active) return;
-        setMessage(`Не удалось восстановить проект: ${error.message}`);
+        setMessage(`Could not restore the project: ${error.message}`);
         dispatch({ type: "HYDRATE_EMPTY" });
       });
     return () => {
@@ -80,7 +80,7 @@ export default function BuildMode() {
         speedMs: state.speedMs,
         voiceEnabled: state.voiceEnabled,
         updatedAt: new Date().toISOString(),
-      }).catch((error) => setMessage(`Не удалось сохранить прогресс: ${error.message}`));
+      }).catch((error) => setMessage(`Could not save your progress: ${error.message}`));
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [state.hydrated, state.pattern, state.stepIndex, state.speedMs, state.voiceEnabled]);
@@ -159,9 +159,9 @@ export default function BuildMode() {
       };
       await saveLatestPattern(pattern);
       dispatch({ type: "LOAD_PATTERN", pattern, progress: null });
-      setMessage("Схема загружена. Прогресс будет сохраняться автоматически.");
+      setMessage("Pattern uploaded. Your progress will be saved automatically.");
     } catch (error) {
-      setMessage(`Ошибка схемы: ${error.message}`);
+      setMessage(`Pattern error: ${error.message}`);
     } finally {
       event.target.value = "";
     }
@@ -175,7 +175,7 @@ export default function BuildMode() {
   const restoreLostPosition = (stepIndex) => {
     dispatch({ type: "SEEK", stepIndex });
     setLostDialogOpen(false);
-    setMessage(`Позиция восстановлена: выполнено соединений — ${stepIndex}.`);
+    setMessage(`Position restored: ${stepIndex} connections completed.`);
   };
 
   const changeSpeed = (delta) => {
@@ -183,7 +183,7 @@ export default function BuildMode() {
   };
 
   if (!state.hydrated) {
-    return <main className="build-loading">Загружаю проект...</main>;
+    return <main className="build-loading">Loading project...</main>;
   }
 
   const total = state.pattern ? state.pattern.sequence.length - 1 : 0;
@@ -215,14 +215,14 @@ export default function BuildMode() {
         <header className="build-header">
           <a className="back-link" href="/">
             <ArrowLeft aria-hidden="true" size={18} />
-            Генератор
+            Generator
           </a>
           <div className="build-header-actions">
             <button
               className="voice-icon-toggle"
               type="button"
-              title={state.voiceEnabled ? "Выключить озвучивание" : "Включить озвучивание"}
-              aria-label={state.voiceEnabled ? "Выключить озвучивание точек" : "Включить озвучивание точек"}
+              title={state.voiceEnabled ? "Turn voice guidance off" : "Turn voice guidance on"}
+              aria-label={state.voiceEnabled ? "Turn pin voice guidance off" : "Turn pin voice guidance on"}
               aria-pressed={state.voiceEnabled}
               onClick={() => dispatch({ type: "SET_VOICE", enabled: !state.voiceEnabled })}
             >
@@ -232,7 +232,7 @@ export default function BuildMode() {
             </button>
             <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
               <Upload aria-hidden="true" size={18} />
-              Загрузить схему
+              Upload pattern
             </label>
           </div>
         </header>
@@ -247,7 +247,7 @@ export default function BuildMode() {
             />
 
             <div className="build-progress-line">
-              <span>Шаг {Math.min(state.stepIndex + 1, total)} из {total}</span>
+              <span>Step {Math.min(state.stepIndex + 1, total)} of {total}</span>
               <strong>{progressPercent}%</strong>
             </div>
             <input
@@ -257,24 +257,24 @@ export default function BuildMode() {
               max={total}
               step="1"
               value={state.stepIndex}
-              aria-label="Перейти к шагу"
+              aria-label="Go to step"
               onChange={(event) => dispatch({ type: "SEEK", stepIndex: event.target.value })}
             />
 
             <div className="build-route" aria-live="polite">
               {complete ? (
                 <div className="build-complete">
-                  <span>Схема завершена</span>
+                  <span>Pattern completed</span>
                   <strong>{total}</strong>
-                  <small>соединений выполнено</small>
+                  <small>connections completed</small>
                 </div>
               ) : (
                 <>
-                  <div className="nail-readout" aria-label={`От точки ${fromPoint}`}>
+                  <div className="nail-readout" aria-label={`From pin ${fromPoint}`}>
                     <strong>{fromPoint}</strong>
                   </div>
                   <ChevronRight className="route-arrow" aria-hidden="true" size={52} />
-                  <div className="nail-readout is-next" aria-label={`К точке ${toPoint}`}>
+                  <div className="nail-readout is-next" aria-label={`To pin ${toPoint}`}>
                     <strong>{toPoint}</strong>
                   </div>
                 </>
@@ -282,8 +282,8 @@ export default function BuildMode() {
             </div>
 
             {!complete && (
-              <div className="route-history" aria-label="Недавние и следующие точки">
-                <span className="route-history-label">Недавно</span>
+              <div className="route-history" aria-label="Recent and upcoming pins">
+                <span className="route-history-label">Recent</span>
                 <ol>
                   {routeContext.map(({ offset, point }) => (
                     <li
@@ -292,20 +292,20 @@ export default function BuildMode() {
                       aria-current={offset === 0 ? "step" : undefined}
                       aria-label={point === null
                         ? undefined
-                        : `${offset < 0 ? "Предыдущая" : offset === 0 ? "Текущая" : "Следующая"} точка ${point}`}
+                        : `${offset < 0 ? "Previous" : offset === 0 ? "Current" : "Next"} pin ${point}`}
                     >
                       <span aria-hidden="true">{point ?? "·"}</span>
                     </li>
                   ))}
                 </ol>
-                <span className="route-history-label">Далее</span>
+                <span className="route-history-label">Next</span>
               </div>
             )}
 
             <div className="build-transport">
               <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
                 <ChevronLeft aria-hidden="true" size={20} />
-                Назад
+                Back
               </button>
               <button
                 className="primary-transport"
@@ -316,26 +316,26 @@ export default function BuildMode() {
                 {state.playback === "playing"
                   ? <Pause aria-hidden="true" size={20} fill="currentColor" />
                   : <Play aria-hidden="true" size={20} fill="currentColor" />}
-                {state.playback === "playing" ? "Пауза" : "Старт"}
+                {state.playback === "playing" ? "Pause" : "Start"}
               </button>
               <button type="button" onClick={() => dispatch({ type: "NEXT" })} disabled={complete}>
-                Далее
+                Next
                 <ChevronRight aria-hidden="true" size={20} />
               </button>
             </div>
 
             <div className="build-speed-control">
               <div className="build-speed-heading">
-                <label htmlFor="buildSpeedInput">Пауза между точками</label>
+                <label htmlFor="buildSpeedInput">Pause between pins</label>
                 <output htmlFor="buildSpeedInput">
-                  {(state.speedMs / 1000).toFixed(2)} сек
+                  {(state.speedMs / 1000).toFixed(2)} sec
                 </output>
               </div>
               <div className="build-speed-row">
                 <button
                   type="button"
-                  title="Быстрее"
-                  aria-label="Уменьшить паузу"
+                  title="Faster"
+                  aria-label="Shorten pause"
                   disabled={state.speedMs <= 500}
                   onClick={() => changeSpeed(-250)}
                 >
@@ -348,7 +348,7 @@ export default function BuildMode() {
                   max="5000"
                   step="250"
                   value={state.speedMs}
-                  aria-label={`Пауза между точками: ${(state.speedMs / 1000).toFixed(2)} сек`}
+                  aria-label={`Pause between pins: ${(state.speedMs / 1000).toFixed(2)} sec`}
                   onChange={(event) => dispatch({
                     type: "SET_SPEED",
                     speedMs: event.target.value,
@@ -356,8 +356,8 @@ export default function BuildMode() {
                 />
                 <button
                   type="button"
-                  title="Медленнее"
-                  aria-label="Увеличить паузу"
+                  title="Slower"
+                  aria-label="Increase pause"
                   disabled={state.speedMs >= 5000}
                   onClick={() => changeSpeed(250)}
                 >
@@ -368,13 +368,13 @@ export default function BuildMode() {
 
             <button className="lost-position-button" type="button" onClick={openLostDialog}>
               <MapPin aria-hidden="true" size={18} />
-              Я потерялся
+              I&apos;m lost
             </button>
           </>
         ) : (
           <div className="empty-build-state">
-            <strong>Нет активной схемы</strong>
-            <span>Сгенерируйте макет или загрузите файл схемы.</span>
+            <strong>No active pattern</strong>
+            <span>Generate an artwork or upload a pattern file.</span>
           </div>
         )}
 
@@ -388,20 +388,20 @@ export default function BuildMode() {
           disabled={!state.pattern || state.stepIndex === 0}
         >
           <RotateCcw aria-hidden="true" size={18} />
-          Начать заново
+          Start over
         </button>
 
         {state.pattern && (
           <dl className="build-summary">
-            <div><dt>Название</dt><dd>{state.pattern.name}</dd></div>
-            <div><dt>Точек</dt><dd>{state.pattern.pointCount}</dd></div>
-            <div><dt>Линий</dt><dd>{total}</dd></div>
-            <div><dt>Сохранено</dt><dd>{state.stepIndex} шагов</dd></div>
+            <div><dt>Name</dt><dd>{state.pattern.name}</dd></div>
+            <div><dt>Pins</dt><dd>{state.pattern.pointCount}</dd></div>
+            <div><dt>Lines</dt><dd>{total}</dd></div>
+            <div><dt>Saved</dt><dd>{state.stepIndex} steps</dd></div>
           </dl>
         )}
         <label className="file-button mobile-scheme-upload" htmlFor="buildSchemeInput">
           <Upload aria-hidden="true" size={18} />
-          Загрузить схему
+          Upload pattern
         </label>
       </aside>
 
@@ -448,7 +448,7 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
         (point) => !Number.isInteger(point) || point < 1 || point > pointCount,
       )
     ) {
-      setError(`Введите три номера от 1 до ${pointCount}.`);
+      setError(`Enter three numbers from 1 to ${pointCount}.`);
       setMatches(null);
       return;
     }
@@ -472,20 +472,20 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
         <button
           className="lost-dialog-close"
           type="button"
-          title="Закрыть"
-          aria-label="Закрыть"
+          title="Close"
+          aria-label="Close"
           onClick={onClose}
         >
           <X aria-hidden="true" size={20} />
         </button>
-        <h2 id="lost-dialog-title">Найти мое место</h2>
-        <p>Введите три последние точки в том порядке, как вы их соединяли.</p>
+        <h2 id="lost-dialog-title">Find my position</h2>
+        <p>Enter the last three pins in the order you connected them.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="lost-point-inputs">
             {points.map((point, index) => (
               <label key={index}>
-                Точка {index + 1}
+                Pin {index + 1}
                 <input
                   ref={index === 0 ? firstInputRef : undefined}
                   type="number"
@@ -493,29 +493,29 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
                   max={pointCount}
                   inputMode="numeric"
                   value={point}
-                  aria-label={`${index + 1}-я последняя точка`}
+                  aria-label={`Recent pin ${index + 1}`}
                   onChange={(event) => updatePoint(index, event.target.value)}
                 />
               </label>
             ))}
           </div>
           <button className="lost-search-button" type="submit">
-            Найти
+            Find
           </button>
         </form>
 
         {error && <p className="lost-dialog-error" role="alert">{error}</p>}
         {matches?.length === 0 && (
           <p className="lost-dialog-empty" role="status">
-            Такая последовательность не найдена. Проверьте номера и их порядок.
+            This sequence was not found. Check the pin numbers and their order.
           </p>
         )}
         {matches?.length > 0 && (
           <div className="lost-match-section" aria-live="polite">
             <strong>
               {matches.length === 1
-                ? "Позиция найдена"
-                : `Найдено вариантов: ${matches.length}`}
+                ? "Position found"
+                : `Matches found: ${matches.length}`}
             </strong>
             <div className="lost-match-list">
               {matches.map((match) => (
@@ -526,16 +526,16 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore }) {
                   onClick={() => onRestore(match.stepIndex)}
                 >
                   <span>
-                    Выполнено соединений: <strong>{match.stepIndex}</strong>
+                    Completed connections: <strong>{match.stepIndex}</strong>
                   </span>
                   <small>
-                    {match.previousPoint === null ? "Начало" : match.previousPoint}
+                    {match.previousPoint === null ? "Start" : match.previousPoint}
                     {" · "}
                     {points.join(" → ")}
                     {" · "}
-                    {match.nextPoint === null ? "Готово" : match.nextPoint}
+                    {match.nextPoint === null ? "Done" : match.nextPoint}
                   </small>
-                  <em>Продолжить отсюда</em>
+                  <em>Continue from here</em>
                 </button>
               ))}
             </div>
@@ -563,7 +563,7 @@ function speakBuildPoint(point, reportError) {
     || !("speechSynthesis" in window)
     || !("SpeechSynthesisUtterance" in window)
   ) {
-    reportError("Озвучка недоступна в этом браузере. Сборка продолжится без неё.");
+    reportError("Voice guidance is unavailable in this browser. Build Mode will continue without it.");
     settle("unavailable");
     return { started: false, finished };
   }
@@ -598,7 +598,7 @@ function speakBuildPoint(point, reportError) {
           return;
         }
         if (event.error !== "canceled" && event.error !== "interrupted") {
-          reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+          reportError("Could not start voice guidance. Build Mode will continue without it.");
         }
         settle(event.error || "error");
       };
@@ -606,7 +606,7 @@ function speakBuildPoint(point, reportError) {
     };
 
     if (voiceAttempts.length === 0) {
-      reportError("На компьютере не найден системный голос. Сборка продолжится без озвучки.");
+      reportError("No system voice was found. Build Mode will continue without voice guidance.");
       settle("unavailable");
     } else {
       speech.resume();
@@ -614,7 +614,7 @@ function speakBuildPoint(point, reportError) {
     }
     return { started: true, finished };
   } catch {
-    reportError("Не удалось включить озвучку. Сборка продолжится без неё.");
+    reportError("Could not start voice guidance. Build Mode will continue without it.");
     settle("error");
     return { started: false, finished };
   }
@@ -808,7 +808,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         className="build-canvas"
         width={BUILD_CANVAS_SIZE}
         height={BUILD_CANVAS_SIZE}
-        aria-label="Визуализация сборки картины"
+        aria-label="Artwork build visualization"
       />
     </div>
   );

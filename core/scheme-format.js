@@ -36,12 +36,12 @@ export function parseSchemeText(text) {
 
   const ordered = entries.filter((entry) => entry.order >= 0).sort((a, b) => a.order - b.order);
   if (ordered.length < 3) {
-    throw new Error("нужны стартовая строка 1____0 и минимум два следующих шага");
+    throw new Error("a 1____0 starting row and at least two following steps are required");
   }
 
   for (let i = 0; i < ordered.length; i++) {
     if (ordered[i].order !== i) {
-      throw new Error(`ожидается позиция ${i}, получено ${ordered[i].order}`);
+      throw new Error(`expected position ${i}, received ${ordered[i].order}`);
     }
   }
 
@@ -60,9 +60,9 @@ function parseCsvSequence(text) {
   const sequence = [rows[0].from];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
-    if (row.step !== i + 1) throw new Error(`ожидается шаг ${i + 1}, получено ${row.step}`);
+    if (row.step !== i + 1) throw new Error(`expected step ${i + 1}, received ${row.step}`);
     if (row.from !== sequence[sequence.length - 1]) {
-      throw new Error(`нарушена последовательность на шаге ${row.step}`);
+      throw new Error(`sequence is broken at step ${row.step}`);
     }
     sequence.push(row.to);
   }
@@ -70,14 +70,14 @@ function parseCsvSequence(text) {
 }
 
 function validateSequence(sequence) {
-  if (sequence.length < 3) throw new Error("схема должна содержать минимум два соединения");
+  if (sequence.length < 3) throw new Error("the pattern must contain at least two connections");
   for (const point of sequence) {
     if (!Number.isInteger(point) || point < 1 || point > 600) {
-      throw new Error(`точка ${point} вне диапазона 1-600`);
+      throw new Error(`pin ${point} is outside the 1-600 range`);
     }
   }
   if (sequence[0] !== 1) {
-    throw new Error(`позиция 0 должна содержать стартовую точку 1, получено ${sequence[0]}`);
+    throw new Error(`position 0 must contain starting pin 1, received ${sequence[0]}`);
   }
   return sequence;
 }

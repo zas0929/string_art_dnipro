@@ -9,29 +9,29 @@ export default function StringArtPanel() {
   return (
     <aside className="panel">
       <div className="control-group">
-        <h2>Параметры</h2>
+        <h2>Settings</h2>
         <label>
-          Точек
+          Pins
           <input id="pointsInput" type="number" min="60" max="600" step="10" defaultValue="240" />
         </label>
         <label>
-          Линий
+          Lines
           <input id="linesInput" type="number" min="100" max="8000" step="100" defaultValue="5000" />
         </label>
         <label>
-          Размер картины, см
+          Artwork size, cm
           <input id="sizeInput" type="number" min="10" max="200" step="1" defaultValue="47" />
         </label>
         <label>
-          Толщина нити, мм
+          Thread thickness, mm
           <select id="threadInput" defaultValue="0.19">
-            <option value="0.11">0.11 - тонкая</option>
-            <option value="0.16">0.16 - средняя</option>
-            <option value="0.19">0.19 - обычная</option>
+            <option value="0.11">0.11 - thin</option>
+            <option value="0.16">0.16 - medium</option>
+            <option value="0.19">0.19 - standard</option>
           </select>
         </label>
         <label>
-          Минимальный пропуск точек
+          Minimum pin gap
           <input id="skipInput" type="number" min="2" max="80" step="1" defaultValue="15" />
         </label>
       </div>
@@ -53,23 +53,23 @@ export default function StringArtPanel() {
 
       <a id="buildModeLink" className="command-link" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
-        Режим сборки
+        Build mode
       </a>
 
       <div className="summary">
-        <h2>Инструкция</h2>
+        <h2>Pattern details</h2>
         <dl>
-          <div><dt>Точек</dt><dd id="pointsOut">-</dd></div>
-          <div><dt>Линий</dt><dd id="linesOut">-</dd></div>
-          <div><dt>Шаг</dt><dd id="stepOut">-</dd></div>
-          <div><dt>Длина нити</dt><dd id="lengthOut">-</dd></div>
+          <div><dt>Pins</dt><dd id="pointsOut">-</dd></div>
+          <div><dt>Lines</dt><dd id="linesOut">-</dd></div>
+          <div><dt>Step</dt><dd id="stepOut">-</dd></div>
+          <div><dt>Thread length</dt><dd id="lengthOut">-</dd></div>
         </dl>
         <textarea
           id="sequenceOutput"
           readOnly
           spellCheck="false"
-          placeholder="Здесь появится последовательность точек."
-          aria-label="Последовательность соединения точек"
+          placeholder="The pin sequence will appear here."
+          aria-label="Pin connection sequence"
         />
       </div>
     </aside>

@@ -26,8 +26,8 @@ function openDatabase() {
     const timeout = setTimeout(() => {
       if (settled) return;
       settled = true;
-      reject(new Error("Локальное хранилище не ответило вовремя"));
-    }, 3000);
+      reject(new Error("Local storage did not respond in time"));
+    }, 10000);
     const finish = (callback, value) => {
       if (settled) {
         if (value && typeof value.close === "function") value.close();
@@ -46,11 +46,11 @@ function openDatabase() {
     request.onsuccess = () => finish(resolve, request.result);
     request.onerror = () => finish(
       reject,
-      request.error || new Error("Не удалось открыть локальное хранилище"),
+      request.error || new Error("Could not open local storage"),
     );
     request.onblocked = () => finish(
       reject,
-      new Error("Локальное хранилище заблокировано другой вкладкой"),
+      new Error("Local storage is locked by another tab"),
     );
   });
 }
@@ -63,8 +63,8 @@ async function putRecord(key, value) {
       const transaction = database.transaction(STORE_NAME, "readwrite");
       transaction.objectStore(STORE_NAME).put(value, key);
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error || new Error("Не удалось сохранить данные"));
-      transaction.onabort = () => reject(transaction.error || new Error("Сохранение отменено"));
+      transaction.onerror = () => reject(transaction.error || new Error("Could not save data"));
+      transaction.onabort = () => reject(transaction.error || new Error("Save was cancelled"));
     });
   } finally {
     database.close();
@@ -79,7 +79,7 @@ async function getRecord(key) {
       const transaction = database.transaction(STORE_NAME, "readonly");
       const request = transaction.objectStore(STORE_NAME).get(key);
       request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error || new Error("Не удалось прочитать данные"));
+      request.onerror = () => reject(request.error || new Error("Could not read data"));
     });
   } finally {
     database.close();

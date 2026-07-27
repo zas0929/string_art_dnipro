@@ -27,21 +27,21 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
-  await expect(page.getByLabel("Минимальный пропуск точек")).toHaveValue("15");
+  await expect(page.getByLabel("Minimum pin gap")).toHaveValue("15");
 
-  const buildModeLink = page.getByRole("link", { name: "Режим сборки" });
+  const buildModeLink = page.getByRole("link", { name: "Build mode" });
   await expect(buildModeLink).toBeVisible();
   await buildModeLink.click();
 
   await expect(page).toHaveURL(/\/build$/);
-  await expect(page.getByRole("link", { name: "Генератор" })).toBeVisible();
-  const voiceButton = page.getByRole("button", { name: "Выключить озвучивание точек" });
+  await expect(page.getByRole("link", { name: "Generator" })).toBeVisible();
+  const voiceButton = page.getByRole("button", { name: "Turn pin voice guidance off" });
   await expect(voiceButton).toHaveAttribute("aria-pressed", "true");
   await voiceButton.click();
-  await expect(page.getByRole("button", { name: "Включить озвучивание точек" }))
+  await expect(page.getByRole("button", { name: "Turn pin voice guidance on" }))
     .toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByText("Нет активной схемы")).toBeVisible();
-  await page.getByRole("link", { name: "Генератор" }).click();
+  await expect(page.getByText("No active pattern")).toBeVisible();
+  await page.getByRole("link", { name: "Generator" }).click();
   await expect(page).toHaveURL(/\/$/);
 });
 
@@ -72,10 +72,10 @@ test("the single reference core generates a route from a photo", async ({ page }
   await setRangeValue(page.locator("#clarityInput"), 20);
   await expect(page.locator("#sharpnessValue")).toHaveText("35%");
   await expect(page.locator("#clarityValue")).toHaveText("20%");
-  await page.getByRole("button", { name: "Увеличить масштаб" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
-  await page.getByRole("button", { name: "Увеличить масштаб" }).click();
-  await page.getByRole("button", { name: "Уменьшить масштаб" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Zoom out" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
   if (testInfo.project.name === "mobile-chrome") {
     await pinchOut(page, "#sourceCanvas");
@@ -92,8 +92,8 @@ test("the single reference core generates a route from a photo", async ({ page }
   await page.mouse.up();
 
   const buildButtonName = testInfo.project.name === "mobile-chrome"
-    ? "Построить макет"
-    : "Построить";
+    ? "Generate artwork"
+    : "Generate";
   const buildButton = page.getByRole("button", { name: buildButtonName });
   await expect(buildButton).toBeEnabled();
   await page.evaluate(() => {
@@ -102,7 +102,7 @@ test("the single reference core generates a route from a photo", async ({ page }
   await buildButton.click();
 
   await expect(page.locator("#status")).toHaveText(
-    "Готово. Инструкция построена.",
+    "Done. Your pattern is ready.",
     { timeout: 30_000 },
   );
   await expect(page.locator("#sequenceOutput")).toHaveValue(/^1 -> 50 ->/);
@@ -140,8 +140,18 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
   await expect(page.locator('.result-variant[data-lines="4000"]'))
     .toHaveClass(/is-selected/);
   await expect(page.locator(".result-variant:visible")).toHaveCount(4);
-  await expect(page.getByRole("button", { name: "Показать макет на 5000 линий" }))
+  await expect(page.getByRole("button", { name: "Show 5000-line artwork" }))
     .toBeVisible();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
+  const defaultFrame = await canvasSignature(page, "#resultCanvas");
+  await page.getByRole("button", { name: "Show 5000-line artwork" }).click();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "5000");
+  const fullFrame = await canvasSignature(page, "#resultCanvas");
+  expect(fullFrame.darkSamples).toBeGreaterThan(defaultFrame.darkSamples);
+  await page.getByRole("button", { name: "Show 4000-line artwork" }).click();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
+  const restoredFrame = await canvasSignature(page, "#resultCanvas");
+  expect(restoredFrame.darkSamples).toBeLessThan(fullFrame.darkSamples);
   await expect.poll(
     () => readLatestPattern(page),
     { timeout: 15_000 },
@@ -150,14 +160,14 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
     lineCount: 5000,
   });
 
-  await page.getByRole("button", { name: "Показать макет на 3500 линий" }).click();
+  await page.getByRole("button", { name: "Show 3500-line artwork" }).click();
   await expect(page.locator('.result-variant[data-lines="3500"]'))
     .toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('.result-variant[data-lines="3500"]'))
     .toHaveClass(/is-selected/);
   await expect(page.locator('.result-variant[data-lines="4000"]'))
     .not.toHaveClass(/is-selected/);
-  await expect(page.locator("#status")).toHaveText("Показан макет на 3500 линий.");
+  await expect(page.locator("#status")).toHaveText("Showing the 3500-line artwork.");
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
@@ -169,7 +179,7 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
     buffer: Buffer.from(scheme),
   });
 
-  await expect(page.locator("#status")).toContainText("Схема загружена: 3 шагов");
+  await expect(page.locator("#status")).toContainText("Pattern uploaded: 3 steps");
   await expect(page.locator("#sequenceOutput")).toHaveValue(/50 -> 25 -> 43/);
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
     pointCount: 240,
@@ -181,34 +191,34 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   expect(download.suggestedFilename()).toBe("string-art-scheme.txt");
   expect(await readDownload(download)).toBe(scheme);
 
-  await page.getByRole("link", { name: "Режим сборки" }).click();
-  await expect(page.getByText("Шаг 1 из 3")).toBeVisible();
+  await page.getByRole("link", { name: "Build mode" }).click();
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
-  await page.getByRole("button", { name: "Уменьшить паузу" }).click();
+  await page.getByRole("button", { name: "Shorten pause" }).click();
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1250");
-  await expect(page.locator(".build-speed-heading output")).toHaveText("1.25 сек");
+  await expect(page.locator(".build-speed-heading output")).toHaveText("1.25 sec");
 
-  await page.getByRole("button", { name: "Далее" }).click();
-  await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Step 2 of 3")).toBeVisible();
   await expect.poll(() => readBuildProgress(page)).toMatchObject({ stepIndex: 1 });
 
   await page.reload();
-  await expect(page.getByText("Шаг 2 из 3")).toBeVisible();
+  await expect(page.getByText("Step 2 of 3")).toBeVisible();
   await expect(page.locator(".nail-readout strong").first()).toHaveText("50");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("25");
 
-  await page.getByRole("button", { name: "Я потерялся" }).click();
-  await expect(page.getByRole("dialog", { name: "Найти мое место" })).toBeVisible();
-  await page.getByLabel("1-я последняя точка").fill("1");
-  await page.getByLabel("2-я последняя точка").fill("50");
-  await page.getByLabel("3-я последняя точка").fill("25");
-  await page.getByRole("button", { name: "Найти", exact: true }).click();
-  await expect(page.getByText("Позиция найдена")).toBeVisible();
-  await page.getByRole("button", { name: /Выполнено соединений: 2/ }).click();
-  await expect(page.getByRole("dialog", { name: "Найти мое место" })).toBeHidden();
-  await expect(page.getByText("Шаг 3 из 3")).toBeVisible();
+  await page.getByRole("button", { name: "I'm lost" }).click();
+  await expect(page.getByRole("dialog", { name: "Find my position" })).toBeVisible();
+  await page.getByLabel("Recent pin 1").fill("1");
+  await page.getByLabel("Recent pin 2").fill("50");
+  await page.getByLabel("Recent pin 3").fill("25");
+  await page.getByRole("button", { name: "Find", exact: true }).click();
+  await expect(page.getByText("Position found")).toBeVisible();
+  await page.getByRole("button", { name: /Completed connections: 2/ }).click();
+  await expect(page.getByRole("dialog", { name: "Find my position" })).toBeHidden();
+  await expect(page.getByText("Step 3 of 3")).toBeVisible();
   await expect(page.locator(".nail-readout strong").first()).toHaveText("25");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("43");
 });
@@ -226,21 +236,23 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
   await expect(page.getByRole("button", { name: "Print" })).toBeEnabled();
   await page.getByRole("button", { name: "Print" }).click();
   await expect(page).toHaveURL(/\/print$/);
-  await expect(page.getByRole("heading", { name: "Инструкция для печати" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Print Instructions" })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByRole("button", { name: "PDF обложки" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "PDF инструкции" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cover PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Instructions PDF" })).toBeVisible();
   await expect(page.locator(".cover-sheet")).toBeVisible();
   await expect(page.locator(".instruction-sheet")).toHaveCount(2);
   await expect(page.locator(".instruction-sheet").first().locator(".instruction-row")).toHaveCount(204);
   await expect(page.locator(".instruction-row")).toHaveCount(205);
-  await expect(page.locator(".instruction-row").first()).toHaveText("1 крок - 1");
-
-  await page.getByLabel("Язык инструкции").selectOption("en");
+  const languageSelect = page.getByLabel("Instruction language");
+  await expect(languageSelect).toHaveValue("en");
   await expect(page.locator(".cover-sheet h2")).toHaveText("Instructions");
   await expect(page.locator(".instruction-row").first()).toHaveText("1 step - 1");
-  await page.getByLabel("Пункт про наліпки").uncheck();
+  await languageSelect.selectOption("uk");
+  await expect(page.locator(".instruction-row").first()).toHaveText("1 крок - 1");
+  await languageSelect.selectOption("en");
+  await page.getByLabel("Include sticker step").uncheck();
   await expect(page.locator(".cover-sheet li")).toHaveCount(2);
   await expect(page.locator(".cover-sheet li").first()).toContainText("Find nail number 1");
 
@@ -249,9 +261,9 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
   expect(countPdfPages(coverPdf)).toBe(1);
   await page.evaluate(() => document.body.classList.remove("print-cover-only"));
 
-  await page.getByLabel("Превью").selectOption("none");
+  await page.getByLabel("Preview").selectOption("none");
   await expect(page.locator(".cover-image")).toHaveClass(/is-empty/);
-  await page.getByLabel("С шага").fill("205");
+  await page.getByLabel("Start at step").fill("205");
   await expect(page.locator(".instruction-row")).toHaveCount(1);
   await expect(page.locator(".instruction-row").first()).toHaveText("205 step - 13");
 });
@@ -266,13 +278,13 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
     /maximum-scale=1.*user-scalable=no/,
   );
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
-  const buildLinkBox = await page.getByRole("link", { name: "Режим сборки" }).boundingBox();
-  const parametersBox = await page.getByRole("heading", { name: "Параметры" }).boundingBox();
+  const buildLinkBox = await page.getByRole("link", { name: "Build mode" }).boundingBox();
+  const parametersBox = await page.getByRole("heading", { name: "Settings" }).boundingBox();
   expect(buildLinkBox.y + buildLinkBox.height).toBeLessThan(parametersBox.y);
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 
-  await page.getByRole("link", { name: "Режим сборки" }).click();
-  await expect(page.getByRole("link", { name: "Генератор" })).toBeVisible();
+  await page.getByRole("link", { name: "Build mode" }).click();
+  await expect(page.getByRole("link", { name: "Generator" })).toBeVisible();
   await expect(page.locator(".desktop-scheme-upload")).toBeHidden();
   await expect(page.locator(".mobile-scheme-upload")).toBeVisible();
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
@@ -291,21 +303,21 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
   ].join("\n");
 
   await page.goto("/build");
-  await page.getByLabel("Загрузить схему").setInputFiles({
+  await page.getByLabel("Upload pattern").setInputFiles({
     name: "long-mobile-scheme.txt",
     mimeType: "text/plain",
     buffer: Buffer.from(longScheme),
   });
-  await expect(page.getByText("Шаг 1 из 1601")).toBeVisible();
+  await expect(page.getByText("Step 1 of 1601")).toBeVisible();
 
   const seek = page.locator(".build-seek");
   await setRangeValue(seek, 1200);
-  await expect(page.getByText("Шаг 1201 из 1601")).toBeVisible();
+  await expect(page.getByText("Step 1201 of 1601")).toBeVisible();
   await page.waitForTimeout(900);
   const forwardFrame = await canvasSignature(page);
 
   await setRangeValue(seek, 350);
-  await expect(page.getByText("Шаг 351 из 1601")).toBeVisible();
+  await expect(page.getByText("Step 351 of 1601")).toBeVisible();
   const immediateBackwardFrame = await canvasSignature(page);
   expect(immediateBackwardFrame.darkSamples).toBeLessThan(
     forwardFrame.darkSamples * 0.75,
@@ -397,8 +409,8 @@ async function setRangeValue(locator, value) {
   }, value);
 }
 
-async function canvasSignature(page) {
-  return page.locator(".build-canvas").evaluate((canvas) => {
+async function canvasSignature(page, selector = ".build-canvas") {
+  return page.locator(selector).evaluate((canvas) => {
     const { data } = canvas.getContext("2d").getImageData(
       0,
       0,

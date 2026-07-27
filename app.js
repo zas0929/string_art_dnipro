@@ -18,6 +18,8 @@ import { saveLatestPattern } from "./storage/local-project-store.js";
 const mountedApps = new WeakMap();
 const WORK_SIZE = 560;
 const ALGORITHM_ID = "reference-v7";
+const DEFAULT_RESULT_LINE_COUNT = 4000;
+const RENDER_BATCH_SIZE = 40;
 
 export function mountStringArtApp(root = document) {
   const existingCleanup = mountedApps.get(root);
@@ -25,7 +27,7 @@ export function mountStringArtApp(root = document) {
 
   const getElement = (id) => {
     const element = root.querySelector(`#${id}`);
-    if (!element) throw new Error(`Не найден обязательный элемент #${id}`);
+    if (!element) throw new Error(`Required element #${id} was not found`);
     return element;
   };
 
@@ -33,7 +35,7 @@ export function mountStringArtApp(root = document) {
   const sourceCanvas = getElement("sourceCanvas");
   const resultCtx = resultCanvas.getContext("2d");
   const sourceCtx = sourceCanvas.getContext("2d");
-  if (!resultCtx || !sourceCtx) throw new Error("Canvas 2D недоступен");
+  if (!resultCtx || !sourceCtx) throw new Error("Canvas 2D is unavailable");
 
   const imageInput = getElement("imageInput");
   const schemeInput = getElement("schemeInput");
@@ -77,7 +79,9 @@ export function mountStringArtApp(root = document) {
     running: false,
     activeWorker: null,
     cancelActiveRun: null,
-    variantFrames: new Map(),
+    availableVariants: new Set(),
+    resultLines: [],
+    resultSettings: null,
     crop: {
       zoom: 1,
       offsetX: 0,
@@ -141,9 +145,9 @@ export function mountStringArtApp(root = document) {
       setCropControlsDisabled(false);
       setBuildButtonsDisabled(false);
       setExportEnabled(false);
-      setStatus("Фото загружено. Перетащите фото для выбора кадра или измените масштаб.");
+      setStatus("Photo uploaded. Drag it to adjust the crop or change the zoom.");
     } catch {
-      setStatus("Не удалось загрузить изображение.");
+      setStatus("Could not load the image.");
     }
   });
 
@@ -155,7 +159,7 @@ export function mountStringArtApp(root = document) {
       const text = await file.text();
       if (!destroyed) await importScheme(text);
     } catch (error) {
-      setStatus(`Ошибка схемы: ${error instanceof Error ? error.message : "не удалось прочитать файл"}`);
+      setStatus(`Pattern error: ${error instanceof Error ? error.message : "could not read the file"}`);
       setExportEnabled(false);
     } finally {
       schemeInput.value = "";
@@ -182,7 +186,7 @@ export function mountStringArtApp(root = document) {
       await persistLatestPattern(readSettings());
       window.location.assign("/print");
     } catch {
-      setStatus("Не удалось подготовить инструкцию к печати.");
+      setStatus("Could not prepare the print instructions.");
       printButton.disabled = false;
     }
   });
@@ -238,9 +242,9 @@ export function mountStringArtApp(root = document) {
   for (const button of variantButtons) {
     listen(button, "click", () => {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
-      if (!state.variantFrames.has(lineCount)) return;
+      if (!state.availableVariants.has(lineCount)) return;
       selectResultVariant(lineCount);
-      setStatus(`Показан макет на ${lineCount} линий.`);
+      setStatus(`Showing the ${lineCount}-line artwork.`);
     });
   }
 
@@ -325,7 +329,7 @@ export function mountStringArtApp(root = document) {
     setCropControlsDisabled(true);
     setExportEnabled(false);
     progress.value = 0;
-    setStatus("Подготавливаю расчет...");
+    setStatus("Preparing the calculation...");
 
     const settings = readSettings();
     const prepared = prepareImage(settings);
@@ -356,14 +360,14 @@ export function mountStringArtApp(root = document) {
         : 1;
       setStatus(
         state.cancelled
-          ? "Построение остановлено. Инструкция сохранена частично."
-          : "Готово. Инструкция построена.",
+          ? "Generation stopped. A partial pattern has been saved."
+          : "Done. Your pattern is ready.",
       );
       if (!state.cancelled) configureResultVariants(renderedLines, settings);
       setExportEnabled(state.sequence.length > 1);
       if (!state.cancelled) scrollToResultOnMobile();
     } catch (error) {
-      setStatus(`Ошибка расчета: ${error instanceof Error ? error.message : "неизвестная ошибка"}`);
+      setStatus(`Calculation error: ${error instanceof Error ? error.message : "unknown error"}`);
       setExportEnabled(state.sequence.length > 1);
     } finally {
       if (!destroyed && state.sequence.length > 1) {
@@ -406,10 +410,16 @@ export function mountStringArtApp(root = document) {
             renderedLines.push(line);
             state.sequence.push(line[1]);
           }
-          drawThreadLines(renderedLines, settings, startIndex);
+          const previewEnd = Math.min(
+            renderedLines.length,
+            getDefaultResultLineCount(settings.lines),
+          );
+          if (startIndex < previewEnd) {
+            drawThreadLines(renderedLines, settings, startIndex, previewEnd);
+          }
           updateSummary(settings, message.completed);
           progress.value = message.completed / message.total;
-          setStatus(`Построено линий: ${message.completed} / ${message.total}`);
+          setStatus(`Generated lines: ${message.completed} / ${message.total}`);
         } else if (message?.type === "done") {
           finish({ cancelled: false });
         } else if (message?.type === "error") {
@@ -417,7 +427,7 @@ export function mountStringArtApp(root = document) {
         }
       });
       worker.addEventListener("error", (event) => {
-        finish(null, new Error(event.message || "Worker не смог выполнить расчет"));
+        finish(null, new Error(event.message || "The worker could not complete the calculation"));
       });
       worker.postMessage({
         type: "start",
@@ -559,7 +569,12 @@ export function mountStringArtApp(root = document) {
     }
 
     drawResultBase(settings);
-    drawThreadLines(renderedLines, settings);
+    drawThreadLines(
+      renderedLines,
+      settings,
+      0,
+      getDefaultResultLineCount(renderedLines.length),
+    );
     configureResultVariants(renderedLines, settings);
     drawSchemePlaceholder(pointCount, lineCount);
     updateSummary(settings, lineCount);
@@ -570,7 +585,7 @@ export function mountStringArtApp(root = document) {
     progress.value = 1;
     setExportEnabled(true);
     await persistLatestPattern(settings);
-    setStatus(`Схема загружена: ${lineCount} шагов, ${lineCount} соединений.`);
+    setStatus(`Pattern uploaded: ${lineCount} steps, ${lineCount} connections.`);
   }
 
   function drawSchemePlaceholder(pointCount, lineCount) {
@@ -582,13 +597,13 @@ export function mountStringArtApp(root = document) {
     sourceCtx.textBaseline = "middle";
     sourceCtx.font = "20px system-ui";
     sourceCtx.fillText(
-      "Схема загружена",
+      "Pattern uploaded",
       sourceCanvas.width / 2,
       sourceCanvas.height / 2 - 16,
     );
     sourceCtx.font = "14px system-ui";
     sourceCtx.fillText(
-      `${pointCount} точек · ${lineCount} соединений`,
+      `${pointCount} pins · ${lineCount} connections`,
       sourceCanvas.width / 2,
       sourceCanvas.height / 2 + 18,
     );
@@ -851,7 +866,7 @@ export function mountStringArtApp(root = document) {
     stepOut.textContent = "-";
     lengthOut.textContent = "-";
     progress.value = 0;
-    setStatus("Параметры изменены. Нажмите «Построить», чтобы пересчитать инструкцию.");
+    setStatus("Settings changed. Select Generate to recalculate the pattern.");
     if (state.image && redrawBase) drawInitialResult();
   }
 
@@ -895,13 +910,41 @@ export function mountStringArtApp(root = document) {
     });
   }
 
-  function drawThreadLines(lines, settings, startIndex = 0) {
-    renderStringArtLines(resultCtx, lines, state.points, {
-      canvasSize: resultCanvas.width,
-      workSize: WORK_SIZE,
-      threadMm: settings.threadMm,
+  function drawThreadLines(
+    lines,
+    settings,
+    startIndex = 0,
+    endIndex = lines.length,
+  ) {
+    renderThreadLinesInBatches(
+      resultCtx,
+      lines,
+      settings,
       startIndex,
-    });
+      endIndex,
+    );
+  }
+
+  function renderThreadLinesInBatches(
+    context,
+    lines,
+    settings,
+    startIndex = 0,
+    endIndex = lines.length,
+  ) {
+    for (
+      let batchStart = startIndex;
+      batchStart < endIndex;
+      batchStart += RENDER_BATCH_SIZE
+    ) {
+      renderStringArtLines(context, lines, state.points, {
+        canvasSize: context.canvas.width,
+        workSize: WORK_SIZE,
+        threadMm: settings.threadMm,
+        startIndex: batchStart,
+        endIndex: Math.min(batchStart + RENDER_BATCH_SIZE, endIndex),
+      });
+    }
   }
 
   function configureResultVariants(lines, settings) {
@@ -909,25 +952,27 @@ export function mountStringArtApp(root = document) {
       .filter((lineCount) => lineCount <= lines.length);
     if (availableLineCounts.length === 0) return;
 
-    state.variantFrames.clear();
+    state.resultLines = lines;
+    state.resultSettings = settings;
+    state.availableVariants.clear();
     for (const lineCount of availableLineCounts) {
       const frame = renderVariantFrame(lines, settings, lineCount);
-      state.variantFrames.set(lineCount, frame);
+      state.availableVariants.add(lineCount);
       const preview = getElement(`resultVariant${lineCount}`);
       const previewContext = preview.getContext("2d");
-      previewContext.save();
-      previewContext.globalCompositeOperation = "copy";
+      previewContext.clearRect(0, 0, preview.width, preview.height);
       previewContext.drawImage(frame, 0, 0, preview.width, preview.height);
-      previewContext.restore();
+      frame.width = 1;
+      frame.height = 1;
     }
     for (const button of variantButtons) {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
-      button.hidden = !state.variantFrames.has(lineCount);
+      button.hidden = !state.availableVariants.has(lineCount);
     }
     resultVariants.hidden = false;
     selectResultVariant(
-      state.variantFrames.has(4000)
-        ? 4000
+      state.availableVariants.has(DEFAULT_RESULT_LINE_COUNT)
+        ? DEFAULT_RESULT_LINE_COUNT
         : availableLineCounts.at(-1),
     );
   }
@@ -940,22 +985,27 @@ export function mountStringArtApp(root = document) {
     renderStringArtBase(context, settings.points, frame.width, {
       showLabels: false,
     });
-    renderStringArtLines(context, lines, state.points, {
-      canvasSize: frame.width,
-      workSize: WORK_SIZE,
-      threadMm: settings.threadMm,
-      endIndex: lineCount,
-    });
+    renderThreadLinesInBatches(context, lines, settings, 0, lineCount);
     return frame;
   }
 
   function selectResultVariant(lineCount) {
-    const frame = state.variantFrames.get(lineCount);
-    if (!frame) return;
-    resultCtx.save();
-    resultCtx.globalCompositeOperation = "copy";
-    resultCtx.drawImage(frame, 0, 0, resultCanvas.width, resultCanvas.height);
-    resultCtx.restore();
+    if (
+      !state.availableVariants.has(lineCount)
+      || !state.resultSettings
+      || state.resultLines.length === 0
+    ) {
+      return;
+    }
+    resultCanvas.width = resultCanvas.width;
+    drawResultBase(state.resultSettings);
+    drawThreadLines(
+      state.resultLines,
+      state.resultSettings,
+      0,
+      lineCount,
+    );
+    resultCanvas.dataset.lines = String(lineCount);
     for (const button of variantButtons) {
       const selected = Number.parseInt(button.dataset.lines, 10) === lineCount;
       button.classList.toggle("is-selected", selected);
@@ -964,13 +1014,20 @@ export function mountStringArtApp(root = document) {
   }
 
   function clearResultVariants() {
-    state.variantFrames.clear();
+    state.availableVariants.clear();
+    state.resultLines = [];
+    state.resultSettings = null;
+    delete resultCanvas.dataset.lines;
     resultVariants.hidden = true;
     for (const button of variantButtons) {
       button.hidden = false;
       button.classList.remove("is-selected");
       button.setAttribute("aria-pressed", "false");
     }
+  }
+
+  function getDefaultResultLineCount(totalLines) {
+    return Math.min(DEFAULT_RESULT_LINE_COUNT, totalLines);
   }
 
   function drawNails(context, points, canvasSize) {
@@ -993,12 +1050,12 @@ export function mountStringArtApp(root = document) {
     resultCtx.font = "20px system-ui";
     sourceCtx.font = "20px system-ui";
     resultCtx.fillText(
-      "Итоговая нить",
+      "String Art preview",
       resultCanvas.width / 2,
       resultCanvas.height / 2,
     );
     sourceCtx.fillText(
-      "Подготовленное фото",
+      "Prepared photo",
       sourceCanvas.width / 2,
       sourceCanvas.height / 2,
     );
@@ -1026,7 +1083,7 @@ export function mountStringArtApp(root = document) {
       ) * Math.PI * 2;
       total += 2 * radiusCm * Math.sin(angle / 2);
     }
-    return `${(total / 100).toFixed(2)} м`;
+    return `${(total / 100).toFixed(2)} m`;
   }
 
   function formatSequence(sequence, startIndex = 0) {
@@ -1101,7 +1158,7 @@ export function mountStringArtApp(root = document) {
         : null;
       await saveLatestPattern({
         id,
-        name: "Последняя схема",
+        name: "Latest pattern",
         sequence: state.sequence.map((point) => point + 1),
         pointCount: settings.points,
         lineCount: state.sequence.length - 1,
@@ -1114,7 +1171,7 @@ export function mountStringArtApp(root = document) {
         createdAt: new Date().toISOString(),
       });
     } catch (error) {
-      console.warn("Не удалось сохранить схему для режима сборки", error);
+      console.warn("Could not save the pattern for Build Mode", error);
     }
   }
 
