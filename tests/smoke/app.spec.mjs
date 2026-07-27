@@ -142,6 +142,16 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
   await expect(page.locator(".result-variant:visible")).toHaveCount(4);
   await expect(page.getByRole("button", { name: "Show 5000-line artwork" }))
     .toBeVisible();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
+  const defaultFrame = await canvasSignature(page, "#resultCanvas");
+  await page.getByRole("button", { name: "Show 5000-line artwork" }).click();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "5000");
+  const fullFrame = await canvasSignature(page, "#resultCanvas");
+  expect(fullFrame.darkSamples).toBeGreaterThan(defaultFrame.darkSamples);
+  await page.getByRole("button", { name: "Show 4000-line artwork" }).click();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
+  const restoredFrame = await canvasSignature(page, "#resultCanvas");
+  expect(restoredFrame.darkSamples).toBeLessThan(fullFrame.darkSamples);
   await expect.poll(
     () => readLatestPattern(page),
     { timeout: 15_000 },
@@ -399,8 +409,8 @@ async function setRangeValue(locator, value) {
   }, value);
 }
 
-async function canvasSignature(page) {
-  return page.locator(".build-canvas").evaluate((canvas) => {
+async function canvasSignature(page, selector = ".build-canvas") {
+  return page.locator(selector).evaluate((canvas) => {
     const { data } = canvas.getContext("2d").getImageData(
       0,
       0,

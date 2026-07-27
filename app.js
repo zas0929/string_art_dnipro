@@ -18,6 +18,8 @@ import { saveLatestPattern } from "./storage/local-project-store.js";
 const mountedApps = new WeakMap();
 const WORK_SIZE = 560;
 const ALGORITHM_ID = "reference-v7";
+const DEFAULT_RESULT_LINE_COUNT = 4000;
+const RENDER_BATCH_SIZE = 40;
 
 export function mountStringArtApp(root = document) {
   const existingCleanup = mountedApps.get(root);
@@ -77,7 +79,9 @@ export function mountStringArtApp(root = document) {
     running: false,
     activeWorker: null,
     cancelActiveRun: null,
-    variantFrames: new Map(),
+    availableVariants: new Set(),
+    resultLines: [],
+    resultSettings: null,
     crop: {
       zoom: 1,
       offsetX: 0,
@@ -238,7 +242,7 @@ export function mountStringArtApp(root = document) {
   for (const button of variantButtons) {
     listen(button, "click", () => {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
-      if (!state.variantFrames.has(lineCount)) return;
+      if (!state.availableVariants.has(lineCount)) return;
       selectResultVariant(lineCount);
       setStatus(`Showing the ${lineCount}-line artwork.`);
     });
@@ -406,7 +410,13 @@ export function mountStringArtApp(root = document) {
             renderedLines.push(line);
             state.sequence.push(line[1]);
           }
-          drawThreadLines(renderedLines, settings, startIndex);
+          const previewEnd = Math.min(
+            renderedLines.length,
+            getDefaultResultLineCount(settings.lines),
+          );
+          if (startIndex < previewEnd) {
+            drawThreadLines(renderedLines, settings, startIndex, previewEnd);
+          }
           updateSummary(settings, message.completed);
           progress.value = message.completed / message.total;
           setStatus(`Generated lines: ${message.completed} / ${message.total}`);
@@ -559,7 +569,12 @@ export function mountStringArtApp(root = document) {
     }
 
     drawResultBase(settings);
-    drawThreadLines(renderedLines, settings);
+    drawThreadLines(
+      renderedLines,
+      settings,
+      0,
+      getDefaultResultLineCount(renderedLines.length),
+    );
     configureResultVariants(renderedLines, settings);
     drawSchemePlaceholder(pointCount, lineCount);
     updateSummary(settings, lineCount);
@@ -895,13 +910,41 @@ export function mountStringArtApp(root = document) {
     });
   }
 
-  function drawThreadLines(lines, settings, startIndex = 0) {
-    renderStringArtLines(resultCtx, lines, state.points, {
-      canvasSize: resultCanvas.width,
-      workSize: WORK_SIZE,
-      threadMm: settings.threadMm,
+  function drawThreadLines(
+    lines,
+    settings,
+    startIndex = 0,
+    endIndex = lines.length,
+  ) {
+    renderThreadLinesInBatches(
+      resultCtx,
+      lines,
+      settings,
       startIndex,
-    });
+      endIndex,
+    );
+  }
+
+  function renderThreadLinesInBatches(
+    context,
+    lines,
+    settings,
+    startIndex = 0,
+    endIndex = lines.length,
+  ) {
+    for (
+      let batchStart = startIndex;
+      batchStart < endIndex;
+      batchStart += RENDER_BATCH_SIZE
+    ) {
+      renderStringArtLines(context, lines, state.points, {
+        canvasSize: context.canvas.width,
+        workSize: WORK_SIZE,
+        threadMm: settings.threadMm,
+        startIndex: batchStart,
+        endIndex: Math.min(batchStart + RENDER_BATCH_SIZE, endIndex),
+      });
+    }
   }
 
   function configureResultVariants(lines, settings) {
@@ -909,25 +952,27 @@ export function mountStringArtApp(root = document) {
       .filter((lineCount) => lineCount <= lines.length);
     if (availableLineCounts.length === 0) return;
 
-    state.variantFrames.clear();
+    state.resultLines = lines;
+    state.resultSettings = settings;
+    state.availableVariants.clear();
     for (const lineCount of availableLineCounts) {
       const frame = renderVariantFrame(lines, settings, lineCount);
-      state.variantFrames.set(lineCount, frame);
+      state.availableVariants.add(lineCount);
       const preview = getElement(`resultVariant${lineCount}`);
       const previewContext = preview.getContext("2d");
-      previewContext.save();
-      previewContext.globalCompositeOperation = "copy";
+      previewContext.clearRect(0, 0, preview.width, preview.height);
       previewContext.drawImage(frame, 0, 0, preview.width, preview.height);
-      previewContext.restore();
+      frame.width = 1;
+      frame.height = 1;
     }
     for (const button of variantButtons) {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
-      button.hidden = !state.variantFrames.has(lineCount);
+      button.hidden = !state.availableVariants.has(lineCount);
     }
     resultVariants.hidden = false;
     selectResultVariant(
-      state.variantFrames.has(4000)
-        ? 4000
+      state.availableVariants.has(DEFAULT_RESULT_LINE_COUNT)
+        ? DEFAULT_RESULT_LINE_COUNT
         : availableLineCounts.at(-1),
     );
   }
@@ -940,22 +985,27 @@ export function mountStringArtApp(root = document) {
     renderStringArtBase(context, settings.points, frame.width, {
       showLabels: false,
     });
-    renderStringArtLines(context, lines, state.points, {
-      canvasSize: frame.width,
-      workSize: WORK_SIZE,
-      threadMm: settings.threadMm,
-      endIndex: lineCount,
-    });
+    renderThreadLinesInBatches(context, lines, settings, 0, lineCount);
     return frame;
   }
 
   function selectResultVariant(lineCount) {
-    const frame = state.variantFrames.get(lineCount);
-    if (!frame) return;
-    resultCtx.save();
-    resultCtx.globalCompositeOperation = "copy";
-    resultCtx.drawImage(frame, 0, 0, resultCanvas.width, resultCanvas.height);
-    resultCtx.restore();
+    if (
+      !state.availableVariants.has(lineCount)
+      || !state.resultSettings
+      || state.resultLines.length === 0
+    ) {
+      return;
+    }
+    resultCanvas.width = resultCanvas.width;
+    drawResultBase(state.resultSettings);
+    drawThreadLines(
+      state.resultLines,
+      state.resultSettings,
+      0,
+      lineCount,
+    );
+    resultCanvas.dataset.lines = String(lineCount);
     for (const button of variantButtons) {
       const selected = Number.parseInt(button.dataset.lines, 10) === lineCount;
       button.classList.toggle("is-selected", selected);
@@ -964,13 +1014,20 @@ export function mountStringArtApp(root = document) {
   }
 
   function clearResultVariants() {
-    state.variantFrames.clear();
+    state.availableVariants.clear();
+    state.resultLines = [];
+    state.resultSettings = null;
+    delete resultCanvas.dataset.lines;
     resultVariants.hidden = true;
     for (const button of variantButtons) {
       button.hidden = false;
       button.classList.remove("is-selected");
       button.setAttribute("aria-pressed", "false");
     }
+  }
+
+  function getDefaultResultLineCount(totalLines) {
+    return Math.min(DEFAULT_RESULT_LINE_COUNT, totalLines);
   }
 
   function drawNails(context, points, canvasSize) {
