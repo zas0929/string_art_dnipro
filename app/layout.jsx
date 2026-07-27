@@ -2,7 +2,7 @@ import "./globals.css";
 
 export const metadata = {
   title: "String Art Generator",
-  description: "Генератор схем для картин из нитей",
+  description: "Generate String Art patterns from your photos",
 };
 
 export const viewport = {
@@ -14,7 +14,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ru">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

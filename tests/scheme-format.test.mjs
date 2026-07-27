@@ -40,6 +40,6 @@ test("parses exported CSV and checks continuity", () => {
   );
   assert.throws(
     () => parseSchemeText("step,from,to\n1,1,50\n2,49,25"),
-    /нарушена последовательность/,
+    /sequence is broken/,
   );
 });

@@ -34,7 +34,7 @@ export default function PrintInstruction() {
   const [pattern, setPattern] = useState(null);
   const [loading, setLoading] = useState(true);
   const [coverImage, setCoverImage] = useState("artwork");
-  const [language, setLanguage] = useState("uk");
+  const [language, setLanguage] = useState("en");
   const [includeStickerStep, setIncludeStickerStep] = useState(true);
   const [stripedRows, setStripedRows] = useState(false);
   const [startStep, setStartStep] = useState(DEFAULT_PRINT_SETTINGS.startStep);
@@ -79,17 +79,17 @@ export default function PrintInstruction() {
   };
 
   if (loading) {
-    return <main className="print-loading">Готовлю инструкцию...</main>;
+    return <main className="print-loading">Preparing instructions...</main>;
   }
 
   if (!pattern) {
     return (
       <main className="print-empty">
-        <h1>Нет готовой схемы</h1>
-        <p>Сначала загрузите схему или постройте макет в генераторе.</p>
+        <h1>No pattern available</h1>
+        <p>Upload a pattern or generate an artwork first.</p>
         <a className="command-link" href="/">
           <ArrowLeft aria-hidden="true" size={18} />
-          В генератор
+          Back to Generator
         </a>
       </main>
     );
@@ -101,18 +101,18 @@ export default function PrintInstruction() {
         <div className="print-toolbar-title">
           <a className="back-link" href="/">
             <ArrowLeft aria-hidden="true" size={18} />
-            Генератор
+            Generator
           </a>
-          <h1>Инструкция для печати</h1>
-          <p>{pattern.pointCount} точек · {pattern.lineCount} соединений</p>
+          <h1>Print Instructions</h1>
+          <p>{pattern.pointCount} pins · {pattern.lineCount} connections</p>
         </div>
 
         <div className="print-settings">
           <fieldset className="print-settings-group">
-            <legend>Обложка</legend>
+            <legend>Cover</legend>
             <div className="print-settings-grid cover-settings-grid">
               <label>
-                Язык инструкции
+                Instruction language
                 <select
                   value={language}
                   onChange={(event) => setLanguage(event.target.value)}
@@ -122,14 +122,14 @@ export default function PrintInstruction() {
                 </select>
               </label>
               <label>
-                Превью
+                Preview
                 <select
                   value={coverImage}
                   onChange={(event) => setCoverImage(event.target.value)}
                 >
-                  <option value="artwork">Макет картины</option>
-                  <option value="source" disabled={!pattern.sourcePreviewDataUrl}>Исходное фото</option>
-                  <option value="none">Без изображения</option>
+                  <option value="artwork">String Art preview</option>
+                  <option value="source" disabled={!pattern.sourcePreviewDataUrl}>Source photo</option>
+                  <option value="none">No image</option>
                 </select>
               </label>
               <label className="print-check">
@@ -138,16 +138,16 @@ export default function PrintInstruction() {
                   checked={includeStickerStep}
                   onChange={(event) => setIncludeStickerStep(event.target.checked)}
                 />
-                Пункт про наліпки
+                Include sticker step
               </label>
             </div>
           </fieldset>
 
           <fieldset className="print-settings-group">
-            <legend>Таблица шагов</legend>
+            <legend>Step table</legend>
             <div className="print-settings-grid instruction-settings-grid">
               <label>
-                С шага
+                Start at step
                 <input
                   type="number"
                   min="1"
@@ -157,7 +157,7 @@ export default function PrintInstruction() {
                 />
               </label>
               <label>
-                По шаг
+                End at step
                 <input
                   type="number"
                   min="1"
@@ -167,7 +167,7 @@ export default function PrintInstruction() {
                 />
               </label>
               <label>
-                Строк в колонке
+                Rows per column
                 <input
                   type="number"
                   min="20"
@@ -182,7 +182,7 @@ export default function PrintInstruction() {
                   checked={stripedRows}
                   onChange={(event) => setStripedRows(event.target.checked)}
                 />
-                Полосатые строки
+                Striped rows
               </label>
             </div>
           </fieldset>
@@ -191,11 +191,11 @@ export default function PrintInstruction() {
         <div className="print-actions">
           <button className="print-action secondary-print-action" type="button" onClick={() => printDocument("cover")}>
             <Printer aria-hidden="true" size={19} />
-            PDF обложки
+            Cover PDF
           </button>
           <button className="print-action" type="button" onClick={() => printDocument("instruction")}>
             <Printer aria-hidden="true" size={19} />
-            PDF инструкции
+            Instructions PDF
           </button>
         </div>
       </header>
@@ -203,8 +203,8 @@ export default function PrintInstruction() {
       <div className="print-preview">
         <section className="print-document-section cover-document">
           <div className="print-document-heading">
-            <h2>Титульный лист</h2>
-            <span>Отдельный документ · 1 страница</span>
+            <h2>Cover page</h2>
+            <span>Separate document · 1 page</span>
           </div>
           <CoverSheet
             image={coverImage === "none" ? null : coverPreview}
@@ -216,10 +216,10 @@ export default function PrintInstruction() {
         <section className="print-document-section instruction-document">
           <div className="print-document-heading">
             <div>
-              <h2>Таблица шагов</h2>
-              <p>Для двусторонней печати выберите в диалоге принтера сначала чётные, затем нечётные страницы.</p>
+              <h2>Step table</h2>
+              <p>For double-sided printing, print even pages first, turn the paper over, then print odd pages.</p>
             </div>
-            <span>{pages.length} стр.</span>
+            <span>{pages.length} pages</span>
           </div>
           <div className="instruction-pages">
             {pages.map((pageColumns, pageIndex) => (
@@ -238,7 +238,7 @@ export default function PrintInstruction() {
 }
 
 function CoverSheet({ image, language, includeStickerStep }) {
-  const copy = COVER_COPY[language] || COVER_COPY.uk;
+  const copy = COVER_COPY[language] || COVER_COPY.en;
   const steps = [
     includeStickerStep ? copy.stickerStep : null,
     copy.tieStep,
@@ -248,7 +248,7 @@ function CoverSheet({ image, language, includeStickerStep }) {
   return (
     <section className="print-sheet cover-sheet">
       <div className={`cover-image${image ? "" : " is-empty"}`}>
-        {image && <img src={image} alt="Превью картины String Art" />}
+        {image && <img src={image} alt="String Art preview" />}
       </div>
       <h2>{copy.title}</h2>
       <ol>
@@ -264,7 +264,7 @@ function CoverSheet({ image, language, includeStickerStep }) {
 }
 
 function InstructionSheet({ columns, stripedRows, language }) {
-  const stepLabel = (COVER_COPY[language] || COVER_COPY.uk).step;
+  const stepLabel = (COVER_COPY[language] || COVER_COPY.en).step;
 
   return (
     <section className="print-sheet instruction-sheet">

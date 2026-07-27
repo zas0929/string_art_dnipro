@@ -13,7 +13,7 @@ export function useStringArtController(rootRef) {
       root.dataset.controllerReady = "true";
     } catch (error) {
       const status = root?.querySelector("#status");
-      if (status) status.textContent = `Ошибка запуска: ${error.message}`;
+      if (status) status.textContent = `Startup error: ${error.message}`;
     }
 
     return () => {
