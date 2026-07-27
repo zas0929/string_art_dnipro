@@ -70,8 +70,7 @@ available high-line-count previews.
 After uploading a photo, drag it with a mouse or touch gesture to adjust the
 crop. Use the Photo zoom slider, its plus and minus controls, a mouse wheel, or
 a two-finger pinch gesture to change scale. Optional photo enhancements can
-increase sharpness and clarity or replace an edge-connected background with an
-adjustable neutral gray before the Reference v7 calculation starts.
+increase sharpness and clarity before the Reference v7 calculation starts.
 
 ## Comparing Patterns
 

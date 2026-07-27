@@ -772,42 +772,6 @@ canvas {
   accent-color: var(--accent-2);
 }
 
-.background-controls {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(190px, auto) minmax(0, 1fr);
-  align-items: end;
-  gap: 14px;
-  padding-top: 2px;
-}
-
-.background-toggle {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 30px;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.background-toggle input {
-  width: 17px;
-  height: 17px;
-  margin: 0;
-  accent-color: var(--accent);
-}
-
-.background-toggle:has(input:disabled) {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.background-shade-control input:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .result-variants {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1366,11 +1330,6 @@ textarea {
 
   .enhancement-controls {
     gap: 10px;
-  }
-
-  .background-controls {
-    grid-template-columns: 1fr;
-    gap: 8px;
   }
 
   .crop-reset-button {
