@@ -115,6 +115,31 @@ export default function StringArtWorkspace() {
                 disabled
               />
             </div>
+            <div className="background-controls">
+              <label className="background-toggle">
+                <input
+                  id="removeBackgroundInput"
+                  type="checkbox"
+                  disabled
+                />
+                <span>Replace background with gray</span>
+              </label>
+              <div className="enhancement-control background-shade-control">
+                <div className="enhancement-control-heading">
+                  <label htmlFor="backgroundGrayInput">Background shade</label>
+                  <output id="backgroundGrayValue" htmlFor="backgroundGrayInput">50%</output>
+                </div>
+                <input
+                  id="backgroundGrayInput"
+                  type="range"
+                  min="0"
+                  max="255"
+                  step="1"
+                  defaultValue="128"
+                  disabled
+                />
+              </div>
+            </div>
           </div>
           <button id="mobileBuildButton" className="mobile-build-button" type="button" disabled>
             <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />

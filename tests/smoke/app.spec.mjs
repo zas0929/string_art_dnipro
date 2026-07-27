@@ -72,6 +72,11 @@ test("the single reference core generates a route from a photo", async ({ page }
   await setRangeValue(page.locator("#clarityInput"), 20);
   await expect(page.locator("#sharpnessValue")).toHaveText("35%");
   await expect(page.locator("#clarityValue")).toHaveText("20%");
+  await expect(page.getByLabel("Background shade")).toBeDisabled();
+  await page.getByLabel("Replace background with gray").check();
+  await expect(page.getByLabel("Background shade")).toBeEnabled();
+  await setRangeValue(page.getByLabel("Background shade"), 160);
+  await expect(page.locator("#backgroundGrayValue")).toHaveText("63%");
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
   await page.getByRole("button", { name: "Zoom in" }).click();
@@ -115,6 +120,8 @@ test("the single reference core generates a route from a photo", async ({ page }
     lineCount: 100,
     sharpness: 35,
     clarity: 20,
+    removeBackground: true,
+    backgroundGray: 160,
   });
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);

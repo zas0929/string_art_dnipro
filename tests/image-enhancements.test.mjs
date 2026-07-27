@@ -46,3 +46,57 @@ test("clarity separates local detail from its surrounding tone", () => {
   assert.ok(data[centerOffset] - data[0] > 40);
   assert.equal(data[3], 255);
 });
+
+test("replaces an edge-connected background with the selected gray", () => {
+  const width = 9;
+  const height = 9;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    const x = pixel % width;
+    const y = Math.floor(pixel / width);
+    const isSubject = x >= 2 && x <= 6 && y >= 2 && y <= 6;
+    data.set(
+      isSubject
+        ? [210, 45, 35, 255]
+        : [245, 244, 242, 255],
+      pixel * 4,
+    );
+  }
+
+  applyImageEnhancements(
+    { data },
+    width,
+    height,
+    { removeBackground: true, backgroundGray: 120 },
+  );
+
+  assert.deepEqual([...data.slice(0, 4)], [120, 120, 120, 255]);
+  const center = (4 * width + 4) * 4;
+  assert.deepEqual([...data.slice(center, center + 4)], [210, 45, 35, 255]);
+});
+
+test("keeps disconnected subject pixels even when their color matches the border", () => {
+  const width = 9;
+  const height = 9;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let pixel = 0; pixel < width * height; pixel++) {
+    data.set([240, 240, 240, 255], pixel * 4);
+  }
+  for (let y = 2; y <= 6; y++) {
+    for (let x = 2; x <= 6; x++) {
+      data.set([30, 30, 30, 255], (y * width + x) * 4);
+    }
+  }
+  const center = (4 * width + 4) * 4;
+  data.set([240, 240, 240, 255], center);
+
+  applyImageEnhancements(
+    { data },
+    width,
+    height,
+    { removeBackground: true, backgroundGray: 100 },
+  );
+
+  assert.equal(data[0], 100);
+  assert.equal(data[center], 240);
+});
