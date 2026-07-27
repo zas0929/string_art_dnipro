@@ -28,6 +28,13 @@ test("generator and build mode share working navigation", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
   await expect(page.getByLabel("Minimum pin gap")).toHaveValue("15");
+  const threadThickness = page.getByLabel("Thread thickness, mm");
+  await expect(threadThickness).toHaveValue("0.19");
+  await expect(threadThickness.locator('option[value="0.22"]')).toHaveText("0.22 - thick");
+  await expect(threadThickness.locator('option[value="0.27"]')).toHaveText("0.27 - extra thick");
+  await expect(threadThickness.locator('option[value="0.3"]')).toHaveText("0.30 - maximum");
+  await threadThickness.selectOption("0.27");
+  await expect(threadThickness).toHaveValue("0.27");
 
   const buildModeLink = page.getByRole("link", { name: "Build mode" });
   await expect(buildModeLink).toBeVisible();

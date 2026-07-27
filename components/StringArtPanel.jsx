@@ -28,6 +28,9 @@ export default function StringArtPanel() {
             <option value="0.11">0.11 - thin</option>
             <option value="0.16">0.16 - medium</option>
             <option value="0.19">0.19 - standard</option>
+            <option value="0.22">0.22 - thick</option>
+            <option value="0.27">0.27 - extra thick</option>
+            <option value="0.3">0.30 - maximum</option>
           </select>
         </label>
         <label>
