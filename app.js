@@ -1,4 +1,5 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
+import { applyImageEnhancements } from "./core/image-enhancements.js";
 import {
   REFERENCE_LINE_STRENGTH,
   REFERENCE_LINE_WIDTH,
@@ -46,6 +47,12 @@ export function mountStringArtApp(root = document) {
   const zoomOutButton = getElement("zoomOutButton");
   const zoomInButton = getElement("zoomInButton");
   const resetCropButton = getElement("resetCropButton");
+  const sharpnessInput = getElement("sharpnessInput");
+  const sharpnessValue = getElement("sharpnessValue");
+  const clarityInput = getElement("clarityInput");
+  const clarityValue = getElement("clarityValue");
+  const resultVariants = getElement("resultVariants");
+  const variantButtons = [...resultVariants.querySelectorAll("[data-lines]")];
   const buildButton = getElement("buildButton");
   const mobileBuildButton = getElement("mobileBuildButton");
   const buildButtons = [buildButton, mobileBuildButton];
@@ -70,6 +77,7 @@ export function mountStringArtApp(root = document) {
     running: false,
     activeWorker: null,
     cancelActiveRun: null,
+    variantFrames: new Map(),
     crop: {
       zoom: 1,
       offsetX: 0,
@@ -126,6 +134,7 @@ export function mountStringArtApp(root = document) {
       state.patternId = null;
       state.sequence = [];
       state.sequenceDisplayStart = 0;
+      clearResultVariants();
       resetCrop();
       drawPreparedPreview();
       drawInitialResult();
@@ -144,7 +153,7 @@ export function mountStringArtApp(root = document) {
 
     try {
       const text = await file.text();
-      if (!destroyed) importScheme(text);
+      if (!destroyed) await importScheme(text);
     } catch (error) {
       setStatus(`Ошибка схемы: ${error instanceof Error ? error.message : "не удалось прочитать файл"}`);
       setExportEnabled(false);
@@ -212,6 +221,28 @@ export function mountStringArtApp(root = document) {
     invalidateResult();
     drawPreparedPreview();
   });
+
+  for (const [input, output] of [
+    [sharpnessInput, sharpnessValue],
+    [clarityInput, clarityValue],
+  ]) {
+    listen(input, "input", () => {
+      output.value = `${clampInt(input.value, 0, 100)}%`;
+      output.textContent = output.value;
+      if (!state.image || state.running) return;
+      invalidateResult();
+      drawPreparedPreview();
+    });
+  }
+
+  for (const button of variantButtons) {
+    listen(button, "click", () => {
+      const lineCount = Number.parseInt(button.dataset.lines, 10);
+      if (!state.variantFrames.has(lineCount)) return;
+      selectResultVariant(lineCount);
+      setStatus(`Показан макет на ${lineCount} линий.`);
+    });
+  }
 
   listen(sourceCanvas, "pointerdown", (event) => {
     if (!state.image || state.running) return;
@@ -299,6 +330,7 @@ export function mountStringArtApp(root = document) {
     const settings = readSettings();
     const prepared = prepareImage(settings);
     const renderedLines = [];
+    clearResultVariants();
     state.points = buildCirclePoints(
       settings.points,
       WORK_SIZE / 2 - 8,
@@ -327,6 +359,7 @@ export function mountStringArtApp(root = document) {
           ? "Построение остановлено. Инструкция сохранена частично."
           : "Готово. Инструкция построена.",
       );
+      if (!state.cancelled) configureResultVariants(renderedLines, settings);
       setExportEnabled(state.sequence.length > 1);
       if (!state.cancelled) scrollToResultOnMobile();
     } catch (error) {
@@ -412,6 +445,8 @@ export function mountStringArtApp(root = document) {
       zoom: state.crop.zoom,
       offsetX: state.crop.offsetX,
       offsetY: state.crop.offsetY,
+      sharpness: clampInt(sharpnessInput.value, 0, 100),
+      clarity: clampInt(clarityInput.value, 0, 100),
       algorithm: ALGORITHM_ID,
     };
   }
@@ -448,6 +483,8 @@ export function mountStringArtApp(root = document) {
     context.drawImage(state.image, fit.x, fit.y, fit.width, fit.height);
 
     const imageData = context.getImageData(0, 0, size, size);
+    applyImageEnhancements(imageData, size, size, settings);
+    context.putImageData(imageData, 0, 0);
     const mask = new Uint8Array(size * size);
     const radius = size / 2 - 8 * scale;
     const center = size / 2;
@@ -481,7 +518,7 @@ export function mountStringArtApp(root = document) {
     }
   }
 
-  function importScheme(text) {
+  async function importScheme(text) {
     const sequence = parseSchemeText(text);
     const maxPoint = Math.max(...sequence);
     const pointCount = Math.max(
@@ -503,6 +540,7 @@ export function mountStringArtApp(root = document) {
     setBuildButtonsDisabled(true);
     setCropControlsDisabled(true);
     state.cancelled = false;
+    clearResultVariants();
     state.sequence = sequence.map((point) => point - 1);
     state.sequenceDisplayStart = 1;
     state.points = buildCirclePoints(
@@ -522,6 +560,7 @@ export function mountStringArtApp(root = document) {
 
     drawResultBase(settings);
     drawThreadLines(renderedLines, settings);
+    configureResultVariants(renderedLines, settings);
     drawSchemePlaceholder(pointCount, lineCount);
     updateSummary(settings, lineCount);
     sequenceOutput.value = formatSequence(
@@ -529,9 +568,9 @@ export function mountStringArtApp(root = document) {
       state.sequenceDisplayStart,
     );
     progress.value = 1;
-    setStatus(`Схема загружена: ${lineCount} шагов, ${lineCount} соединений.`);
     setExportEnabled(true);
-    void persistLatestPattern(settings);
+    await persistLatestPattern(settings);
+    setStatus(`Схема загружена: ${lineCount} шагов, ${lineCount} соединений.`);
   }
 
   function drawSchemePlaceholder(pointCount, lineCount) {
@@ -564,12 +603,8 @@ export function mountStringArtApp(root = document) {
   }
 
   function drawInteractiveSourcePreview() {
+    const settings = readSettings();
     const canvasScale = sourceCanvas.width / WORK_SIZE;
-    const fit = getImageFit(state.image, WORK_SIZE, {
-      zoom: state.crop.zoom,
-      offsetX: state.crop.offsetX,
-      offsetY: state.crop.offsetY,
-    });
     const cropRadius = (WORK_SIZE / 2 - 8) * canvasScale;
 
     sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
@@ -589,13 +624,22 @@ export function mountStringArtApp(root = document) {
     sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
     sourceCtx.imageSmoothingEnabled = true;
     sourceCtx.imageSmoothingQuality = "high";
-    sourceCtx.drawImage(
-      state.image,
-      fit.x * canvasScale,
-      fit.y * canvasScale,
-      fit.width * canvasScale,
-      fit.height * canvasScale,
-    );
+    if (
+      state.crop.pointers.size === 0
+      && (settings.sharpness > 0 || settings.clarity > 0)
+    ) {
+      const frame = createSourceFrame(settings, WORK_SIZE);
+      sourceCtx.drawImage(frame.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
+    } else {
+      const fit = getImageFit(state.image, WORK_SIZE, settings);
+      sourceCtx.drawImage(
+        state.image,
+        fit.x * canvasScale,
+        fit.y * canvasScale,
+        fit.width * canvasScale,
+        fit.height * canvasScale,
+      );
+    }
     sourceCtx.restore();
     drawSourceNails();
   }
@@ -739,6 +783,7 @@ export function mountStringArtApp(root = document) {
     state.crop.pointerId = null;
     state.crop.gesture = null;
     invalidateResult();
+    drawPreparedPreview();
   }
 
   function getPointerMidpoint(first, second) {
@@ -796,6 +841,7 @@ export function mountStringArtApp(root = document) {
   }
 
   function invalidateResult(redrawBase = true) {
+    clearResultVariants();
     state.sequence = [];
     state.sequenceDisplayStart = 0;
     setExportEnabled(false);
@@ -856,6 +902,75 @@ export function mountStringArtApp(root = document) {
       threadMm: settings.threadMm,
       startIndex,
     });
+  }
+
+  function configureResultVariants(lines, settings) {
+    const availableLineCounts = [3500, 4000, 4500, 5000]
+      .filter((lineCount) => lineCount <= lines.length);
+    if (availableLineCounts.length === 0) return;
+
+    state.variantFrames.clear();
+    for (const lineCount of availableLineCounts) {
+      const frame = renderVariantFrame(lines, settings, lineCount);
+      state.variantFrames.set(lineCount, frame);
+      const preview = getElement(`resultVariant${lineCount}`);
+      const previewContext = preview.getContext("2d");
+      previewContext.save();
+      previewContext.globalCompositeOperation = "copy";
+      previewContext.drawImage(frame, 0, 0, preview.width, preview.height);
+      previewContext.restore();
+    }
+    for (const button of variantButtons) {
+      const lineCount = Number.parseInt(button.dataset.lines, 10);
+      button.hidden = !state.variantFrames.has(lineCount);
+    }
+    resultVariants.hidden = false;
+    selectResultVariant(
+      state.variantFrames.has(4000)
+        ? 4000
+        : availableLineCounts.at(-1),
+    );
+  }
+
+  function renderVariantFrame(lines, settings, lineCount) {
+    const frame = document.createElement("canvas");
+    frame.width = resultCanvas.width;
+    frame.height = resultCanvas.height;
+    const context = frame.getContext("2d");
+    renderStringArtBase(context, settings.points, frame.width, {
+      showLabels: false,
+    });
+    renderStringArtLines(context, lines, state.points, {
+      canvasSize: frame.width,
+      workSize: WORK_SIZE,
+      threadMm: settings.threadMm,
+      endIndex: lineCount,
+    });
+    return frame;
+  }
+
+  function selectResultVariant(lineCount) {
+    const frame = state.variantFrames.get(lineCount);
+    if (!frame) return;
+    resultCtx.save();
+    resultCtx.globalCompositeOperation = "copy";
+    resultCtx.drawImage(frame, 0, 0, resultCanvas.width, resultCanvas.height);
+    resultCtx.restore();
+    for (const button of variantButtons) {
+      const selected = Number.parseInt(button.dataset.lines, 10) === lineCount;
+      button.classList.toggle("is-selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+    }
+  }
+
+  function clearResultVariants() {
+    state.variantFrames.clear();
+    resultVariants.hidden = true;
+    for (const button of variantButtons) {
+      button.hidden = false;
+      button.classList.remove("is-selected");
+      button.setAttribute("aria-pressed", "false");
+    }
   }
 
   function drawNails(context, points, canvasSize) {
@@ -953,6 +1068,8 @@ export function mountStringArtApp(root = document) {
 
   function setCropControlsDisabled(disabled) {
     zoomInput.disabled = disabled;
+    sharpnessInput.disabled = disabled;
+    clarityInput.disabled = disabled;
     resetCropButton.disabled = disabled;
     if (disabled) {
       zoomOutButton.disabled = true;
@@ -990,6 +1107,8 @@ export function mountStringArtApp(root = document) {
         lineCount: state.sequence.length - 1,
         algorithm: ALGORITHM_ID,
         threadMm: settings.threadMm,
+        sharpness: settings.sharpness,
+        clarity: settings.clarity,
         sourcePreviewDataUrl,
         artworkPreviewDataUrl: resultCanvas.toDataURL("image/png"),
         createdAt: new Date().toISOString(),

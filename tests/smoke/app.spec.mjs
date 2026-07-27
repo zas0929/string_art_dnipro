@@ -14,6 +14,13 @@ const printScheme = [
     (_, index) => `${((index * 73) % 240) + 1}____  ${index + 1}`,
   ),
 ].join("\n");
+const variantScheme = [
+  "Points______Lines/n1____0/",
+  ...Array.from(
+    { length: 5000 },
+    (_, index) => `${((index * 73) % 240) + 1}____  ${index + 1}`,
+  ),
+].join("\n");
 
 test("generator and build mode share working navigation", async ({ page }) => {
   await page.goto("/");
@@ -61,6 +68,10 @@ test("the single reference core generates a route from a photo", async ({ page }
 
   await page.locator("#linesInput").fill("100");
   await page.locator("#imageInput").setInputFiles(path.resolve("test-photo.png"));
+  await setRangeValue(page.locator("#sharpnessInput"), 35);
+  await setRangeValue(page.locator("#clarityInput"), 20);
+  await expect(page.locator("#sharpnessValue")).toHaveText("35%");
+  await expect(page.locator("#clarityValue")).toHaveText("20%");
   await page.getByRole("button", { name: "Увеличить масштаб" }).click();
   await expect(page.locator("#zoomValue")).toHaveText("105%");
   await page.getByRole("button", { name: "Увеличить масштаб" }).click();
@@ -102,11 +113,51 @@ test("the single reference core generates a route from a photo", async ({ page }
     algorithm: "reference-v7",
     pointCount: 240,
     lineCount: 100,
+    sharpness: 35,
+    clarity: 20,
   });
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
   }
   expect(pageErrors).toEqual([]);
+});
+
+test("a 5000-line result keeps the source and exposes four clear variants", async ({ page }) => {
+  await page.goto("/");
+  await waitForGenerator(page);
+  await page.locator("#schemeInput").setInputFiles({
+    name: "variant-scheme.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(variantScheme),
+  });
+
+  const stage = page.locator(".stage");
+  await expect(stage).not.toHaveClass(/has-result-variants/);
+  await expect(page.locator(".source-column")).toBeVisible();
+  await expect(page.locator("#resultVariants")).toBeVisible();
+  await expect(page.locator('.result-variant[data-lines="4000"]'))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('.result-variant[data-lines="4000"]'))
+    .toHaveClass(/is-selected/);
+  await expect(page.locator(".result-variant:visible")).toHaveCount(4);
+  await expect(page.getByRole("button", { name: "Показать макет на 5000 линий" }))
+    .toBeVisible();
+  await expect.poll(
+    () => readLatestPattern(page),
+    { timeout: 15_000 },
+  ).toMatchObject({
+    pointCount: 240,
+    lineCount: 5000,
+  });
+
+  await page.getByRole("button", { name: "Показать макет на 3500 линий" }).click();
+  await expect(page.locator('.result-variant[data-lines="3500"]'))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator('.result-variant[data-lines="3500"]'))
+    .toHaveClass(/is-selected/);
+  await expect(page.locator('.result-variant[data-lines="4000"]'))
+    .not.toHaveClass(/is-selected/);
+  await expect(page.locator("#status")).toHaveText("Показан макет на 3500 линий.");
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
@@ -210,6 +261,10 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
 
   await page.goto("/");
   await waitForGenerator(page);
+  await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
+    "content",
+    /maximum-scale=1.*user-scalable=no/,
+  );
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
   const buildLinkBox = await page.getByRole("link", { name: "Режим сборки" }).boundingBox();
   const parametersBox = await page.getByRole("heading", { name: "Параметры" }).boundingBox();
