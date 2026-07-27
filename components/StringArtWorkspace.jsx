@@ -149,9 +149,9 @@ export default function StringArtWorkspace() {
         </div>
       </div>
 
-      <div className="status-row" aria-live="polite">
-        <span id="status">{t("generator.uploadPrompt")}</span>
-        <progress id="progress" value="0" max="1" aria-label={t("generator.generationProgress")} />
+      <div hidden>
+        <span id="status" />
+        <progress id="progress" value="0" max="1" />
       </div>
     </section>
   );

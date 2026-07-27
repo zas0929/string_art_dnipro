@@ -1,6 +1,6 @@
 export const DEFAULT_PRINT_SETTINGS = Object.freeze({
   startStep: 1,
-  endStep: null,
+  endStep: 4000,
   rowsPerColumn: 51,
   columnsPerPage: 4,
 });
@@ -10,7 +10,8 @@ export function createInstructionPages(sequence, settings = {}) {
 
   const lineCount = sequence.length - 1;
   const startStep = clampInt(settings.startStep, 1, lineCount, 1);
-  const endStep = clampInt(settings.endStep, startStep, lineCount, lineCount);
+  const defaultEndStep = Math.min(DEFAULT_PRINT_SETTINGS.endStep, lineCount);
+  const endStep = clampInt(settings.endStep, startStep, lineCount, defaultEndStep);
   const rowsPerColumn = clampInt(settings.rowsPerColumn, 1, 70, 51);
   const columnsPerPage = clampInt(settings.columnsPerPage, 2, 5, 4);
   const rows = [];

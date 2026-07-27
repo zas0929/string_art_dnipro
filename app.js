@@ -88,6 +88,7 @@ export function mountStringArtApp(root = document) {
     availableVariants: new Set(),
     resultLines: [],
     resultSettings: null,
+    resultNeedsRecalculation: false,
     crop: {
       zoom: 1,
       offsetX: 0,
@@ -107,7 +108,7 @@ export function mountStringArtApp(root = document) {
   let destroyed = false;
   let cropPreviewFrame = 0;
   let uiLanguage = getStoredLanguage();
-  let currentStatus = { key: "generator.uploadPrompt", params: {} };
+  let currentStatus = { key: null, params: {} };
 
   const listen = (target, type, handler, options = {}) => {
     target.addEventListener(type, handler, {
@@ -126,6 +127,9 @@ export function mountStringArtApp(root = document) {
       );
     } else if (!state.image) {
       drawEmpty();
+    } else if (state.resultNeedsRecalculation) {
+      drawInitialResult();
+      drawRecalculationPlaceholder();
     }
   });
 
@@ -159,6 +163,7 @@ export function mountStringArtApp(root = document) {
       state.patternId = null;
       state.sequence = [];
       state.sequenceDisplayStart = 0;
+      state.resultNeedsRecalculation = false;
       clearResultVariants();
       resetCrop();
       drawPreparedPreview();
@@ -267,7 +272,6 @@ export function mountStringArtApp(root = document) {
       const lineCount = Number.parseInt(button.dataset.lines, 10);
       if (!state.availableVariants.has(lineCount)) return;
       selectResultVariant(lineCount);
-      setStatus("generator.showingVariant", { count: lineCount });
     });
   }
 
@@ -348,6 +352,7 @@ export function mountStringArtApp(root = document) {
   async function generate() {
     state.cancelled = false;
     state.running = true;
+    state.resultNeedsRecalculation = false;
     setBuildButtonsDisabled(true);
     setCropControlsDisabled(true);
     setExportEnabled(false);
@@ -570,6 +575,7 @@ export function mountStringArtApp(root = document) {
     linesInput.value = String(lineCount);
     imageInput.value = "";
     state.image = null;
+    state.resultNeedsRecalculation = false;
     state.patternId = null;
     setBuildButtonsDisabled(true);
     setCropControlsDisabled(true);
@@ -893,8 +899,12 @@ export function mountStringArtApp(root = document) {
     stepOut.textContent = "-";
     lengthOut.textContent = "-";
     progress.value = 0;
-    setStatus("generator.settingsChanged");
-    if (state.image && redrawBase) drawInitialResult();
+    state.resultNeedsRecalculation = true;
+    setStatus(null);
+    if (state.image && redrawBase) {
+      drawInitialResult();
+      drawRecalculationPlaceholder();
+    }
   }
 
   function drawSourceFromPrepared(prepared, settings) {
@@ -929,6 +939,28 @@ export function mountStringArtApp(root = document) {
       WORK_SIZE / 2,
     );
     drawResultBase(settings);
+  }
+
+  function drawRecalculationPlaceholder() {
+    const centerX = resultCanvas.width / 2;
+    const centerY = resultCanvas.height / 2;
+    resultCtx.save();
+    resultCtx.fillStyle = "#5b616b";
+    resultCtx.textAlign = "center";
+    resultCtx.textBaseline = "middle";
+    resultCtx.font = "600 22px system-ui";
+    resultCtx.fillText(
+      t("generator.settingsChangedTitle"),
+      centerX,
+      centerY - 16,
+    );
+    resultCtx.font = "16px system-ui";
+    resultCtx.fillText(
+      t("generator.settingsChangedAction"),
+      centerX,
+      centerY + 18,
+    );
+    resultCtx.restore();
   }
 
   function drawResultBase(settings) {
@@ -1141,7 +1173,9 @@ export function mountStringArtApp(root = document) {
   }
 
   function renderCurrentStatus() {
-    statusText.textContent = t(currentStatus.key, currentStatus.params);
+    statusText.textContent = currentStatus.key
+      ? t(currentStatus.key, currentStatus.params)
+      : "";
   }
 
   function setStatus(key, params = {}) {

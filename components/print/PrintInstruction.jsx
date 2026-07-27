@@ -41,7 +41,7 @@ export default function PrintInstruction() {
   const [includeStickerStep, setIncludeStickerStep] = useState(true);
   const [stripedRows, setStripedRows] = useState(false);
   const [startStep, setStartStep] = useState(DEFAULT_PRINT_SETTINGS.startStep);
-  const [endStep, setEndStep] = useState("");
+  const [endStep, setEndStep] = useState(DEFAULT_PRINT_SETTINGS.endStep);
   const [rowsPerColumn, setRowsPerColumn] = useState(DEFAULT_PRINT_SETTINGS.rowsPerColumn);
 
   useEffect(() => {
@@ -50,7 +50,9 @@ export default function PrintInstruction() {
       .then((savedPattern) => {
         if (!active) return;
         setPattern(savedPattern);
-        setEndStep(savedPattern?.lineCount || "");
+        setEndStep(savedPattern
+          ? Math.min(savedPattern.lineCount, DEFAULT_PRINT_SETTINGS.endStep)
+          : DEFAULT_PRINT_SETTINGS.endStep);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -76,6 +78,13 @@ export default function PrintInstruction() {
   const coverPreview = coverImage === "source"
     ? pattern?.sourcePreviewDataUrl
     : pattern?.artworkPreviewDataUrl;
+  const printableLineCount = pages.reduce(
+    (pageTotal, page) => pageTotal + page.reduce(
+      (columnTotal, column) => columnTotal + column.length,
+      0,
+    ),
+    0,
+  );
 
   const printDocument = (target) => {
     const className = `print-${target}-only`;
@@ -118,7 +127,7 @@ export default function PrintInstruction() {
             {t("common.generator")}
           </a>
           <h1>{t("print.title")}</h1>
-          <p>{t("print.summary", { pins: pattern.pointCount, lines: pattern.lineCount })}</p>
+          <p>{t("print.summary", { pins: pattern.pointCount, lines: printableLineCount })}</p>
         </div>
 
         <div className="print-settings">

@@ -17,10 +17,7 @@ export default function StringArtPanel() {
           {t("panel.pins")}
           <input id="pointsInput" type="number" min="60" max="600" step="10" defaultValue="240" />
         </label>
-        <label>
-          {t("panel.lines")}
-          <input id="linesInput" type="number" min="100" max="8000" step="100" defaultValue="5000" />
-        </label>
+        <input id="linesInput" type="hidden" defaultValue="5000" />
         <label>
           {t("panel.artworkSize")}
           <input id="sizeInput" type="number" min="10" max="200" step="1" defaultValue="47" />

@@ -9,7 +9,6 @@ import Play from "lucide-react/dist/esm/icons/play.mjs";
 import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
-import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
 import VolumeX from "lucide-react/dist/esm/icons/volume-x.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
@@ -22,7 +21,6 @@ import {
   findRecentPointMatches,
   initialBuildSessionState,
 } from "../../core/build-session.js";
-import { parseSchemeText } from "../../core/scheme-format.js";
 import {
   createCirclePoints,
   renderStringArtBase,
@@ -33,7 +31,6 @@ import {
   loadBuildProgress,
   loadLatestPattern,
   saveBuildProgress,
-  saveLatestPattern,
 } from "../../storage/local-project-store.js";
 
 export default function BuildMode() {
@@ -145,31 +142,6 @@ export default function BuildMode() {
     dispatch({ type: "TOGGLE_PLAY" });
   };
 
-  const handleSchemeUpload = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const sequence = parseSchemeText(await file.text());
-      const pattern = {
-        id: typeof crypto.randomUUID === "function" ? crypto.randomUUID() : String(Date.now()),
-        name: file.name.replace(/\.[^.]+$/, ""),
-        sequence,
-        pointCount: Math.max(...sequence),
-        lineCount: sequence.length - 1,
-        algorithm: "reference-v7",
-        threadMm: 0.19,
-        createdAt: new Date().toISOString(),
-      };
-      await saveLatestPattern(pattern);
-      dispatch({ type: "LOAD_PATTERN", pattern, progress: null });
-      setMessage(t("build.uploadSuccess"));
-    } catch (error) {
-      setMessage(t("build.patternError", { error: error.message }));
-    } finally {
-      event.target.value = "";
-    }
-  };
-
   const openLostDialog = () => {
     dispatch({ type: "PAUSE" });
     setLostDialogOpen(true);
@@ -213,13 +185,6 @@ export default function BuildMode() {
   return (
     <main className="build-page">
       <LanguageSwitch />
-      <input
-        id="buildSchemeInput"
-        className="build-scheme-input"
-        type="file"
-        accept=".txt,.csv,text/plain,text/csv"
-        onChange={handleSchemeUpload}
-      />
       <section className="build-workspace">
         <header className="build-header">
           <a className="back-link" href="/">
@@ -239,10 +204,6 @@ export default function BuildMode() {
                 ? <Volume2 aria-hidden="true" size={20} />
                 : <VolumeX aria-hidden="true" size={20} />}
             </button>
-            <label className="file-button desktop-scheme-upload" htmlFor="buildSchemeInput">
-              <Upload aria-hidden="true" size={18} />
-              {t("build.uploadPattern")}
-            </label>
           </div>
         </header>
 
@@ -418,10 +379,6 @@ export default function BuildMode() {
             <div><dt>{t("build.saved")}</dt><dd>{t("build.steps", { count: state.stepIndex })}</dd></div>
           </dl>
         )}
-        <label className="file-button mobile-scheme-upload" htmlFor="buildSchemeInput">
-          <Upload aria-hidden="true" size={18} />
-          {t("build.uploadPattern")}
-        </label>
       </aside>
 
       {lostDialogOpen && (

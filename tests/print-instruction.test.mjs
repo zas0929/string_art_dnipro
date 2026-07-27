@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createInstructionPages } from "../core/print-instruction.js";
+import {
+  DEFAULT_PRINT_SETTINGS,
+  createInstructionPages,
+} from "../core/print-instruction.js";
+
+test("uses 4000 connections as the default print range", () => {
+  assert.equal(DEFAULT_PRINT_SETTINGS.endStep, 4000);
+  const sequence = Array.from({ length: 6001 }, (_, index) => index);
+  const pages = createInstructionPages(sequence);
+  const rows = pages.flat(2);
+
+  assert.equal(rows.length, 4000);
+  assert.deepEqual(rows.at(-1), { step: 4000, point: 4000 });
+});
 
 test("splits printable steps into columns and pages", () => {
   const sequence = [1, ...Array.from({ length: 13 }, (_, index) => index + 10)];

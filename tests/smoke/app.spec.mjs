@@ -39,9 +39,7 @@ test("UI language switches from Ukrainian by default and persists across pages",
   const viewport = page.viewportSize();
   expect(Math.round(switchBox.y)).toBe(16);
   expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(16);
-  await expect(page.locator("#status")).toHaveText(
-    "Завантажте фото, щоб побачити майбутній макет",
-  );
+  await expect(page.locator("#status")).toBeEmpty();
   await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect.poll(() => page.evaluate(
@@ -107,7 +105,9 @@ test("the single reference core generates a route from a photo", async ({ page }
     );
   }
 
-  await page.locator("#linesInput").fill("100");
+  await page.locator("#linesInput").evaluate((input) => {
+    input.value = "100";
+  });
   await page.locator("#imageInput").setInputFiles(path.resolve("test-photo.png"));
   await setRangeValue(page.locator("#sharpnessInput"), 35);
   await setRangeValue(page.locator("#clarityInput"), 20);
@@ -208,7 +208,6 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
     .toHaveClass(/is-selected/);
   await expect(page.locator('.result-variant[data-lines="4000"]'))
     .not.toHaveClass(/is-selected/);
-  await expect(page.locator("#status")).toHaveText("Showing the 3500-line artwork.");
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {

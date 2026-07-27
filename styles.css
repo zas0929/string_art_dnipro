@@ -521,7 +521,6 @@ textarea {
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
-  padding-top: 42px;
 }
 
 .topbar-actions {
@@ -582,18 +581,6 @@ button svg,
   opacity: 0;
   width: 1px;
   height: 1px;
-}
-
-.build-scheme-input {
-  position: fixed;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.mobile-scheme-upload {
-  display: none;
 }
 
 button:hover,
@@ -848,22 +835,6 @@ canvas {
 
 .result-variant:hover:not(:disabled) {
   color: var(--text);
-}
-
-.status-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 18px;
-  align-items: center;
-  margin-top: 16px;
-  color: var(--muted);
-  min-height: 28px;
-}
-
-progress {
-  width: 100%;
-  height: 10px;
-  accent-color: var(--accent);
 }
 
 .panel {
@@ -1315,8 +1286,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .topbar,
-  .status-row {
+  .topbar {
     grid-template-columns: 1fr;
     display: grid;
   }
@@ -1398,16 +1368,6 @@ textarea {
 
   .build-header-actions .language-switch {
     min-width: 82px;
-  }
-
-  .desktop-scheme-upload {
-    display: none;
-  }
-
-  .mobile-scheme-upload {
-    display: inline-flex;
-    width: 100%;
-    margin-top: auto;
   }
 
   .build-route {
