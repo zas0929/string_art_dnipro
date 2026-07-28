@@ -37,8 +37,8 @@ async function resolveProjectIdentity() {
     return { key: "local:unconfigured", supabase: null, userId: null };
   }
   const supabase = createClient();
-  const { data, error } = await supabase.auth.getClaims();
-  const userId = data?.claims?.sub;
+  const { data, error } = await supabase.auth.getSession();
+  const userId = data?.session?.user?.id;
   if (error || !userId) {
     return { key: "local:guest", supabase: null, userId: null };
   }

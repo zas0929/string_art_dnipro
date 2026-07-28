@@ -6,6 +6,7 @@ import FolderOpen from "lucide-react/dist/esm/icons/folder-open.mjs";
 import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 import LogIn from "lucide-react/dist/esm/icons/log-in.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
+import Save from "lucide-react/dist/esm/icons/save.mjs";
 import { useLanguage } from "./i18n/LanguageProvider.jsx";
 
 export default function StringArtPanel() {
@@ -55,6 +56,11 @@ export default function StringArtPanel() {
           {t("panel.print")}
         </button>
       </div>
+
+      <button id="saveProjectButton" className="command-link" type="button" disabled>
+        <Save aria-hidden="true" size={18} strokeWidth={2} />
+        <span id="saveProjectLabel">{t("panel.saveProject")}</span>
+      </button>
 
       <a id="buildModeLink" className="command-link" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
