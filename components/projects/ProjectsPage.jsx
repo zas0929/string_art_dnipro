@@ -91,7 +91,7 @@ export default function ProjectsPage() {
       <LanguageSwitch />
       <header className="projects-header">
         <div>
-          <a className="back-link" href="/">
+          <a className="back-link" href="/create">
             <ArrowLeft aria-hidden="true" size={18} />
             {t("common.generator")}
           </a>
@@ -104,7 +104,7 @@ export default function ProjectsPage() {
               ? t("projects.unlimitedSlots", { count: projects.length })
               : t("projects.slots", { count: projects.length, limit: projectLimit })}
           </span>
-          <a className="command-link project-create" href="/">
+          <a className="command-link project-create" href="/create">
             <Plus aria-hidden="true" size={18} />
             {t("projects.create")}
           </a>
@@ -117,7 +117,7 @@ export default function ProjectsPage() {
         <section className="projects-empty">
           <h2>{t("projects.emptyTitle")}</h2>
           <p>{t("projects.emptyHint")}</p>
-          <a className="command-link" href="/">
+          <a className="command-link" href="/create">
             <Plus aria-hidden="true" size={18} />
             {t("projects.createFirst")}
           </a>

@@ -29,8 +29,18 @@ test.beforeEach(async ({ page }, testInfo) => {
   });
 });
 
-test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+test("landing page leads to the generator", async ({ page }) => {
   await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "String Art Dnipro" })).toBeVisible();
+  await expect(page.locator('img[src="/family-string-art.jpg"]')).toBeVisible();
+  await page.getByRole("link", { name: "Create from photo" }).click();
+  await expect(page).toHaveURL(/\/create$/);
+  await waitForGenerator(page);
+});
+
+test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+  await page.goto("/create");
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "Налаштування" })).toBeVisible();
@@ -64,7 +74,7 @@ test("account page degrades gracefully before Supabase is configured", async ({ 
 });
 
 test("generator and build mode share working navigation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
@@ -90,11 +100,11 @@ test("generator and build mode share working navigation", async ({ page }) => {
     .toHaveAttribute("aria-pressed", "false");
   await expect(page.getByText("No active pattern")).toBeVisible();
   await page.getByRole("link", { name: "Generator" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/create$/);
 });
 
 test("saved patterns appear in the local project library", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "library-pattern.txt",
@@ -134,7 +144,7 @@ test("the single reference core generates a route from a photo", async ({ page }
       return originalClearRect.apply(this, args);
     };
   });
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => canvasTop(page, "#sourceCanvas")).toBeLessThan(
@@ -200,7 +210,7 @@ test("the single reference core generates a route from a photo", async ({ page }
 });
 
 test("a 5000-line result keeps the source and exposes four clear variants", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "variant-scheme.txt",
@@ -247,7 +257,7 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "smoke-scheme.txt",
@@ -300,7 +310,7 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
 
 test("Print opens a configurable A4 instruction from the latest scheme", async ({ page }) => {
   test.slow();
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "print-scheme.txt",
@@ -355,7 +365,7 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
 test("generator and build mode do not overflow a mobile viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile-only layout assertion");
 
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
     "content",
@@ -385,7 +395,7 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
     ...sequence.map((point, index) => `${point}____  ${index + 1}`),
   ].join("\n");
 
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "long-mobile-scheme.txt",

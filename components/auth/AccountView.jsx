@@ -11,7 +11,7 @@ export default function AccountView({ email }) {
 
   return (
     <section className="auth-shell account-shell">
-      <a className="back-link" href="/">
+      <a className="back-link" href="/create">
         <ArrowLeft aria-hidden="true" size={18} />
         {t("common.generator")}
       </a>

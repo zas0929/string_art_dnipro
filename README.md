@@ -51,7 +51,8 @@ progress updates arrive in batches.
 - `storage/cloud-project-store.js` is the authenticated Supabase adapter for projects, previews, and Build Mode progress.
 - `lib/supabase/` contains optional browser/server clients and cookie-based session refresh.
 - `supabase/migrations/` contains the database schema, row-level security policies, private preview storage, and the free-plan project limit.
-- `/` opens the generator and imports existing TXT or CSV patterns.
+- `/` opens the bilingual product landing page.
+- `/create` opens the generator and imports existing TXT or CSV patterns.
 - `/build` opens Build Mode with voice guidance, playback speed, seeking, and IndexedDB progress restoration.
 - `/print` creates configurable cover and instruction PDFs in English or Ukrainian.
 

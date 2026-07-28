@@ -188,7 +188,7 @@ export default function BuildMode() {
       <LanguageSwitch />
       <section className="build-workspace">
         <header className="build-header">
-          <a className="back-link" href="/">
+          <a className="back-link" href="/create">
             <ArrowLeft aria-hidden="true" size={18} />
             {t("common.generator")}
           </a>
