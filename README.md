@@ -105,6 +105,9 @@ progress while IndexedDB remains a local active-project cache for Build Mode
 and printing. On the first authenticated visit, local projects that do not
 already exist in the account are migrated to the cloud.
 
+Account access supports email registration, confirmation, sign-in, sign-out,
+and password recovery through Supabase Auth.
+
 Route calculation stays on the device. The cloud schema stores the generated
 pin sequence and settings, while source and artwork previews use a private
 Storage bucket with signed URLs. Free users are limited to five projects;

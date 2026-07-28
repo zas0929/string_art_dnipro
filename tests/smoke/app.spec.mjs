@@ -63,14 +63,20 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
 });
 
-test("account page degrades gracefully before Supabase is configured", async ({ page }) => {
+test("account page exposes sign-in, registration and password recovery", async ({ page }) => {
   await page.goto("/login");
 
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
-  await expect(page.getByText("Cloud accounts are not configured yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeVisible();
   await page.getByRole("tab", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await page.getByRole("tab", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });
 
 test("generator and build mode share working navigation", async ({ page }) => {

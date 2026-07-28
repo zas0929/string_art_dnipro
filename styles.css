@@ -652,6 +652,21 @@ textarea {
   color: var(--accent);
 }
 
+.auth-text-button {
+  min-height: auto;
+  margin: 14px auto 0;
+  padding: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.auth-text-button:hover {
+  border-color: transparent;
+  color: var(--text);
+}
+
 .account-action {
   width: 100%;
 }

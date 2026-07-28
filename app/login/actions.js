@@ -46,6 +46,33 @@ export async function signUp(_state, formData) {
   return { success: "checkEmail" };
 }
 
+export async function requestPasswordReset(_state, formData) {
+  if (!isSupabaseConfigured()) return configurationError();
+
+  const email = normalizeEmail(formData.get("email"));
+  if (!email) return { error: "invalidEmail" };
+
+  const headerStore = await headers();
+  const origin = headerStore.get("origin") || "http://localhost:3000";
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/confirm?next=/reset-password`,
+  });
+  if (error) {
+    console.error("Supabase password reset request failed", {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return {
+      error: error.code === "over_email_send_rate_limit"
+        ? "emailRateLimit"
+        : "passwordResetFailed",
+    };
+  }
+  return { success: "resetEmailSent" };
+}
+
 export async function signOut() {
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
