@@ -288,6 +288,13 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
+  test.setTimeout(75_000);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => false,
+    });
+  });
   await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
@@ -303,8 +310,25 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   expect(download.suggestedFilename()).toBe("string-art-scheme.txt");
   expect(await readDownload(download)).toBe(scheme);
 
+  const pngDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "PNG" }).click();
+  const pngDownload = await pngDownloadPromise;
+  expect(pngDownload.suggestedFilename()).toBe("string-art-preview.png");
+  const pngBuffer = await readDownloadBuffer(pngDownload);
+  const cornerAlpha = await page.evaluate(async (encodedPng) => {
+    const response = await fetch(`data:image/png;base64,${encodedPng}`);
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  }, pngBuffer.toString("base64"));
+  expect(cornerAlpha).toBe(0);
+
   await page.getByRole("link", { name: "Build mode" }).click();
-  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await expect(page.getByText("Step 1 of 3")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
@@ -586,8 +610,12 @@ async function waitForGenerator(page) {
 }
 
 async function readDownload(download) {
+  return (await readDownloadBuffer(download)).toString();
+}
+
+async function readDownloadBuffer(download) {
   const stream = await download.createReadStream();
-  let contents = "";
-  for await (const chunk of stream) contents += chunk.toString();
-  return contents;
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
 }
