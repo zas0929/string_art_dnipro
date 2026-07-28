@@ -53,6 +53,16 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
 });
 
+test("account page degrades gracefully before Supabase is configured", async ({ page }) => {
+  await page.goto("/login");
+
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByText("Cloud accounts are not configured yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeDisabled();
+  await page.getByRole("tab", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+});
+
 test("generator and build mode share working navigation", async ({ page }) => {
   await page.goto("/");
   await waitForGenerator(page);
@@ -359,8 +369,7 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
 
   await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByRole("link", { name: "Generator" })).toBeVisible();
-  await expect(page.locator(".desktop-scheme-upload")).toBeHidden();
-  await expect(page.locator(".mobile-scheme-upload")).toBeVisible();
+  await expect(page.getByLabel("Upload pattern")).toHaveCount(0);
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 });
 
@@ -376,12 +385,15 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
     ...sequence.map((point, index) => `${point}____  ${index + 1}`),
   ].join("\n");
 
-  await page.goto("/build");
-  await page.getByLabel("Upload pattern").setInputFiles({
+  await page.goto("/");
+  await waitForGenerator(page);
+  await page.locator("#schemeInput").setInputFiles({
     name: "long-mobile-scheme.txt",
     mimeType: "text/plain",
     buffer: Buffer.from(longScheme),
   });
+  await expect(page.locator("#sequenceOutput")).toHaveValue(/1 -> 74 -> 147/);
+  await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByText("Step 1 of 1601")).toBeVisible();
 
   const seek = page.locator(".build-seek");

@@ -48,6 +48,9 @@ progress updates arrive in batches.
 - `workers/reference-worker.js` performs the expensive calculation outside the main UI thread.
 - `core/scheme-format.js` handles TXT and CSV pattern import and export.
 - `storage/local-project-store.js` stores the latest pattern and Build Mode progress in IndexedDB.
+- `storage/cloud-project-store.js` is the authenticated Supabase adapter for projects, previews, and Build Mode progress.
+- `lib/supabase/` contains optional browser/server clients and cookie-based session refresh.
+- `supabase/migrations/` contains the database schema, row-level security policies, private preview storage, and the free-plan project limit.
 - `/` opens the generator and imports existing TXT or CSV patterns.
 - `/build` opens Build Mode with voice guidance, playback speed, seeking, and IndexedDB progress restoration.
 - `/print` creates configurable cover and instruction PDFs in English or Ukrainian.
@@ -93,15 +96,36 @@ crop. Use the Photo zoom slider, its plus and minus controls, a mouse wheel, or
 a two-finger pinch gesture to change scale. Optional photo enhancements can
 increase sharpness and clarity before the Reference v7 calculation starts.
 
-## Local Data
+## Project Data
 
-The application currently has no backend or user accounts. The latest pattern,
-Build Mode progress, and selected interface language are stored locally in the
-browser. Clearing browser storage removes this local state.
+The current interface stores projects, Build Mode progress, and the selected
+language locally in the browser. Clearing browser storage removes this local
+state. The repository also includes the Supabase backend foundation for the
+next account milestone; until authentication is connected to the interface,
+the local store remains the active adapter.
 
-Source photos and route calculation data stay on the device. A future backend
-milestone will add authenticated projects, cloud persistence, account limits,
-subscriptions, and administrator access.
+Route calculation stays on the device. The cloud schema stores the generated
+pin sequence and settings, while source and artwork previews use a private
+Storage bucket with signed URLs. Free users are limited to five projects;
+profiles marked as `admin` or using the `unlimited` plan bypass that limit.
+
+## Supabase Setup
+
+1. Create a Supabase project.
+2. Run `supabase/migrations/202607280001_initial_projects.sql` in the Supabase
+   SQL editor or apply it with the Supabase CLI.
+3. Copy `.env.example` to `.env.local` and set the project URL and publishable
+   key.
+4. Restart Next.js after changing environment variables.
+
+```bash
+cp .env.example .env.local
+pnpm dev
+```
+
+When the environment variables are absent, the application deliberately runs
+without Supabase and does not attempt to refresh an auth session. Never expose
+the Supabase service-role key in this application.
 
 ## Printing
 
