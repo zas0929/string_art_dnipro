@@ -98,11 +98,11 @@ increase sharpness and clarity before the Reference v7 calculation starts.
 
 ## Project Data
 
-The current interface stores projects, Build Mode progress, and the selected
-language locally in the browser. Clearing browser storage removes this local
-state. The repository also includes the Supabase backend foundation for the
-next account milestone; until authentication is connected to the interface,
-the local store remains the active adapter.
+Guest projects, Build Mode progress, and the selected language are stored
+locally in the browser. Authenticated users use Supabase for projects and build
+progress while IndexedDB remains a local active-project cache for Build Mode
+and printing. On the first authenticated visit, local projects that do not
+already exist in the account are migrated to the cloud.
 
 Route calculation stays on the device. The cloud schema stores the generated
 pin sequence and settings, while source and artwork previews use a private

@@ -6,14 +6,9 @@ import Pencil from "lucide-react/dist/esm/icons/pencil.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import Trash2 from "lucide-react/dist/esm/icons/trash-2.mjs";
-import { useEffect, useState } from "react";
-import {
-  LOCAL_PROJECT_LIMIT,
-  activateLocalProject,
-  deleteLocalProject,
-  listLocalProjects,
-  renameLocalProject,
-} from "../../storage/local-project-store.js";
+import { useEffect, useRef, useState } from "react";
+import { LOCAL_PROJECT_LIMIT } from "../../storage/local-project-store.js";
+import { getProjectStore } from "../../storage/project-store.js";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
@@ -24,10 +19,22 @@ export default function ProjectsPage() {
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [draftName, setDraftName] = useState("");
+  const [projectLimit, setProjectLimit] = useState(LOCAL_PROJECT_LIMIT);
+  const projectStoreRef = useRef(null);
 
   useEffect(() => {
     let active = true;
-    listLocalProjects()
+    getProjectStore()
+      .then(async (store) => {
+        projectStoreRef.current = store;
+        if (active && store.migrationError) setError(store.migrationError.message);
+        const [items, account] = await Promise.all([
+          store.listProjects(),
+          store.getAccount(),
+        ]);
+        if (active) setProjectLimit(account.projectLimit);
+        return items;
+      })
       .then((items) => {
         if (active) setProjects(items);
       })
@@ -45,7 +52,7 @@ export default function ProjectsPage() {
   const openProject = async (projectId, destination) => {
     setError("");
     try {
-      await activateLocalProject(projectId);
+      await projectStoreRef.current.activateProject(projectId);
       window.location.assign(destination);
     } catch (openError) {
       setError(openError.message);
@@ -55,7 +62,7 @@ export default function ProjectsPage() {
   const saveName = async (event, projectId) => {
     event.preventDefault();
     try {
-      const updated = await renameLocalProject(projectId, draftName);
+      const updated = await projectStoreRef.current.renameProject(projectId, draftName);
       if (updated) {
         setProjects((items) => items.map((item) => (
           item.id === projectId
@@ -72,7 +79,7 @@ export default function ProjectsPage() {
   const removeProject = async (project) => {
     if (!window.confirm(t("projects.deleteConfirm", { name: project.name }))) return;
     try {
-      await deleteLocalProject(project.id);
+      await projectStoreRef.current.deleteProject(project.id);
       setProjects((items) => items.filter((item) => item.id !== project.id));
     } catch (deleteError) {
       setError(deleteError.message);
@@ -93,7 +100,9 @@ export default function ProjectsPage() {
         </div>
         <div className="projects-header-actions">
           <span className="project-limit">
-            {t("projects.slots", { count: projects.length, limit: LOCAL_PROJECT_LIMIT })}
+            {projectLimit === null
+              ? t("projects.unlimitedSlots", { count: projects.length })
+              : t("projects.slots", { count: projects.length, limit: projectLimit })}
           </span>
           <a className="command-link project-create" href="/">
             <Plus aria-hidden="true" size={18} />

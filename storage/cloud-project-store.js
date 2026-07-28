@@ -24,6 +24,22 @@ export function createCloudProjectStore(supabase, userId) {
   if (!supabase || !userId) throw new Error("Cloud project storage requires an authenticated user");
 
   return {
+    async getAccount() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role,plan")
+        .eq("id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      const unlimited = data?.role === "admin" || data?.plan === "unlimited";
+      return {
+        mode: "cloud",
+        role: data?.role || "user",
+        plan: data?.plan || "free",
+        projectLimit: unlimited ? null : 5,
+      };
+    },
+
     async listProjects() {
       const { data, error } = await supabase
         .from("projects")
