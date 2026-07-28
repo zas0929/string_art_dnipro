@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createCirclePoints, renderStringArtLines } from "../core/string-art-renderer.js";
+import {
+  createCirclePoints,
+  renderStringArtBase,
+  renderStringArtLines,
+} from "../core/string-art-renderer.js";
 
 test("places point 1 at three o'clock and numbers clockwise", () => {
   const points = createCirclePoints(240, 272, 280, 280);
@@ -38,4 +42,29 @@ test("renders only the requested line range", () => {
     endIndex: 3,
   });
   assert.equal(strokes, 2);
+});
+
+test("can render the String Art base without an opaque background", () => {
+  let clears = 0;
+  let fills = 0;
+  const context = {
+    canvas: { width: 200 },
+    clearRect() { clears++; },
+    fillRect() { fills++; },
+    save() {},
+    beginPath() {},
+    arc() {},
+    clip() {},
+    restore() {},
+    stroke() {},
+    fill() {},
+  };
+
+  renderStringArtBase(context, 4, 200, {
+    showLabels: false,
+    background: false,
+  });
+
+  assert.equal(clears, 1);
+  assert.equal(fills, 0);
 });

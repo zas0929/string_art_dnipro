@@ -209,7 +209,7 @@ export function mountStringArtApp(root = document) {
   }
 
   listen(pngButton, "click", () => {
-    downloadDataUrl("string-art-preview.png", resultCanvas.toDataURL("image/png"));
+    void exportPng();
   });
   listen(txtButton, "click", () => {
     downloadText("string-art-scheme.txt", formatSchemeText(state.sequence));
@@ -1021,12 +1021,12 @@ export function mountStringArtApp(root = document) {
   }
 
   function configureResultVariants(lines, settings) {
+    state.resultLines = lines;
+    state.resultSettings = settings;
     const availableLineCounts = [3500, 4000, 4500, 5000]
       .filter((lineCount) => lineCount <= lines.length);
     if (availableLineCounts.length === 0) return;
 
-    state.resultLines = lines;
-    state.resultSettings = settings;
     state.availableVariants.clear();
     for (const lineCount of availableLineCounts) {
       const frame = renderVariantFrame(lines, settings, lineCount);
@@ -1059,6 +1059,39 @@ export function mountStringArtApp(root = document) {
       showLabels: false,
     });
     renderThreadLinesInBatches(context, lines, settings, 0, lineCount);
+    return frame;
+  }
+
+  function renderTransparentExportFrame() {
+    if (!state.resultSettings || state.resultLines.length === 0) return null;
+
+    const lineCount = Math.min(
+      Number.parseInt(resultCanvas.dataset.lines, 10)
+        || getDefaultResultLineCount(state.resultLines.length),
+      state.resultLines.length,
+    );
+    const frame = document.createElement("canvas");
+    frame.width = resultCanvas.width;
+    frame.height = resultCanvas.height;
+    const context = frame.getContext("2d");
+    if (!context) return null;
+
+    renderStringArtBase(
+      context,
+      state.resultSettings.points,
+      frame.width,
+      {
+        showLabels: false,
+        background: false,
+      },
+    );
+    renderThreadLinesInBatches(
+      context,
+      state.resultLines,
+      state.resultSettings,
+      0,
+      lineCount,
+    );
     return frame;
   }
 
@@ -1304,8 +1337,63 @@ export function mountStringArtApp(root = document) {
     downloadUrl(filename, URL.createObjectURL(blob));
   }
 
-  function downloadDataUrl(filename, url) {
-    downloadUrl(filename, url);
+  async function exportPng() {
+    const frame = renderTransparentExportFrame();
+    if (!frame) return;
+
+    const filename = "string-art-preview.png";
+    const blob = dataUrlToBlob(frame.toDataURL("image/png"));
+    frame.width = 1;
+    frame.height = 1;
+
+    const file = new File([blob], filename, { type: "image/png" });
+    const shareData = {
+      files: [file],
+      title: "String Art",
+    };
+    let canShareFiles = false;
+    try {
+      canShareFiles = (
+        typeof navigator.share === "function"
+        && typeof navigator.canShare === "function"
+        && navigator.canShare(shareData)
+      );
+    } catch {
+      canShareFiles = false;
+    }
+    if (canShareFiles) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    if (isIosBrowser()) {
+      const opened = window.open(url, "_blank", "noopener,noreferrer");
+      if (!opened) downloadUrl(filename, url);
+    } else {
+      downloadUrl(filename, url);
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  function dataUrlToBlob(url) {
+    const [metadata, encoded] = url.split(",");
+    const mimeType = metadata.match(/^data:([^;]+)/)?.[1] || "application/octet-stream";
+    const binary = window.atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return new Blob([bytes], { type: mimeType });
+  }
+
+  function isIosBrowser() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   }
 
   function downloadUrl(filename, url) {

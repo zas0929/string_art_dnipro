@@ -14,10 +14,15 @@ export default function StringArtWorkspace() {
   return (
     <section className="workspace">
       <div className="topbar">
-        <div>
-          <h1>String Art Generator</h1>
-          <p>{t("generator.subtitle")}</p>
-        </div>
+        <a className="generator-brand" href="/" aria-label="String Art Dnipro">
+          <span className="brand-logo" aria-hidden="true">
+            <img src="/logo-white.png" alt="" />
+          </span>
+          <span className="generator-brand-copy">
+            <h1>String Art Generator</h1>
+            <p>{t("generator.subtitle")}</p>
+          </span>
+        </a>
         <div className="topbar-actions">
           <label className="file-button photo-upload">
             <ImagePlus aria-hidden="true" size={18} strokeWidth={2} />

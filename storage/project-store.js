@@ -59,7 +59,13 @@ function createLocalAdapter() {
     mode: "local",
     migrationError: null,
     getAccount: async () => ({ mode: "local", role: "guest", plan: "free", projectLimit: 5 }),
-    listProjects: listLocalProjects,
+    async listProjects() {
+      const projects = await listLocalProjects();
+      return Promise.all(projects.map(async (project) => ({
+        ...project,
+        buildProgress: await loadBuildProgress(project.id),
+      })));
+    },
     loadLatestPattern,
     saveLatestPattern,
     activateProject: activateLocalProject,
@@ -76,7 +82,20 @@ function createCloudAdapter(cloud) {
     migrationError: null,
     getAccount: () => cloud.getAccount(),
     listProjects: () => cloud.listProjects(),
-    loadLatestPattern,
+    async loadLatestPattern() {
+      const localPattern = await loadLatestPattern();
+      if (!localPattern) return null;
+
+      const cloudPattern = await cloud.findProject(localPattern.id);
+      if (cloudPattern) {
+        await saveLatestPattern(cloudPattern);
+        return cloudPattern;
+      }
+
+      const savedPattern = await cloud.saveProject(localPattern);
+      await saveLatestPattern(savedPattern);
+      return savedPattern;
+    },
     async saveLatestPattern(pattern) {
       const localResult = await saveLatestPattern(pattern);
       const savedPattern = await cloud.saveProject(localResult.pattern);

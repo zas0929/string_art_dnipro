@@ -20,17 +20,21 @@ export function renderStringArtBase(
 ) {
   const center = canvasSize / 2;
   const radius = center - 20;
+  const drawBackground = options.background ?? true;
   context.clearRect(0, 0, canvasSize, canvasSize);
-  context.fillStyle = "#f6f3ea";
-  context.fillRect(0, 0, canvasSize, canvasSize);
 
-  context.save();
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.clip();
-  context.fillStyle = "#f8f6ef";
-  context.fillRect(0, 0, canvasSize, canvasSize);
-  context.restore();
+  if (drawBackground) {
+    context.fillStyle = "#f6f3ea";
+    context.fillRect(0, 0, canvasSize, canvasSize);
+
+    context.save();
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.clip();
+    context.fillStyle = "#f8f6ef";
+    context.fillRect(0, 0, canvasSize, canvasSize);
+    context.restore();
+  }
 
   context.strokeStyle = "#2d2f34";
   context.lineWidth = 2;

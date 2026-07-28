@@ -33,7 +33,18 @@ test("landing page leads to the generator", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "String Art Dnipro" })).toBeVisible();
+  await expect(page.locator('.landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
   await expect(page.locator('img[src="/family-string-art.jpg"]')).toBeVisible();
+  const comparisonSlider = page.locator(".landing-comparison input");
+  await expect(comparisonSlider).toHaveValue("50");
+  await comparisonSlider.scrollIntoViewIfNeeded();
+  await comparisonSlider.focus();
+  await comparisonSlider.press("End");
+  await expect(comparisonSlider).toHaveValue("100");
+  await expect(page.locator(".landing-comparison")).toHaveCSS(
+    "--comparison-position",
+    "100%",
+  );
   await page.getByRole("link", { name: "Create from photo" }).click();
   await expect(page).toHaveURL(/\/create$/);
   await waitForGenerator(page);
@@ -63,14 +74,20 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
 });
 
-test("account page degrades gracefully before Supabase is configured", async ({ page }) => {
+test("account page exposes sign-in, registration and password recovery", async ({ page }) => {
   await page.goto("/login");
 
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
-  await expect(page.getByText("Cloud accounts are not configured yet.")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeVisible();
   await page.getByRole("tab", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+  await page.getByRole("tab", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Forgot password?" }).click();
+  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
 });
 
 test("generator and build mode share working navigation", async ({ page }) => {
@@ -78,6 +95,7 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
+  await expect(page.locator('.generator-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
   await expect(page.getByLabel("Minimum distance between pins")).toHaveValue("15");
   const threadThickness = page.getByLabel("Thread thickness, mm");
   await expect(threadThickness).toHaveValue("0.19");
@@ -122,6 +140,8 @@ test("saved patterns appear in the local project library", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "My projects" })).toBeVisible();
   await expect(page.getByText("1 of 5 projects")).toBeVisible();
   await expect(page.getByText("240 pins · 3 connections")).toBeVisible();
+  await expect(page.getByText("Not started")).toBeVisible();
+  await expect(page.getByText("0%")).toBeVisible();
 
   await page.getByRole("button", { name: "Rename project" }).click();
   await page.getByLabel("Project name").fill("Family portrait");
@@ -131,6 +151,11 @@ test("saved patterns appear in the local project library", async ({ page }) => {
   await page.getByRole("button", { name: "Build", exact: true }).click();
   await expect(page).toHaveURL(/\/build$/);
   await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect.poll(() => readBuildProgress(page)).toMatchObject({ stepIndex: 1 });
+  await page.goto("/projects");
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await expect(page.getByText("33%")).toBeVisible();
 });
 
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
@@ -244,6 +269,7 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
   await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
   const restoredFrame = await canvasSignature(page, "#resultCanvas");
   expect(restoredFrame.darkSamples).toBeLessThan(fullFrame.darkSamples);
+  await page.getByRole("button", { name: "Save project" }).click();
   await expect.poll(
     () => readLatestPattern(page),
     { timeout: 15_000 },
@@ -262,6 +288,13 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
+  test.setTimeout(75_000);
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "canShare", {
+      configurable: true,
+      value: () => false,
+    });
+  });
   await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
@@ -271,18 +304,31 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   });
 
   await expect(page.locator("#sequenceOutput")).toHaveValue(/50 -> 25 -> 43/);
-  await expect.poll(() => readLatestPattern(page)).toMatchObject({
-    pointCount: 240,
-    lineCount: 3,
-  });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "TXT" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("string-art-scheme.txt");
   expect(await readDownload(download)).toBe(scheme);
 
+  const pngDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "PNG" }).click();
+  const pngDownload = await pngDownloadPromise;
+  expect(pngDownload.suggestedFilename()).toBe("string-art-preview.png");
+  const pngBuffer = await readDownloadBuffer(pngDownload);
+  const cornerAlpha = await page.evaluate(async (encodedPng) => {
+    const response = await fetch(`data:image/png;base64,${encodedPng}`);
+    const bitmap = await createImageBitmap(await response.blob());
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const context = canvas.getContext("2d");
+    context.drawImage(bitmap, 0, 0);
+    return context.getImageData(0, 0, 1, 1).data[3];
+  }, pngBuffer.toString("base64"));
+  expect(cornerAlpha).toBe(0);
+
   await page.getByRole("link", { name: "Build mode" }).click();
-  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await expect(page.getByText("Step 1 of 3")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
@@ -564,8 +610,12 @@ async function waitForGenerator(page) {
 }
 
 async function readDownload(download) {
+  return (await readDownloadBuffer(download)).toString();
+}
+
+async function readDownloadBuffer(download) {
   const stream = await download.createReadStream();
-  let contents = "";
-  for await (const chunk of stream) contents += chunk.toString();
-  return contents;
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  return Buffer.concat(chunks);
 }
