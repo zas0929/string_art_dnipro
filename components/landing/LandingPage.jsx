@@ -1,25 +1,30 @@
 "use client";
 
 import ArrowRight from "lucide-react/dist/esm/icons/arrow-right.mjs";
+import ArrowLeftRight from "lucide-react/dist/esm/icons/arrow-left-right.mjs";
 import Camera from "lucide-react/dist/esm/icons/camera.mjs";
 import Check from "lucide-react/dist/esm/icons/check.mjs";
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
 import Package from "lucide-react/dist/esm/icons/package.mjs";
 import Upload from "lucide-react/dist/esm/icons/upload.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
+import { useState } from "react";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 export default function LandingPage() {
   const { t } = useLanguage();
+  const [comparisonPosition, setComparisonPosition] = useState(50);
 
   return (
     <main className="landing-page">
       <LanguageSwitch className="landing-language" />
       <header className="landing-header">
         <a className="landing-brand" href="/" aria-label="String Art Dnipro">
-          <span aria-hidden="true">SA</span>
-          String Art Dnipro
+          <span className="brand-logo" aria-hidden="true">
+            <img src="/logo-white.png" alt="" />
+          </span>
+          <span className="brand-name">String Art Dnipro</span>
         </a>
         <nav aria-label={t("landing.navigation")}>
           <a href="#process">{t("landing.howItWorks")}</a>
@@ -82,15 +87,36 @@ export default function LandingPage() {
             <ArrowRight aria-hidden="true" size={19} />
           </a>
         </div>
-        <div className="landing-comparison" aria-label={t("landing.comparison")}>
-          <figure>
-            <img src="/family-source.jpg" alt={t("landing.sourceAlt")} />
-            <figcaption>{t("landing.yourPhoto")}</figcaption>
-          </figure>
-          <figure>
-            <img src="/family-string-art.jpg" alt={t("landing.resultAlt")} />
-            <figcaption>{t("landing.yourArtwork")}</figcaption>
-          </figure>
+        <div
+          className="landing-comparison"
+          style={{ "--comparison-position": `${comparisonPosition}%` }}
+          aria-label={t("landing.comparison")}
+        >
+          <img
+            className="landing-comparison-source"
+            src="/family-source.jpg"
+            alt={t("landing.sourceAlt")}
+          />
+          <img
+            className="landing-comparison-result"
+            src="/family-string-art.jpg"
+            alt={t("landing.resultAlt")}
+          />
+          <span className="landing-comparison-label is-result">{t("landing.yourArtwork")}</span>
+          <span className="landing-comparison-label is-source">{t("landing.yourPhoto")}</span>
+          <span className="landing-comparison-divider" aria-hidden="true">
+            <span>
+              <ArrowLeftRight size={20} strokeWidth={2.2} />
+            </span>
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={comparisonPosition}
+            onChange={(event) => setComparisonPosition(Number(event.target.value))}
+            aria-label={t("landing.comparisonSlider")}
+          />
         </div>
       </section>
 

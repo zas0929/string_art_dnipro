@@ -33,7 +33,18 @@ test("landing page leads to the generator", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "String Art Dnipro" })).toBeVisible();
+  await expect(page.locator('.landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
   await expect(page.locator('img[src="/family-string-art.jpg"]')).toBeVisible();
+  const comparisonSlider = page.locator(".landing-comparison input");
+  await expect(comparisonSlider).toHaveValue("50");
+  await comparisonSlider.scrollIntoViewIfNeeded();
+  await comparisonSlider.focus();
+  await comparisonSlider.press("End");
+  await expect(comparisonSlider).toHaveValue("100");
+  await expect(page.locator(".landing-comparison")).toHaveCSS(
+    "--comparison-position",
+    "100%",
+  );
   await page.getByRole("link", { name: "Create from photo" }).click();
   await expect(page).toHaveURL(/\/create$/);
   await waitForGenerator(page);
@@ -84,6 +95,7 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
+  await expect(page.locator('.generator-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
   await expect(page.getByLabel("Minimum distance between pins")).toHaveValue("15");
   const threadThickness = page.getByLabel("Thread thickness, mm");
   await expect(threadThickness).toHaveValue("0.19");
