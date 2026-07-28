@@ -289,12 +289,6 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
   test.setTimeout(75_000);
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, "canShare", {
-      configurable: true,
-      value: () => false,
-    });
-  });
   await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({

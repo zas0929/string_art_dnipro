@@ -107,21 +107,21 @@ textarea {
 }
 
 .brand-logo {
+  --logo-render-width: 66px;
+  --logo-y-offset: 5px;
   position: relative;
   display: block;
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
   overflow: hidden;
-  border: 1px solid currentColor;
-  border-radius: 50%;
 }
 
 .brand-logo img {
   position: absolute;
-  top: 50%;
+  top: calc(50% + var(--logo-y-offset));
   left: 50%;
-  width: 58px;
+  width: var(--logo-render-width);
   max-width: none;
   height: auto;
   transform: translate(-50%, -50%);
@@ -1430,13 +1430,11 @@ textarea {
 }
 
 .generator-brand .brand-logo {
-  flex-basis: 42px;
-  width: 42px;
-  height: 42px;
-}
-
-.generator-brand .brand-logo img {
-  width: 68px;
+  --logo-render-width: 76px;
+  --logo-y-offset: 6px;
+  flex-basis: 46px;
+  width: 46px;
+  height: 46px;
 }
 
 .generator-brand-copy {
