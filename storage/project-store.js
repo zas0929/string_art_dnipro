@@ -16,23 +16,37 @@ import {
 
 const MIGRATION_KEY_PREFIX = "string-art-cloud-migration";
 let activeStorePromise;
+let activeStoreIdentity;
 
-export function getProjectStore() {
-  if (!activeStorePromise) activeStorePromise = createProjectStore();
+export async function getProjectStore() {
+  const identity = await resolveProjectIdentity();
+  if (!activeStorePromise || activeStoreIdentity !== identity.key) {
+    activeStoreIdentity = identity.key;
+    activeStorePromise = createProjectStore(identity);
+  }
   return activeStorePromise;
 }
 
 export function resetProjectStore() {
   activeStorePromise = undefined;
+  activeStoreIdentity = undefined;
 }
 
-async function createProjectStore() {
-  if (!isSupabaseConfigured()) return createLocalAdapter();
-
+async function resolveProjectIdentity() {
+  if (!isSupabaseConfigured()) {
+    return { key: "local:unconfigured", supabase: null, userId: null };
+  }
   const supabase = createClient();
   const { data, error } = await supabase.auth.getClaims();
   const userId = data?.claims?.sub;
-  if (error || !userId) return createLocalAdapter();
+  if (error || !userId) {
+    return { key: "local:guest", supabase: null, userId: null };
+  }
+  return { key: `cloud:${userId}`, supabase, userId };
+}
+
+async function createProjectStore({ supabase, userId }) {
+  if (!supabase || !userId) return createLocalAdapter();
 
   const cloud = createCloudProjectStore(supabase, userId);
   const store = createCloudAdapter(cloud);

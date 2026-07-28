@@ -34,7 +34,14 @@ export async function signUp(_state, formData) {
     password,
     options: { emailRedirectTo: `${origin}/auth/confirm` },
   });
-  if (error) return { error: "signupFailed" };
+  if (error) {
+    console.error("Supabase signup failed", {
+      code: error.code,
+      status: error.status,
+      message: error.message,
+    });
+    return { error: getSignUpErrorKey(error) };
+  }
   if (data.session) redirect("/projects");
   return { success: "checkEmail" };
 }
@@ -53,4 +60,27 @@ function normalizeEmail(value) {
 
 function configurationError() {
   return { error: "notConfigured" };
+}
+
+function getSignUpErrorKey(error) {
+  switch (error?.code) {
+    case "email_address_invalid":
+    case "validation_failed":
+      return "invalidEmail";
+    case "email_exists":
+    case "user_already_exists":
+      return "emailAlreadyRegistered";
+    case "email_provider_disabled":
+    case "signup_disabled":
+      return "signupDisabled";
+    case "over_email_send_rate_limit":
+    case "over_request_rate_limit":
+      return "emailRateLimit";
+    case "weak_password":
+      return "weakPassword";
+    case "unexpected_failure":
+      return "signupDatabaseError";
+    default:
+      return "signupFailed";
+  }
 }
