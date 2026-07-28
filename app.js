@@ -67,6 +67,9 @@ export function mountStringArtApp(root = document) {
   const pngButton = getElement("pngButton");
   const txtButton = getElement("txtButton");
   const printButton = getElement("printButton");
+  const saveProjectButton = getElement("saveProjectButton");
+  const saveProjectLabel = getElement("saveProjectLabel");
+  const buildModeLink = getElement("buildModeLink");
   const statusText = getElement("status");
   const progress = getElement("progress");
   const pointsOut = getElement("pointsOut");
@@ -109,6 +112,8 @@ export function mountStringArtApp(root = document) {
   let cropPreviewFrame = 0;
   let uiLanguage = getStoredLanguage();
   let currentStatus = { key: null, params: {} };
+  let saveLabelKey = "panel.saveProject";
+  let saveLabelResetTimer = 0;
 
   const listen = (target, type, handler, options = {}) => {
     target.addEventListener(type, handler, {
@@ -120,6 +125,7 @@ export function mountStringArtApp(root = document) {
   listen(window, LANGUAGE_CHANGE_EVENT, (event) => {
     uiLanguage = normalizeLanguage(event.detail?.language);
     renderCurrentStatus();
+    renderSaveLabel();
     if (!state.image && state.sequence.length > 1) {
       drawSchemePlaceholder(
         state.resultSettings?.points ?? Math.max(...state.sequence) + 1,
@@ -142,6 +148,7 @@ export function mountStringArtApp(root = document) {
     state.crop.gesture = null;
     listenerController.abort();
     if (cropPreviewFrame) cancelAnimationFrame(cropPreviewFrame);
+    if (saveLabelResetTimer) clearTimeout(saveLabelResetTimer);
     if (state.cancelActiveRun) state.cancelActiveRun();
     else if (state.activeWorker) state.activeWorker.terminate();
     state.activeWorker = null;
@@ -217,6 +224,17 @@ export function mountStringArtApp(root = document) {
       setStatus("generator.printError");
       printButton.disabled = false;
     }
+  });
+
+  listen(saveProjectButton, "click", async () => {
+    if (state.sequence.length < 2 || state.running) return;
+    await saveCurrentProject();
+  });
+
+  listen(buildModeLink, "click", async (event) => {
+    if (state.sequence.length < 2 || state.running) return;
+    event.preventDefault();
+    if (await saveCurrentProject()) window.location.assign(buildModeLink.href);
   });
 
   listen(pointsInput, "input", () => {
@@ -396,9 +414,6 @@ export function mountStringArtApp(root = document) {
       });
       setExportEnabled(state.sequence.length > 1);
     } finally {
-      if (!destroyed && state.sequence.length > 1) {
-        void persistLatestPattern(settings);
-      }
       state.activeWorker = null;
       state.cancelActiveRun = null;
       setBuildButtonsDisabled(!state.image);
@@ -614,7 +629,6 @@ export function mountStringArtApp(root = document) {
     );
     progress.value = 1;
     setExportEnabled(true);
-    await persistLatestPattern(settings);
     setStatus("generator.patternUploaded", { count: lineCount });
   }
 
@@ -1187,6 +1201,41 @@ export function mountStringArtApp(root = document) {
     pngButton.disabled = !enabled;
     txtButton.disabled = !enabled;
     printButton.disabled = !enabled;
+    saveProjectButton.disabled = !enabled;
+  }
+
+  async function saveCurrentProject() {
+    if (saveLabelResetTimer) {
+      clearTimeout(saveLabelResetTimer);
+      saveLabelResetTimer = 0;
+    }
+    saveProjectButton.disabled = true;
+    buildModeLink.classList.add("is-disabled");
+    setSaveLabel("panel.savingProject");
+    try {
+      await persistLatestPattern(readSettings());
+      setSaveLabel("panel.projectSaved");
+      saveLabelResetTimer = window.setTimeout(() => {
+        saveLabelResetTimer = 0;
+        setSaveLabel("panel.saveProject");
+      }, 2200);
+      return true;
+    } catch {
+      setSaveLabel("panel.saveProject");
+      return false;
+    } finally {
+      saveProjectButton.disabled = state.sequence.length < 2 || state.running;
+      buildModeLink.classList.remove("is-disabled");
+    }
+  }
+
+  function setSaveLabel(key) {
+    saveLabelKey = key;
+    renderSaveLabel();
+  }
+
+  function renderSaveLabel() {
+    saveProjectLabel.textContent = t(saveLabelKey);
   }
 
   function setBuildButtonsDisabled(disabled) {
@@ -1227,7 +1276,7 @@ export function mountStringArtApp(root = document) {
         ? createSourceFrame(settings, resultCanvas.width).canvas.toDataURL("image/jpeg", 0.9)
         : null;
       const projectStore = await getProjectStore();
-      await projectStore.saveLatestPattern({
+      return await projectStore.saveLatestPattern({
         id,
         name: "Latest pattern",
         sequence: state.sequence.map((point) => point + 1),
@@ -1246,6 +1295,7 @@ export function mountStringArtApp(root = document) {
       setStatus("generator.projectSaveError", {
         error: error instanceof Error ? error.message : t("generator.unknownError"),
       });
+      throw error;
     }
   }
 

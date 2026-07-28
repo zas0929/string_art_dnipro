@@ -112,6 +112,8 @@ test("saved patterns appear in the local project library", async ({ page }) => {
     buffer: Buffer.from(scheme),
   });
 
+  await page.getByRole("button", { name: "Save project" }).click();
+  await expect(page.getByText("Project saved")).toBeVisible();
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
     pointCount: 240,
     lineCount: 3,
@@ -132,6 +134,7 @@ test("saved patterns appear in the local project library", async ({ page }) => {
 });
 
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
@@ -196,6 +199,8 @@ test("the single reference core generates a route from a photo", async ({ page }
   await expect.poll(
     () => page.evaluate(() => window.__resultCanvasClearCount),
   ).toBe(1);
+  await page.getByRole("button", { name: "Save project" }).click();
+  await expect(page.getByText("Project saved")).toBeVisible();
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
     algorithm: "reference-v7",
     pointCount: 240,

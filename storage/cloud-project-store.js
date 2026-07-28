@@ -134,14 +134,16 @@ export function createCloudProjectStore(supabase, userId) {
 
 async function uploadPreviews(pattern, userId, supabase, existingPaths = {}) {
   const paths = { ...existingPaths };
-  if (pattern.sourcePreviewDataUrl) {
+  const uploads = [];
+  if (pattern.sourcePreviewDataUrl) uploads.push((async () => {
     paths.source = `${userId}/${pattern.id}/source.jpg`;
     await uploadDataUrl(supabase, paths.source, pattern.sourcePreviewDataUrl);
-  }
-  if (pattern.artworkPreviewDataUrl) {
+  })());
+  if (pattern.artworkPreviewDataUrl) uploads.push((async () => {
     paths.artwork = `${userId}/${pattern.id}/artwork.png`;
     await uploadDataUrl(supabase, paths.artwork, pattern.artworkPreviewDataUrl);
-  }
+  })());
+  await Promise.all(uploads);
   return paths;
 }
 
