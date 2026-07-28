@@ -96,6 +96,11 @@ test("generator and build mode share working navigation", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
   await expect(page.locator('.generator-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
+  const pointCount = page.getByRole("spinbutton", { name: "Pins", exact: true });
+  await expect(pointCount).toHaveAttribute("max", "320");
+  await pointCount.fill("999");
+  await expect(pointCount).toHaveValue("320");
+  await pointCount.fill("240");
   await expect(page.getByLabel("Minimum distance between pins")).toHaveValue("15");
   const threadThickness = page.getByLabel("Thread thickness, mm");
   await expect(threadThickness).toHaveValue("0.19");
@@ -326,6 +331,23 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
+
+  const englishVoiceRequest = page.waitForRequest(
+    (request) => request.url().endsWith("/audio/build/en/50.m4a"),
+  );
+  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await englishVoiceRequest;
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
+
+  await page.getByRole("button", { name: "Switch to Ukrainian" }).click();
+  const ukrainianVoiceRequest = page.waitForRequest(
+    (request) => request.url().endsWith("/audio/build/uk/50.m4a"),
+  );
+  await page.getByRole("button", { name: "Старт", exact: true }).click();
+  await ukrainianVoiceRequest;
+  await page.getByRole("button", { name: "Пауза", exact: true }).click();
+  await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
+
   await page.getByRole("button", { name: "Shorten pause" }).click();
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1250");
   await expect(page.locator(".build-speed-heading output")).toHaveText("1.25 sec");

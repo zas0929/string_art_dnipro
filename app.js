@@ -1,5 +1,6 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
 import { applyImageEnhancements } from "./core/image-enhancements.js";
+import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "./core/limits.js";
 import {
   REFERENCE_LINE_STRENGTH,
   REFERENCE_LINE_WIDTH,
@@ -238,6 +239,9 @@ export function mountStringArtApp(root = document) {
   });
 
   listen(pointsInput, "input", () => {
+    if (Number(pointsInput.value) > MAX_POINT_COUNT) {
+      pointsInput.value = String(MAX_POINT_COUNT);
+    }
     if (!state.image || state.running) return;
     invalidateResult();
     drawPreparedPreview();
@@ -491,7 +495,7 @@ export function mountStringArtApp(root = document) {
 
   function readSettings() {
     return {
-      points: clampInt(pointsInput.value, 60, 600),
+      points: clampInt(pointsInput.value, MIN_POINT_COUNT, MAX_POINT_COUNT),
       lines: clampInt(linesInput.value, 100, 8000),
       sizeCm: clampNumber(sizeInput.value, 10, 200),
       threadMm: clampNumber(threadInput.value, 0.05, 1),
@@ -576,7 +580,7 @@ export function mountStringArtApp(root = document) {
     const sequence = parseSchemeText(text);
     const maxPoint = Math.max(...sequence);
     const pointCount = Math.max(
-      clampInt(pointsInput.value, 60, 600),
+      clampInt(pointsInput.value, MIN_POINT_COUNT, MAX_POINT_COUNT),
       maxPoint,
     );
     const lineCount = sequence.length - 1;
@@ -707,7 +711,11 @@ export function mountStringArtApp(root = document) {
   }
 
   function drawSourceNails() {
-    const pointCount = clampInt(pointsInput.value, 60, 600);
+    const pointCount = clampInt(
+      pointsInput.value,
+      MIN_POINT_COUNT,
+      MAX_POINT_COUNT,
+    );
     drawNails(
       sourceCtx,
       buildCirclePoints(

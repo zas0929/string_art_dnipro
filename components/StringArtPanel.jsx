@@ -7,6 +7,7 @@ import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 import LogIn from "lucide-react/dist/esm/icons/log-in.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import Save from "lucide-react/dist/esm/icons/save.mjs";
+import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "../core/limits.js";
 import { useLanguage } from "./i18n/LanguageProvider.jsx";
 
 export default function StringArtPanel() {
@@ -18,7 +19,14 @@ export default function StringArtPanel() {
         <h2>{t("panel.settings")}</h2>
         <label>
           {t("panel.pins")}
-          <input id="pointsInput" type="number" min="60" max="600" step="10" defaultValue="240" />
+          <input
+            id="pointsInput"
+            type="number"
+            min={MIN_POINT_COUNT}
+            max={MAX_POINT_COUNT}
+            step="10"
+            defaultValue="240"
+          />
         </label>
         <input id="linesInput" type="hidden" defaultValue="5000" />
         <label>

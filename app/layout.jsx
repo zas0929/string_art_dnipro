@@ -14,18 +14,10 @@ export const metadata = {
     startupImage: [],
   },
   icons: {
-    icon: [
-      {
-        url: "/pwa/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        url: "/pwa/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-    ],
+    icon: {
+      url: "/favicon.ico?v=2",
+      type: "image/x-icon",
+    },
     apple: [
       {
         url: "/pwa/apple-touch-icon.png",

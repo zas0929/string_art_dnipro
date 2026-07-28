@@ -21,6 +21,7 @@ import {
   findRecentPointMatches,
   initialBuildSessionState,
 } from "../../core/build-session.js";
+import { createBuildVoicePlayer } from "../../core/build-voice-player.js";
 import {
   createCirclePoints,
   renderStringArtBase,
@@ -30,20 +31,22 @@ import {
 import { getProjectStore } from "../../storage/project-store.js";
 
 export default function BuildMode() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
   const primedSpeechRef = useRef(null);
+  const voicePlayerRef = useRef(null);
   const projectStoreRef = useRef(null);
 
   useEffect(() => {
-    if (!("speechSynthesis" in window)) return undefined;
-    const speech = window.speechSynthesis;
-    const warmVoices = () => speech.getVoices();
-    warmVoices();
-    speech.addEventListener("voiceschanged", warmVoices);
-    return () => speech.removeEventListener("voiceschanged", warmVoices);
+    if (typeof Audio === "undefined") return undefined;
+    const player = createBuildVoicePlayer();
+    voicePlayerRef.current = player;
+    return () => {
+      player.dispose();
+      voicePlayerRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -104,8 +107,18 @@ export default function BuildMode() {
     if (state.voiceEnabled) {
       const primedSpeech = primedSpeechRef.current?.stepIndex === state.stepIndex
         ? primedSpeechRef.current.run
-        : speakBuildPoint(nextPoint, setMessage, t);
+        : playBuildPoint(
+          voicePlayerRef.current,
+          nextPoint,
+          language,
+          setMessage,
+          t,
+        );
       primedSpeechRef.current = null;
+      const followingPoint = state.pattern.sequence[state.stepIndex + 2];
+      if (followingPoint) {
+        voicePlayerRef.current?.preload(followingPoint, language);
+      }
       speechWatchdog = window.setTimeout(
         () => scheduleAdvance(0),
         state.speedMs + 1800,
@@ -122,9 +135,16 @@ export default function BuildMode() {
       cancelled = true;
       window.clearTimeout(advanceTimeout);
       window.clearTimeout(speechWatchdog);
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      voicePlayerRef.current?.stop();
     };
-  }, [state.pattern, state.playback, state.stepIndex, state.speedMs, state.voiceEnabled]);
+  }, [
+    language,
+    state.pattern,
+    state.playback,
+    state.stepIndex,
+    state.speedMs,
+    state.voiceEnabled,
+  ]);
 
   const handlePlaybackToggle = () => {
     if (state.playback !== "playing") setMessage("");
@@ -136,7 +156,13 @@ export default function BuildMode() {
       if (nextPoint) {
         primedSpeechRef.current = {
           stepIndex: state.stepIndex,
-          run: speakBuildPoint(nextPoint, setMessage, t),
+          run: playBuildPoint(
+            voicePlayerRef.current,
+            nextPoint,
+            language,
+            setMessage,
+            t,
+          ),
         };
       }
     }
@@ -524,78 +550,23 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore, t }) {
   );
 }
 
-function speakBuildPoint(point, reportError, t) {
-  let settleSpeech;
-  const finished = new Promise((resolve) => {
-    settleSpeech = resolve;
-  });
-  let settled = false;
-  const settle = (result) => {
-    if (settled) return;
-    settled = true;
-    settleSpeech(result);
-  };
-
-  if (
-    typeof window === "undefined"
-    || !("speechSynthesis" in window)
-    || !("SpeechSynthesisUtterance" in window)
-  ) {
+function playBuildPoint(player, point, language, reportError, t) {
+  if (!player) {
     reportError(t("build.voiceUnavailable"));
-    settle("unavailable");
-    return { started: false, finished };
-  }
-
-  try {
-    const speech = window.speechSynthesis;
-    const voices = speech.getVoices();
-    const isUkrainian = (voice) => voice.lang.toLowerCase().startsWith("uk");
-    const primaryVoice = voices.find((voice) => voice.default && voice.localService)
-      || voices.find((voice) => voice.default)
-      || null;
-    const fallbackVoice = voices.find((voice) => voice !== primaryVoice && isUkrainian(voice) && voice.localService)
-      || voices.find((voice) => voice !== primaryVoice && isUkrainian(voice))
-      || null;
-    const voiceAttempts = fallbackVoice ? [primaryVoice, fallbackVoice] : [primaryVoice];
-
-    const speakAttempt = (attemptIndex) => {
-      const selectedVoice = voiceAttempts[attemptIndex];
-      const utterance = new window.SpeechSynthesisUtterance(String(point));
-      if (selectedVoice) utterance.lang = selectedVoice.lang;
-      utterance.rate = 0.92;
-      utterance.volume = 1;
-      if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.onend = () => settle("ended");
-      utterance.onerror = (event) => {
-        if (
-          event.error !== "canceled"
-          && event.error !== "interrupted"
-          && attemptIndex + 1 < voiceAttempts.length
-        ) {
-          speakAttempt(attemptIndex + 1);
-          return;
-        }
-        if (event.error !== "canceled" && event.error !== "interrupted") {
-          reportError(t("build.voiceStartError"));
-        }
-        settle(event.error || "error");
-      };
-      speech.speak(utterance);
+    return {
+      started: false,
+      finished: Promise.resolve("unavailable"),
     };
-
-    if (voiceAttempts.length === 0) {
-      reportError(t("build.voiceMissing"));
-      settle("unavailable");
-    } else {
-      speech.resume();
-      speakAttempt(0);
-    }
-    return { started: true, finished };
-  } catch {
-    reportError(t("build.voiceStartError"));
-    settle("error");
-    return { started: false, finished };
   }
+
+  const run = player.play(point, language);
+  if (!run.started) {
+    reportError(t("build.voiceStartError"));
+  }
+  run.finished.then((result) => {
+    if (result === "error") reportError(t("build.voiceStartError"));
+  });
+  return run;
 }
 
 const BUILD_CANVAS_SIZE = 760;
