@@ -27,11 +27,7 @@ import {
   renderStringArtLines,
   STRING_ART_WORK_SIZE,
 } from "../../core/string-art-renderer.js";
-import {
-  loadBuildProgress,
-  loadLatestPattern,
-  saveBuildProgress,
-} from "../../storage/local-project-store.js";
+import { getProjectStore } from "../../storage/project-store.js";
 
 export default function BuildMode() {
   const { t } = useLanguage();
@@ -39,6 +35,7 @@ export default function BuildMode() {
   const [message, setMessage] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
   const primedSpeechRef = useRef(null);
+  const projectStoreRef = useRef(null);
 
   useEffect(() => {
     if (!("speechSynthesis" in window)) return undefined;
@@ -51,14 +48,16 @@ export default function BuildMode() {
 
   useEffect(() => {
     let active = true;
-    loadLatestPattern()
-      .then(async (pattern) => {
+    getProjectStore()
+      .then(async (store) => {
+        projectStoreRef.current = store;
+        const pattern = await store.loadLatestPattern();
         if (!active) return;
         if (!pattern) {
           dispatch({ type: "HYDRATE_EMPTY" });
           return;
         }
-        const progress = await loadBuildProgress(pattern.id);
+        const progress = await store.loadProgress(pattern.id);
         if (active) dispatch({ type: "LOAD_PATTERN", pattern, progress });
       })
       .catch((error) => {
@@ -74,7 +73,9 @@ export default function BuildMode() {
   useEffect(() => {
     if (!state.hydrated || !state.pattern) return;
     const timeout = window.setTimeout(() => {
-      saveBuildProgress({
+      const projectStore = projectStoreRef.current;
+      if (!projectStore) return;
+      projectStore.saveProgress({
         patternId: state.pattern.id,
         stepIndex: state.stepIndex,
         speedMs: state.speedMs,
@@ -187,7 +188,7 @@ export default function BuildMode() {
       <LanguageSwitch />
       <section className="build-workspace">
         <header className="build-header">
-          <a className="back-link" href="/">
+          <a className="back-link" href="/create">
             <ArrowLeft aria-hidden="true" size={18} />
             {t("common.generator")}
           </a>

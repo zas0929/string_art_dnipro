@@ -109,7 +109,7 @@ export default function PrintInstruction() {
         <LanguageSwitch />
         <h1>{t("print.noPattern")}</h1>
         <p>{t("print.noPatternHint")}</p>
-        <a className="command-link" href="/">
+        <a className="command-link" href="/create">
           <ArrowLeft aria-hidden="true" size={18} />
           {t("print.back")}
         </a>
@@ -122,7 +122,7 @@ export default function PrintInstruction() {
       <LanguageSwitch />
       <header className="print-toolbar">
         <div className="print-toolbar-title">
-          <a className="back-link" href="/">
+          <a className="back-link" href="/create">
             <ArrowLeft aria-hidden="true" size={18} />
             {t("common.generator")}
           </a>

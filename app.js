@@ -13,7 +13,7 @@ import {
   renderStringArtBase,
   renderStringArtLines,
 } from "./core/string-art-renderer.js";
-import { saveLatestPattern } from "./storage/local-project-store.js";
+import { getProjectStore } from "./storage/project-store.js";
 import {
   LANGUAGE_CHANGE_EVENT,
   getStoredLanguage,
@@ -1226,7 +1226,8 @@ export function mountStringArtApp(root = document) {
       const sourcePreviewDataUrl = state.image
         ? createSourceFrame(settings, resultCanvas.width).canvas.toDataURL("image/jpeg", 0.9)
         : null;
-      await saveLatestPattern({
+      const projectStore = await getProjectStore();
+      await projectStore.saveLatestPattern({
         id,
         name: "Latest pattern",
         sequence: state.sequence.map((point) => point + 1),

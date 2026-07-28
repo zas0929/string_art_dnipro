@@ -29,8 +29,18 @@ test.beforeEach(async ({ page }, testInfo) => {
   });
 });
 
-test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+test("landing page leads to the generator", async ({ page }) => {
   await page.goto("/");
+
+  await expect(page.getByRole("heading", { name: "String Art Dnipro" })).toBeVisible();
+  await expect(page.locator('img[src="/family-string-art.jpg"]')).toBeVisible();
+  await page.getByRole("link", { name: "Create from photo" }).click();
+  await expect(page).toHaveURL(/\/create$/);
+  await waitForGenerator(page);
+});
+
+test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+  await page.goto("/create");
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "Налаштування" })).toBeVisible();
@@ -53,8 +63,18 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
 });
 
+test("account page degrades gracefully before Supabase is configured", async ({ page }) => {
+  await page.goto("/login");
+
+  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await expect(page.getByText("Cloud accounts are not configured yet.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeDisabled();
+  await page.getByRole("tab", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
+});
+
 test("generator and build mode share working navigation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
@@ -80,11 +100,11 @@ test("generator and build mode share working navigation", async ({ page }) => {
     .toHaveAttribute("aria-pressed", "false");
   await expect(page.getByText("No active pattern")).toBeVisible();
   await page.getByRole("link", { name: "Generator" }).click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/create$/);
 });
 
 test("saved patterns appear in the local project library", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "library-pattern.txt",
@@ -124,7 +144,7 @@ test("the single reference core generates a route from a photo", async ({ page }
       return originalClearRect.apply(this, args);
     };
   });
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   if (testInfo.project.name === "mobile-chrome") {
     await expect.poll(() => canvasTop(page, "#sourceCanvas")).toBeLessThan(
@@ -190,7 +210,7 @@ test("the single reference core generates a route from a photo", async ({ page }
 });
 
 test("a 5000-line result keeps the source and exposes four clear variants", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "variant-scheme.txt",
@@ -237,7 +257,7 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 });
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "smoke-scheme.txt",
@@ -290,7 +310,7 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
 
 test("Print opens a configurable A4 instruction from the latest scheme", async ({ page }) => {
   test.slow();
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
     name: "print-scheme.txt",
@@ -345,7 +365,7 @@ test("Print opens a configurable A4 instruction from the latest scheme", async (
 test("generator and build mode do not overflow a mobile viewport", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile-only layout assertion");
 
-  await page.goto("/");
+  await page.goto("/create");
   await waitForGenerator(page);
   await expect(page.locator('meta[name="viewport"]')).toHaveAttribute(
     "content",
@@ -359,8 +379,7 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
 
   await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByRole("link", { name: "Generator" })).toBeVisible();
-  await expect(page.locator(".desktop-scheme-upload")).toBeHidden();
-  await expect(page.locator(".mobile-scheme-upload")).toBeVisible();
+  await expect(page.getByLabel("Upload pattern")).toHaveCount(0);
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 });
 
@@ -376,12 +395,15 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
     ...sequence.map((point, index) => `${point}____  ${index + 1}`),
   ].join("\n");
 
-  await page.goto("/build");
-  await page.getByLabel("Upload pattern").setInputFiles({
+  await page.goto("/create");
+  await waitForGenerator(page);
+  await page.locator("#schemeInput").setInputFiles({
     name: "long-mobile-scheme.txt",
     mimeType: "text/plain",
     buffer: Buffer.from(longScheme),
   });
+  await expect(page.locator("#sequenceOutput")).toHaveValue(/1 -> 74 -> 147/);
+  await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByText("Step 1 of 1601")).toBeVisible();
 
   const seek = page.locator(".build-seek");
