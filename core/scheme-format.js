@@ -1,3 +1,5 @@
+import { MAX_POINT_COUNT } from "./limits.js";
+
 export function formatSchemeText(sequence) {
   const lines = ["Points______Lines/n1____0/"];
   for (let order = 1; order < sequence.length; order++) {
@@ -72,8 +74,10 @@ function parseCsvSequence(text) {
 function validateSequence(sequence) {
   if (sequence.length < 3) throw new Error("the pattern must contain at least two connections");
   for (const point of sequence) {
-    if (!Number.isInteger(point) || point < 1 || point > 600) {
-      throw new Error(`pin ${point} is outside the 1-600 range`);
+    if (!Number.isInteger(point) || point < 1 || point > MAX_POINT_COUNT) {
+      throw new Error(
+        `pin ${point} is outside the 1-${MAX_POINT_COUNT} range`,
+      );
     }
   }
   if (sequence[0] !== 1) {

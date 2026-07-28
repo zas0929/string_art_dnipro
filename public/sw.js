@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "string-art-dnipro";
-const CACHE_VERSION = "v1";
+const CACHE_VERSION = "v2";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const NETWORK_ONLY_ROUTES = [
   "/account",
@@ -57,7 +57,7 @@ self.addEventListener("fetch", (event) => {
   if (
     url.pathname.startsWith("/_next/static/")
     || url.pathname.startsWith("/pwa/")
-    || /\.(?:png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname)
+    || /\.(?:m4a|png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname)
   ) {
     event.respondWith(cacheFirst(request));
   }

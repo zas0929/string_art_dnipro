@@ -43,3 +43,10 @@ test("parses exported CSV and checks continuity", () => {
     /sequence is broken/,
   );
 });
+
+test("rejects points above the supported maximum", () => {
+  assert.throws(
+    () => parseSchemeText("Points______Lines/n1____0/\n321____  1\n25____  2"),
+    /outside the 1-320 range/,
+  );
+});
