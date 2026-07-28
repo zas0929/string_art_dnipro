@@ -171,6 +171,7 @@ export default function ProjectsPage() {
                 <p className="project-date">
                   {formatProjectDate(project.updatedAt || project.createdAt, language)}
                 </p>
+                <ProjectProgress project={project} t={t} />
                 <div className="project-actions">
                   <button type="button" onClick={() => openProject(project.id, "/build")}>
                     <Hammer aria-hidden="true" size={17} />
@@ -198,6 +199,35 @@ export default function ProjectsPage() {
 
       {error && <p className="projects-error" role="alert">{error}</p>}
     </main>
+  );
+}
+
+function ProjectProgress({ project, t }) {
+  const total = Math.max(0, Number(project.lineCount) || 0);
+  const completed = Math.max(
+    0,
+    Math.min(total, Number(project.buildProgress?.stepIndex) || 0),
+  );
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const label = completed <= 0
+    ? t("projects.notStarted")
+    : completed >= total
+      ? t("projects.completed")
+      : t("projects.progressStep", { current: completed, total });
+
+  return (
+    <div
+      className="project-progress"
+      aria-label={t("projects.progressAria", { current: completed, total })}
+    >
+      <div className="project-progress-label">
+        <span>{label}</span>
+        <strong>{percent}%</strong>
+      </div>
+      <div className="project-progress-track" aria-hidden="true">
+        <span style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   );
 }
 

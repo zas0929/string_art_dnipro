@@ -1203,6 +1203,40 @@ textarea {
   color: #777f8b;
 }
 
+.project-progress {
+  margin-top: 13px;
+}
+
+.project-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.project-progress-label strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.project-progress-track {
+  height: 5px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #30343b;
+}
+
+.project-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
 .project-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;

@@ -41,12 +41,25 @@ export function createCloudProjectStore(supabase, userId) {
     },
 
     async listProjects() {
-      const { data, error } = await supabase
-        .from("projects")
-        .select(PROJECT_COLUMNS)
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return Promise.all((data || []).map(hydratePattern));
+      const [projectsResult, progressResult] = await Promise.all([
+        supabase
+          .from("projects")
+          .select(PROJECT_COLUMNS)
+          .order("updated_at", { ascending: false }),
+        supabase
+          .from("build_progress")
+          .select("project_id,step_index,speed_ms,voice_enabled,updated_at"),
+      ]);
+      if (projectsResult.error) throw projectsResult.error;
+      if (progressResult.error) throw progressResult.error;
+
+      const progressByProject = new Map(
+        (progressResult.data || []).map((row) => [row.project_id, cloudRowToProgress(row)]),
+      );
+      return Promise.all((projectsResult.data || []).map(async (row) => ({
+        ...await hydratePattern(row),
+        buildProgress: progressByProject.get(row.id) || null,
+      })));
     },
 
     async loadProject(projectId) {
@@ -57,6 +70,16 @@ export function createCloudProjectStore(supabase, userId) {
         .single();
       if (error) throw error;
       return hydratePattern(data);
+    },
+
+    async findProject(projectId) {
+      const { data, error } = await supabase
+        .from("projects")
+        .select(PROJECT_COLUMNS)
+        .eq("id", projectId)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? hydratePattern(data) : null;
     },
 
     async saveProject(pattern) {

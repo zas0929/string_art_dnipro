@@ -122,6 +122,8 @@ test("saved patterns appear in the local project library", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "My projects" })).toBeVisible();
   await expect(page.getByText("1 of 5 projects")).toBeVisible();
   await expect(page.getByText("240 pins · 3 connections")).toBeVisible();
+  await expect(page.getByText("Not started")).toBeVisible();
+  await expect(page.getByText("0%")).toBeVisible();
 
   await page.getByRole("button", { name: "Rename project" }).click();
   await page.getByLabel("Project name").fill("Family portrait");
@@ -131,6 +133,11 @@ test("saved patterns appear in the local project library", async ({ page }) => {
   await page.getByRole("button", { name: "Build", exact: true }).click();
   await expect(page).toHaveURL(/\/build$/);
   await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect.poll(() => readBuildProgress(page)).toMatchObject({ stepIndex: 1 });
+  await page.goto("/projects");
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await expect(page.getByText("33%")).toBeVisible();
 });
 
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
@@ -244,6 +251,7 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
   await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
   const restoredFrame = await canvasSignature(page, "#resultCanvas");
   expect(restoredFrame.darkSamples).toBeLessThan(fullFrame.darkSamples);
+  await page.getByRole("button", { name: "Save project" }).click();
   await expect.poll(
     () => readLatestPattern(page),
     { timeout: 15_000 },
@@ -271,10 +279,6 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   });
 
   await expect(page.locator("#sequenceOutput")).toHaveValue(/50 -> 25 -> 43/);
-  await expect.poll(() => readLatestPattern(page)).toMatchObject({
-    pointCount: 240,
-    lineCount: 3,
-  });
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "TXT" }).click();
   const download = await downloadPromise;

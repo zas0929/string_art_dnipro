@@ -169,6 +169,10 @@ const translations = {
       delete: "Delete project",
       deleteConfirm: "Delete “{name}” and its saved build progress?",
       summary: "{pins} pins · {lines} connections",
+      notStarted: "Not started",
+      completed: "Completed",
+      progressStep: "Step {current} of {total}",
+      progressAria: "Build progress: {current} of {total} connections",
     },
     build: {
       loading: "Loading project...",
@@ -421,6 +425,10 @@ const translations = {
       delete: "Видалити проєкт",
       deleteConfirm: "Видалити «{name}» і збережений прогрес складання?",
       summary: "{pins} точок · {lines} з’єднань",
+      notStarted: "Ще не розпочато",
+      completed: "Завершено",
+      progressStep: "Крок {current} із {total}",
+      progressAria: "Прогрес складання: {current} із {total} з’єднань",
     },
     build: {
       loading: "Завантаження проєкту...",
