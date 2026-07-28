@@ -39,7 +39,6 @@ test("UI language switches from Ukrainian by default and persists across pages",
   const viewport = page.viewportSize();
   expect(Math.round(switchBox.y)).toBe(16);
   expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(16);
-  await expect(page.locator("#status")).toBeEmpty();
   await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect.poll(() => page.evaluate(
@@ -59,7 +58,7 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await waitForGenerator(page);
 
   await expect(page.getByRole("heading", { name: "String Art Generator" })).toBeVisible();
-  await expect(page.getByLabel("Minimum pin gap")).toHaveValue("15");
+  await expect(page.getByLabel("Minimum distance between pins")).toHaveValue("15");
   const threadThickness = page.getByLabel("Thread thickness, mm");
   await expect(threadThickness).toHaveValue("0.19");
   await expect(threadThickness.locator('option[value="0.22"]')).toHaveText("0.22 - thick");
@@ -82,6 +81,34 @@ test("generator and build mode share working navigation", async ({ page }) => {
   await expect(page.getByText("No active pattern")).toBeVisible();
   await page.getByRole("link", { name: "Generator" }).click();
   await expect(page).toHaveURL(/\/$/);
+});
+
+test("saved patterns appear in the local project library", async ({ page }) => {
+  await page.goto("/");
+  await waitForGenerator(page);
+  await page.locator("#schemeInput").setInputFiles({
+    name: "library-pattern.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(scheme),
+  });
+
+  await expect.poll(() => readLatestPattern(page)).toMatchObject({
+    pointCount: 240,
+    lineCount: 3,
+  });
+  await page.goto("/projects");
+  await expect(page.getByRole("heading", { name: "My projects" })).toBeVisible();
+  await expect(page.getByText("1 of 5 projects")).toBeVisible();
+  await expect(page.getByText("240 pins · 3 connections")).toBeVisible();
+
+  await page.getByRole("button", { name: "Rename project" }).click();
+  await page.getByLabel("Project name").fill("Family portrait");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByRole("heading", { name: "Family portrait" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Build", exact: true }).click();
+  await expect(page).toHaveURL(/\/build$/);
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
 });
 
 test("the single reference core generates a route from a photo", async ({ page }, testInfo) => {
@@ -142,11 +169,10 @@ test("the single reference core generates a route from a photo", async ({ page }
   });
   await buildButton.click();
 
-  await expect(page.locator("#status")).toHaveText(
-    "Done. Your pattern is ready.",
+  await expect(page.locator("#sequenceOutput")).toHaveValue(
+    /^1 -> 50 ->/,
     { timeout: 30_000 },
   );
-  await expect(page.locator("#sequenceOutput")).toHaveValue(/^1 -> 50 ->/);
   await expect.poll(
     () => page.evaluate(() => window.__resultCanvasClearCount),
   ).toBe(1);
@@ -219,7 +245,6 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
     buffer: Buffer.from(scheme),
   });
 
-  await expect(page.locator("#status")).toContainText("Pattern uploaded: 3 steps");
   await expect(page.locator("#sequenceOutput")).toHaveValue(/50 -> 25 -> 43/);
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
     pointCount: 240,

@@ -2,6 +2,7 @@
 
 import FileImage from "lucide-react/dist/esm/icons/file-image.mjs";
 import FileText from "lucide-react/dist/esm/icons/file-text.mjs";
+import FolderOpen from "lucide-react/dist/esm/icons/folder-open.mjs";
 import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import { useLanguage } from "./i18n/LanguageProvider.jsx";
@@ -57,6 +58,11 @@ export default function StringArtPanel() {
       <a id="buildModeLink" className="command-link" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
         {t("panel.buildMode")}
+      </a>
+
+      <a className="command-link" href="/projects">
+        <FolderOpen aria-hidden="true" size={18} strokeWidth={2} />
+        {t("panel.myProjects")}
       </a>
 
       <div className="summary">
