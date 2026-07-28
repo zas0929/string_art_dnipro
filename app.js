@@ -209,7 +209,7 @@ export function mountStringArtApp(root = document) {
   }
 
   listen(pngButton, "click", () => {
-    void exportPng();
+    exportPng();
   });
   listen(txtButton, "click", () => {
     downloadText("string-art-scheme.txt", formatSchemeText(state.sequence));
@@ -1334,53 +1334,24 @@ export function mountStringArtApp(root = document) {
 
   function downloadText(filename, text) {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    downloadUrl(filename, URL.createObjectURL(blob));
+    downloadBlob(filename, blob);
   }
 
-  async function exportPng() {
+  function exportPng() {
     const frame = renderTransparentExportFrame();
     if (!frame) return;
 
     const filename = "string-art-preview.png";
-    const blob = dataUrlToBlob(frame.toDataURL("image/png"));
+    const blob = dataUrlToBlob(
+      frame.toDataURL("image/png"),
+      "application/octet-stream",
+    );
     frame.width = 1;
     frame.height = 1;
-
-    const file = new File([blob], filename, { type: "image/png" });
-    const shareData = {
-      files: [file],
-      title: "String Art",
-    };
-    let canShareFiles = false;
-    try {
-      canShareFiles = (
-        typeof navigator.share === "function"
-        && typeof navigator.canShare === "function"
-        && navigator.canShare(shareData)
-      );
-    } catch {
-      canShareFiles = false;
-    }
-    if (canShareFiles) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
-    }
-
-    const url = URL.createObjectURL(blob);
-    if (isIosBrowser()) {
-      const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) downloadUrl(filename, url);
-    } else {
-      downloadUrl(filename, url);
-    }
-    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    downloadBlob(filename, blob);
   }
 
-  function dataUrlToBlob(url) {
+  function dataUrlToBlob(url, type) {
     const [metadata, encoded] = url.split(",");
     const mimeType = metadata.match(/^data:([^;]+)/)?.[1] || "application/octet-stream";
     const binary = window.atob(encoded);
@@ -1388,12 +1359,13 @@ export function mountStringArtApp(root = document) {
     for (let index = 0; index < binary.length; index++) {
       bytes[index] = binary.charCodeAt(index);
     }
-    return new Blob([bytes], { type: mimeType });
+    return new Blob([bytes], { type: type || mimeType });
   }
 
-  function isIosBrowser() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent)
-      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  function downloadBlob(filename, blob) {
+    const url = URL.createObjectURL(blob);
+    downloadUrl(filename, url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   function downloadUrl(filename, url) {
