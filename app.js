@@ -1242,7 +1242,10 @@ export function mountStringArtApp(root = document) {
         createdAt: new Date().toISOString(),
       });
     } catch (error) {
-      console.warn("Could not save the pattern for Build Mode", error);
+      console.error("Could not save the generated project", error);
+      setStatus("generator.projectSaveError", {
+        error: error instanceof Error ? error.message : t("generator.unknownError"),
+      });
     }
   }
 
