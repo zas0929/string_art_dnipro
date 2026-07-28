@@ -826,7 +826,7 @@ function createSeekPreviewFrame(renderCache, completedLines, threadMm) {
     canvasSize: BUILD_CANVAS_SIZE,
     workSize: STRING_ART_WORK_SIZE,
     threadMm,
-    lineAlpha: Math.min(0.42, 0.16 * Math.sqrt(stride)),
+    lineAlpha: 0.28,
   });
   return { canvas, context, exact: false };
 }
