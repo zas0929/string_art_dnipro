@@ -26,10 +26,10 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const featureCards = [
-    { image: "/family-source.jpg", title: t("landing.featureMaterials"), copy: t("landing.featureMaterialsCopy") },
-    { image: "/family-string-art.jpg", title: t("landing.featureGuide"), copy: t("landing.featureGuideCopy") },
+    { image: "/board.png", title: t("landing.featureMaterials"), copy: t("landing.featureMaterialsCopy") },
+    { image: "/instruction.png", title: t("landing.featureGuide"), copy: t("landing.featureGuideCopy") },
     { image: "/owners.png", title: t("landing.featurePersonal"), copy: t("landing.featurePersonalCopy") },
-    { image: "/family-source.jpg", title: t("landing.featureSupport"), copy: t("landing.featureSupportCopy") },
+    { image: "/support.png", title: t("landing.featureSupport"), copy: t("landing.featureSupportCopy") },
   ];
 
   const benefits = [
@@ -48,7 +48,6 @@ export default function LandingPage() {
 
   return (
     <main className="landing-page">
-      <LanguageSwitch className="landing-language" />
       <header className="landing-header">
         <a className="landing-brand" href="/" aria-label="String Art Dnipro">
           <span className="brand-logo" aria-hidden="true"><img src="/logo-white.png" alt="" /></span>
@@ -60,9 +59,11 @@ export default function LandingPage() {
           <a href="#reviews" onClick={() => setMenuOpen(false)}>{t("landing.reviews")}</a>
           <a href="#kit" onClick={() => setMenuOpen(false)}>{t("landing.deliveryPayment")}</a>
           <a href="#faq" onClick={() => setMenuOpen(false)}>FAQ</a>
+          <LanguageSwitch className="landing-menu-language" />
         </nav>
         <div className="landing-header-actions">
           <a className="landing-header-cta" href="/create">{t("landing.createPattern")}</a>
+          <LanguageSwitch className="landing-header-language" />
           <a className="landing-icon-link" href="/account" aria-label={t("panel.account")}><UserRound size={18} /></a>
           <a className="landing-icon-link" href="/projects" aria-label={t("landing.projects")}><ShoppingBag size={18} /></a>
           <button
@@ -101,6 +102,12 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="landing-benefits" aria-label={t("landing.keyFeatures")}>
+        {benefits.map(({ icon: Icon, title, copy }) => (
+          <div key={title}><span><Icon size={20} /></span><p><strong>{title}</strong>{copy}</p></div>
+        ))}
+      </section>
+
       <section className="landing-feature-gallery" aria-label={t("landing.keyFeatures")}>
         {featureCards.map((item, index) => (
           <article key={item.title}>
@@ -108,12 +115,6 @@ export default function LandingPage() {
             <h2>{item.title}</h2>
             <p>{item.copy}</p>
           </article>
-        ))}
-      </section>
-
-      <section className="landing-benefits" aria-label={t("landing.keyFeatures")}>
-        {benefits.map(({ icon: Icon, title, copy }) => (
-          <div key={title}><span><Icon size={20} /></span><p><strong>{title}</strong>{copy}</p></div>
         ))}
       </section>
 
@@ -154,8 +155,10 @@ export default function LandingPage() {
             style={{ "--comparison-position": `${comparisonPosition}%` }}
             aria-label={t("landing.comparison")}
           >
-            <img className="landing-comparison-source" src="/family-source.jpg" alt={t("landing.sourceAlt")} />
-            <img className="landing-comparison-result" src="/family-string-art.jpg" alt={t("landing.resultAlt")} />
+            <span className="landing-comparison-source-mask">
+              <img className="landing-comparison-source" src="/owners-original.png" alt={t("landing.sourceAlt")} />
+            </span>
+            <img className="landing-comparison-result" src="/owners.png" alt={t("landing.resultAlt")} />
             <span className="landing-comparison-label is-result">{t("landing.yourArtwork")}</span>
             <span className="landing-comparison-label is-source">{t("landing.yourPhoto")}</span>
             <span className="landing-comparison-divider" aria-hidden="true"><span><ArrowLeftRight size={18} /></span></span>

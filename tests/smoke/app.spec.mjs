@@ -42,6 +42,7 @@ test("landing page leads to the generator", async ({ page }) => {
     await menuButton.click();
     await expect(menuButton).toHaveAttribute("aria-expanded", "true");
     await expect(page.locator("#landing-navigation")).toHaveClass(/is-open/);
+    await expect(page.locator(".landing-menu-language")).toBeVisible();
     await menuButton.click();
   }
   const comparisonSlider = page.locator(".landing-comparison input");
