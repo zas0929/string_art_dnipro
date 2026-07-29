@@ -12,7 +12,6 @@ import Menu from "lucide-react/dist/esm/icons/menu.mjs";
 import Package from "lucide-react/dist/esm/icons/package.mjs";
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.mjs";
 import ShoppingBag from "lucide-react/dist/esm/icons/shopping-bag.mjs";
-import Star from "lucide-react/dist/esm/icons/star.mjs";
 import UserRound from "lucide-react/dist/esm/icons/user-round.mjs";
 import WandSparkles from "lucide-react/dist/esm/icons/wand-sparkles.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
@@ -40,10 +39,10 @@ export default function LandingPage() {
   ];
 
   const steps = [
-    { icon: Camera, title: t("landing.stepPhoto"), copy: t("landing.stepPhotoCopy"), image: "/family-source.jpg" },
-    { icon: WandSparkles, title: t("landing.stepPattern"), copy: t("landing.stepPatternCopy"), image: "/family-string-art.jpg" },
-    { icon: Package, title: t("landing.stepKit"), copy: t("landing.stepKitCopy"), image: "/owners.png" },
-    { icon: Hammer, title: t("landing.stepBuild"), copy: t("landing.stepBuildCopy"), image: "/family-string-art.jpg" },
+    { icon: Camera, title: t("landing.stepPhoto"), copy: t("landing.stepPhotoCopy") },
+    { icon: WandSparkles, title: t("landing.stepPattern"), copy: t("landing.stepPatternCopy") },
+    { icon: Package, title: t("landing.stepKit"), copy: t("landing.stepKitCopy") },
+    { icon: Hammer, title: t("landing.stepBuild"), copy: t("landing.stepBuildCopy") },
   ];
 
   return (
@@ -55,8 +54,6 @@ export default function LandingPage() {
         </a>
         <nav id="landing-navigation" className={menuOpen ? "is-open" : ""} aria-label={t("landing.navigation")}>
           <a href="#process" onClick={() => setMenuOpen(false)}>{t("landing.howItWorks")}</a>
-          <a href="#gallery" onClick={() => setMenuOpen(false)}>{t("landing.gallery")}</a>
-          <a href="#reviews" onClick={() => setMenuOpen(false)}>{t("landing.reviews")}</a>
           <a href="#kit" onClick={() => setMenuOpen(false)}>{t("landing.deliveryPayment")}</a>
           <a href="#faq" onClick={() => setMenuOpen(false)}>FAQ</a>
           <LanguageSwitch className="landing-menu-language" />
@@ -124,13 +121,12 @@ export default function LandingPage() {
           <h2>{t("landing.processTitle")}</h2>
         </div>
         <ol>
-          {steps.map(({ icon: Icon, title, copy, image }, index) => (
+          {steps.map(({ icon: Icon, title, copy }, index) => (
             <li key={title}>
               <span>{String(index + 1).padStart(2, "0")}</span>
               <Icon aria-hidden="true" size={21} />
               <h3>{title}</h3>
               <p>{copy}</p>
-              <img src={image} alt="" />
             </li>
           ))}
         </ol>
@@ -143,13 +139,6 @@ export default function LandingPage() {
           <p>{t("landing.generatorCopy")}</p>
         </div>
         <div className="landing-demo-shell">
-          <div className="landing-demo-controls" aria-hidden="true">
-            <p>{t("landing.demoSettings")}</p>
-            <label>{t("landing.demoLines")}<strong>4 000</strong><span><i style={{ width: "76%" }} /></span></label>
-            <label>{t("landing.demoPins")}<strong>240</strong><span><i style={{ width: "54%" }} /></span></label>
-            <label>{t("landing.demoContrast")}<strong>75%</strong><span><i style={{ width: "68%" }} /></span></label>
-            <a href="/create">{t("landing.createPattern")}</a>
-          </div>
           <div
             className="landing-comparison"
             style={{ "--comparison-position": `${comparisonPosition}%` }}
@@ -163,11 +152,6 @@ export default function LandingPage() {
             <span className="landing-comparison-label is-source">{t("landing.yourPhoto")}</span>
             <span className="landing-comparison-divider" aria-hidden="true"><span><ArrowLeftRight size={18} /></span></span>
             <input type="range" min="0" max="100" value={comparisonPosition} onChange={(event) => setComparisonPosition(Number(event.target.value))} aria-label={t("landing.comparisonSlider")} />
-          </div>
-          <div className="landing-demo-result" aria-hidden="true">
-            <p>{t("landing.demoResult")}</p>
-            <dl><div><dt>{t("landing.demoTime")}</dt><dd>8–12 h</dd></div><div><dt>{t("landing.demoDifficulty")}</dt><dd>{t("landing.demoMedium")}</dd></div><div><dt>{t("landing.demoThread")}</dt><dd>≈ 1 200 m</dd></div></dl>
-            <a href="/create">{t("landing.continue")}</a>
           </div>
         </div>
       </section>
@@ -185,13 +169,10 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="landing-kit-visual" aria-hidden="true">
-            <img src="/owners.png" alt="" />
-            <span className="landing-thread-spool" />
-            <span className="landing-guide-book"><img src="/logo-white.png" alt="" /></span>
+            <img src="/kit.png" alt="" />
           </div>
         </article>
         <article className="landing-build-panel">
-          <div className="landing-build-preview"><img src="/family-string-art.jpg" alt="" /></div>
           <div className="landing-build-copy">
             <p>{t("landing.buildMode")}</p>
             <span>{t("landing.buildStep")} 1247 / 4000</span>
@@ -199,16 +180,6 @@ export default function LandingPage() {
             <div><button type="button">{t("landing.back")}</button><button type="button">{t("landing.nextStep")}</button></div>
           </div>
         </article>
-      </section>
-
-      <section id="reviews" className="landing-social-proof">
-        <div><p>{t("landing.happyCustomers")}</p><strong>4.9</strong><span aria-label="5 stars">{[1, 2, 3, 4, 5].map((item) => <Star key={item} size={17} fill="currentColor" />)}</span></div>
-        <div id="gallery" className="landing-artwork-row">
-          <img src="/family-string-art.jpg" alt={t("landing.galleryArtworkAlt")} />
-          <img src="/owners.png" alt={t("landing.galleryArtworkAlt")} />
-          <img src="/family-string-art.jpg" alt={t("landing.galleryArtworkAlt")} />
-          <img src="/owners.png" alt={t("landing.galleryArtworkAlt")} />
-        </div>
       </section>
 
       <section id="faq" className="landing-final-cta">
