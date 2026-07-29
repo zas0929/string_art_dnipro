@@ -32,9 +32,18 @@ test.beforeEach(async ({ page }, testInfo) => {
 test("landing page leads to the generator", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "String Art Dnipro" })).toBeVisible();
-  await expect(page.locator('.landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
-  await expect(page.locator('img[src="/family-string-art.jpg"]')).toBeVisible();
+  await expect(page.getByRole("heading", {
+    name: /Thread art from your photo|Картина ниткою за вашим фото/,
+  })).toBeVisible();
+  await expect(page.locator('.landing-header .landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
+  await expect(page.locator('img[src="/family-string-art.jpg"]').first()).toBeVisible();
+  const menuButton = page.locator(".landing-menu");
+  if (await menuButton.isVisible()) {
+    await menuButton.click();
+    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#landing-navigation")).toHaveClass(/is-open/);
+    await menuButton.click();
+  }
   const comparisonSlider = page.locator(".landing-comparison input");
   await expect(comparisonSlider).toHaveValue("50");
   await comparisonSlider.scrollIntoViewIfNeeded();
@@ -45,7 +54,7 @@ test("landing page leads to the generator", async ({ page }) => {
     "--comparison-position",
     "100%",
   );
-  await page.getByRole("link", { name: "Create from photo" }).click();
+  await page.locator('a[href="/create"]:visible').first().click();
   await expect(page).toHaveURL(/\/create$/);
   await waitForGenerator(page);
 });
