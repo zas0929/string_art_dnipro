@@ -1,6 +1,10 @@
 import "./globals.css";
+import { AuthSessionProvider } from "../components/auth/AuthSessionProvider.jsx";
 import { LanguageProvider } from "../components/i18n/LanguageProvider.jsx";
+import MobileNavigation from "../components/navigation/MobileNavigation.jsx";
 import ServiceWorkerRegistration from "../components/pwa/ServiceWorkerRegistration.jsx";
+import { isSupabaseConfigured } from "../lib/supabase/config.js";
+import { createClient } from "../lib/supabase/server.js";
 
 export const metadata = {
   title: "String Art Generator",
@@ -36,11 +40,32 @@ export const viewport = {
   themeColor: "#0f1310",
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  let user = null;
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getClaims();
+      if (data?.claims?.sub) {
+        user = {
+          id: data.claims.sub,
+          email: data.claims.email || "",
+        };
+      }
+    } catch {
+      user = null;
+    }
+  }
+
   return (
     <html lang="en">
       <body>
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <AuthSessionProvider user={user}>
+            <MobileNavigation />
+            {children}
+          </AuthSessionProvider>
+        </LanguageProvider>
         <ServiceWorkerRegistration />
       </body>
     </html>

@@ -2,7 +2,6 @@ const CACHE_PREFIX = "string-art-dnipro";
 const CACHE_VERSION = "v3";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const NETWORK_ONLY_ROUTES = [
-  "/account",
   "/auth",
   "/login",
   "/projects",
