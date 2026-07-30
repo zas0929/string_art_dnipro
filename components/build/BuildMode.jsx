@@ -30,6 +30,8 @@ import {
 } from "../../core/string-art-renderer.js";
 import { getProjectStore } from "../../storage/project-store.js";
 
+const ACTIVE_THREAD_COLOR = "#c79b67";
+
 export default function BuildMode() {
   const { language, t } = useLanguage();
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
@@ -674,7 +676,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         context.beginPath();
         context.moveTo(from.x, from.y);
         context.lineTo(x, y);
-        context.strokeStyle = "#2f9c4c";
+        context.strokeStyle = ACTIVE_THREAD_COLOR;
         context.lineWidth = 3;
         context.stroke();
 
@@ -686,7 +688,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         const pulse = playback === "playing" ? Math.sin(now / 110) * 1.4 : 0;
         context.beginPath();
         context.arc(x, y, 7 + pulse, 0, Math.PI * 2);
-        context.fillStyle = "#2f9c4c";
+        context.fillStyle = ACTIVE_THREAD_COLOR;
         context.fill();
         context.restore();
       }
