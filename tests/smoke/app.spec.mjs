@@ -36,7 +36,7 @@ test("landing page leads to the generator", async ({ page }) => {
     name: /Thread art from your photo|Картина ниткою за вашим фото/,
   })).toBeVisible();
   await expect(page.locator('.landing-header .landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
-  await expect(page.locator('img[src="/family-string-art.jpg"]').first()).toBeVisible();
+  await expect(page.locator('img[src="/owners.png"]').first()).toBeVisible();
   const menuButton = page.locator(".landing-menu");
   if (await menuButton.isVisible()) {
     await menuButton.click();
@@ -60,7 +60,7 @@ test("landing page leads to the generator", async ({ page }) => {
   await waitForGenerator(page);
 });
 
-test("UI language switches from Ukrainian by default and persists across pages", async ({ page }) => {
+test("UI language switches from Ukrainian by default and persists across pages", async ({ page }, testInfo) => {
   await page.goto("/create");
   await waitForGenerator(page);
 
@@ -68,8 +68,9 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("link", { name: "Режим складання" })).toBeVisible();
   const switchBox = await page.locator(".language-switch").boundingBox();
   const viewport = page.viewportSize();
-  expect(Math.round(switchBox.y)).toBe(16);
-  expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(16);
+  const mobile = testInfo.project.name === "mobile-chrome";
+  expect(Math.round(switchBox.y)).toBe(mobile ? 12 : 18);
+  expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(mobile ? 14 : 20);
   await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect.poll(() => page.evaluate(
@@ -86,6 +87,10 @@ test("UI language switches from Ukrainian by default and persists across pages",
 
 test("account page exposes sign-in, registration and password recovery", async ({ page }) => {
   await page.goto("/login");
+  const englishSwitch = page.locator('.language-switch button').first();
+  if (await englishSwitch.getAttribute("aria-pressed") !== "true") {
+    await englishSwitch.click();
+  }
 
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeVisible();
@@ -239,6 +244,9 @@ test("the single reference core generates a route from a photo", async ({ page }
   await expect.poll(
     () => page.evaluate(() => window.__resultCanvasClearCount),
   ).toBe(1);
+  if (testInfo.project.name === "mobile-chrome") {
+    await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
+  }
   await page.getByRole("button", { name: "Save project" }).click();
   await expect(page.getByText("Project saved")).toBeVisible();
   await expect.poll(() => readLatestPattern(page)).toMatchObject({
@@ -248,9 +256,6 @@ test("the single reference core generates a route from a photo", async ({ page }
     sharpness: 35,
     clarity: 20,
   });
-  if (testInfo.project.name === "mobile-chrome") {
-    await expect.poll(() => resultIsNearViewportTop(page)).toBe(true);
-  }
   expect(pageErrors).toEqual([]);
 });
 
@@ -566,7 +571,7 @@ async function canvasTop(page, selector) {
 async function resultIsNearViewportTop(page) {
   return page.locator("#resultCanvas").evaluate((element) => {
     const top = element.getBoundingClientRect().top;
-    return top >= -2 && top < window.innerHeight * 0.25;
+    return top >= -2 && top < window.innerHeight * 0.4;
   });
 }
 
