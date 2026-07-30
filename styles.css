@@ -4790,7 +4790,7 @@ textarea {
 
   .nail-readout strong {
     min-width: 3ch;
-    font-size: clamp(64px, 6vw, 88px);
+    font-size: 64px;
     font-variant-numeric: tabular-nums;
     font-weight: 650;
     line-height: 1;
@@ -4839,16 +4839,16 @@ textarea {
     .build-route {
       grid-template-columns: 140px 36px 140px;
       gap: 8px;
-      min-height: 176px;
+      min-height: 140px;
     }
 
     .nail-readout {
-      width: 140px;
-      height: 140px;
+      width: 110px;
+      height: 110px;
     }
 
     .nail-readout strong {
-      font-size: clamp(48px, 16vw, 64px);
+      font-size: 35px;
     }
 
     .route-history {
