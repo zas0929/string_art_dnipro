@@ -7,6 +7,8 @@ import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
 import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
+import MonitorCheck from "lucide-react/dist/esm/icons/monitor-check.mjs";
+import MonitorOff from "lucide-react/dist/esm/icons/monitor-off.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
@@ -36,13 +38,15 @@ export default function BuildMode() {
   const { language, t } = useLanguage();
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
+  const [wakeLockEnabled, setWakeLockEnabled] = useState(true);
+  const [wakeLockNotice, setWakeLockNotice] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
   const primedSpeechRef = useRef(null);
   const voicePlayerRef = useRef(null);
   const projectStoreRef = useRef(null);
   const wakeLockRef = useRef(null);
   const wakeLockRequestRef = useRef(null);
-  const keepScreenAwakeRef = useRef(false);
+  const keepScreenAwakeRef = useRef(true);
 
   useEffect(() => {
     if (typeof Audio === "undefined") return undefined;
@@ -53,6 +57,12 @@ export default function BuildMode() {
       voicePlayerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!wakeLockNotice) return undefined;
+    const timeout = window.setTimeout(() => setWakeLockNotice(""), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [wakeLockNotice]);
 
   useEffect(() => {
     const restoreWakeLock = () => {
@@ -109,10 +119,15 @@ export default function BuildMode() {
   }, [state.hydrated, state.pattern, state.stepIndex, state.speedMs, state.voiceEnabled]);
 
   useEffect(() => {
-    if (!state.hydrated || !state.pattern) return;
-    keepScreenAwakeRef.current = true;
-    void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
-  }, [state.hydrated, state.pattern]);
+    keepScreenAwakeRef.current = wakeLockEnabled;
+    if (!wakeLockEnabled) {
+      void releaseScreenWakeLock(wakeLockRef);
+      return;
+    }
+    if (state.hydrated && state.pattern) {
+      void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
+    }
+  }, [state.hydrated, state.pattern, wakeLockEnabled]);
 
   useEffect(() => {
     if (state.playback !== "playing" || !state.pattern) return;
@@ -210,9 +225,27 @@ export default function BuildMode() {
   };
 
   const keepScreenAwake = () => {
-    if (!state.pattern) return;
-    keepScreenAwakeRef.current = true;
+    if (!state.pattern || !wakeLockEnabled) return;
     void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
+  };
+
+  const toggleWakeLock = async () => {
+    const enabled = !wakeLockEnabled;
+    setWakeLockEnabled(enabled);
+    keepScreenAwakeRef.current = enabled;
+
+    if (!enabled) {
+      await releaseScreenWakeLock(wakeLockRef);
+      setWakeLockNotice(t("build.wakeLockDisabledNotice"));
+      return;
+    }
+
+    const acquired = state.pattern
+      ? await acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef)
+      : true;
+    setWakeLockNotice(acquired
+      ? t("build.wakeLockEnabledNotice")
+      : t("build.wakeLockUnavailableNotice"));
   };
 
   if (!state.hydrated) {
@@ -265,6 +298,18 @@ export default function BuildMode() {
               {state.voiceEnabled
                 ? <Volume2 aria-hidden="true" size={20} />
                 : <VolumeX aria-hidden="true" size={20} />}
+            </button>
+            <button
+              className="wake-lock-toggle"
+              type="button"
+              title={wakeLockEnabled ? t("build.wakeLockOff") : t("build.wakeLockOn")}
+              aria-label={wakeLockEnabled ? t("build.wakeLockOffAria") : t("build.wakeLockOnAria")}
+              aria-pressed={wakeLockEnabled}
+              onClick={toggleWakeLock}
+            >
+              {wakeLockEnabled
+                ? <MonitorCheck aria-hidden="true" size={20} />
+                : <MonitorOff aria-hidden="true" size={20} />}
             </button>
           </div>
         </header>
@@ -451,6 +496,11 @@ export default function BuildMode() {
           onClose={() => setLostDialogOpen(false)}
           onRestore={restoreLostPosition}
         />
+      )}
+      {wakeLockNotice && (
+        <div className="wake-lock-toast" role="status" aria-live="polite">
+          {wakeLockNotice}
+        </div>
       )}
     </main>
   );

@@ -1519,21 +1519,43 @@ textarea {
   gap: 10px;
 }
 
-.voice-icon-toggle {
+.voice-icon-toggle,
+.wake-lock-toggle {
   width: 42px;
   min-height: 42px;
   padding: 0;
   color: var(--muted);
 }
 
-.voice-icon-toggle[aria-pressed="true"] {
+.voice-icon-toggle[aria-pressed="true"],
+.wake-lock-toggle[aria-pressed="true"] {
   border-color: var(--line);
   color: var(--accent);
   background: #172019;
 }
 
-.voice-icon-toggle:hover {
+.voice-icon-toggle:hover,
+.wake-lock-toggle:hover {
   border-color: var(--line);
+}
+
+.wake-lock-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  z-index: 1400;
+  width: min(420px, calc(100vw - 28px));
+  padding: 12px 16px;
+  border: 1px solid #596158;
+  border-radius: 5px;
+  background: #202620;
+  color: #f3eee5;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 38%);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%);
 }
 
 .back-link {
@@ -1553,7 +1575,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   width: min(100%, 720px);
-  margin: 22px auto 0;
+  margin: 12px auto 0;
   color: var(--muted);
 }
 
@@ -1562,11 +1584,13 @@ textarea {
 }
 
 .build-canvas-wrap {
+  border-radius: 50%;
   width: min(100%, 520px);
   margin: 24px auto 0;
 }
 
 .build-canvas {
+  border-radius: 50%;
   display: block;
   width: 100%;
   aspect-ratio: 1;
@@ -3098,7 +3122,7 @@ textarea {
 
   .build-canvas-wrap {
     width: clamp(210px, 68vw, 260px);
-    margin-top: 20px;
+    margin-top: 16px;
   }
 
   .nail-readout strong {
@@ -3554,26 +3578,29 @@ textarea {
     border-bottom: 1px solid var(--line);
   }
 
-  .voice-icon-toggle {
+  .voice-icon-toggle,
+  .wake-lock-toggle {
     border: 0;
     background: transparent;
     color: #766c60;
   }
 
-  .voice-icon-toggle[aria-pressed="true"] {
+  .voice-icon-toggle[aria-pressed="true"],
+  .wake-lock-toggle[aria-pressed="true"] {
     border: 0;
     background: #ded2c1;
     color: #1a211b;
   }
 
-  .voice-icon-toggle:hover:not(:disabled) {
+  .voice-icon-toggle:hover:not(:disabled),
+  .wake-lock-toggle:hover:not(:disabled) {
     border-color: transparent;
     background: #e5daca;
   }
 
   .build-canvas-wrap {
     width: min(100%, 500px);
-    padding: 9px;
+    padding: 2px;
     border: 1px solid #c8bba9;
     background: #fffaf2;
     box-shadow: 0 14px 36px rgb(55 42 29 / 12%);
@@ -3581,13 +3608,12 @@ textarea {
 
   .build-canvas {
     border: 0;
-    border-radius: 0;
     background: #f7f1e7;
   }
 
   .build-progress-line {
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .build-progress-line strong {
@@ -4107,7 +4133,6 @@ textarea {
 
     .build-canvas-wrap {
       width: clamp(220px, 72vw, 280px);
-      padding: 6px;
       box-shadow: 0 8px 24px rgb(55 42 29 / 10%);
     }
 
@@ -4422,16 +4447,19 @@ textarea {
     border-bottom-color: #343b35;
   }
 
-  .voice-icon-toggle {
+  .voice-icon-toggle,
+  .wake-lock-toggle {
     color: #aaa79e;
   }
 
-  .voice-icon-toggle[aria-pressed="true"] {
+  .voice-icon-toggle[aria-pressed="true"],
+  .wake-lock-toggle[aria-pressed="true"] {
     background: #27271f;
     color: #d0ad7d;
   }
 
-  .voice-icon-toggle:hover:not(:disabled) {
+  .voice-icon-toggle:hover:not(:disabled),
+  .wake-lock-toggle:hover:not(:disabled) {
     background: #202620;
   }
 
