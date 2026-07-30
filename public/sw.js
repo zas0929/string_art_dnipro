@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "string-art-dnipro";
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const NETWORK_ONLY_ROUTES = [
   "/account",
@@ -54,10 +54,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Media players, especially Safari in standalone PWA mode, request M4A
+  // files in byte ranges. Cache API cannot store 206 Partial Content
+  // responses, so audio must keep the browser's native Range handling.
+  if (url.pathname.startsWith("/audio/") || /\.m4a$/i.test(url.pathname)) {
+    return;
+  }
+
   if (
     url.pathname.startsWith("/_next/static/")
     || url.pathname.startsWith("/pwa/")
-    || /\.(?:m4a|png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname)
+    || /\.(?:png|jpe?g|webp|svg|ico|woff2?)$/i.test(url.pathname)
   ) {
     event.respondWith(cacheFirst(request));
   }
