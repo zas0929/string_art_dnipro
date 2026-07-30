@@ -36,7 +36,7 @@ export default function MobileNavigation() {
   return (
     <header className="mobile-site-header">
       <a className="mobile-site-brand" href="/" aria-label="String Art Dnipro">
-        <img src="/logo-white.png" alt="" />
+        <img src="/logo-white-compact.png" alt="" />
         <span>String Art Dnipro</span>
       </a>
       <div className="mobile-site-actions">
