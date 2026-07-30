@@ -35,15 +35,15 @@ test("landing page leads to the generator", async ({ page }) => {
   await expect(page.getByRole("heading", {
     name: /Thread art from your photo|Картина ниткою за вашим фото/,
   })).toBeVisible();
-  await expect(page.locator('.landing-header .landing-brand[href="/"] img[src="/logo-white.png"]')).toBeVisible();
+  await expect(page.locator('a[href="/"] img[src="/logo-white.png"]:visible').first()).toBeVisible();
   await expect(page.locator('img[src="/owners.png"]').first()).toBeVisible();
-  const menuButton = page.locator(".landing-menu");
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-    await expect(menuButton).toHaveAttribute("aria-expanded", "true");
-    await expect(page.locator("#landing-navigation")).toHaveClass(/is-open/);
-    await expect(page.locator(".landing-menu-language")).toBeVisible();
-    await menuButton.click();
+  const mobileMenuButton = page.locator(".mobile-site-menu-toggle");
+  if (await mobileMenuButton.isVisible()) {
+    await mobileMenuButton.click();
+    await expect(mobileMenuButton).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#mobile-site-menu")).toHaveClass(/is-open/);
+    await expect(page.locator("#mobile-site-menu .language-switch")).toBeVisible();
+    await mobileMenuButton.click();
   }
   const comparisonSlider = page.locator(".landing-comparison input");
   await expect(comparisonSlider).toHaveValue("50");
@@ -66,12 +66,14 @@ test("UI language switches from Ukrainian by default and persists across pages",
 
   await expect(page.getByRole("heading", { name: "Налаштування" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Режим складання" })).toBeVisible();
-  const switchBox = await page.locator(".language-switch").boundingBox();
-  const viewport = page.viewportSize();
   const mobile = testInfo.project.name === "mobile-chrome";
-  expect(Math.round(switchBox.y)).toBe(mobile ? 12 : 18);
-  expect(Math.round(viewport.width - switchBox.x - switchBox.width)).toBe(mobile ? 14 : 20);
-  await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
+  if (mobile) {
+    await page.locator(".mobile-site-menu-toggle").click();
+    await expect(page.locator("#mobile-site-menu")).toHaveClass(/is-open/);
+  }
+  const visibleLanguageSwitch = page.locator(".language-switch:visible");
+  await expect(visibleLanguageSwitch).toHaveCount(1);
+  await visibleLanguageSwitch.getByRole("button", { name: "Перемкнути на англійську" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await expect.poll(() => page.evaluate(
     () => window.localStorage.getItem("string-art-ui-language"),
@@ -83,6 +85,25 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByText("No active pattern")).toBeVisible();
   await page.goto("/print");
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
+});
+
+test("shared mobile menu connects the main application pages", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chrome", "Mobile navigation is only rendered on narrow screens");
+
+  await page.goto("/create");
+  await waitForGenerator(page);
+  await expect(page.locator(".mobile-site-header")).toBeVisible();
+  await expect(page.locator(".app > .language-switch")).toBeHidden();
+  await page.locator(".mobile-site-menu-toggle").click();
+  await expect(page.locator('#mobile-site-menu a[href="/build"]')).toBeVisible();
+  await expect(page.locator('#mobile-site-menu a[href="/login"]')).toBeVisible();
+  await page.locator('#mobile-site-menu a[href="/build"]').click();
+  await expect(page).toHaveURL(/\/build$/);
+  await expect(page.getByText("No active pattern")).toBeVisible();
+  await expect(page.locator(".mobile-site-menu-toggle")).toHaveAttribute("aria-expanded", "false");
+
+  await page.goto("/print");
+  await expect(page.locator(".mobile-site-header")).toHaveCount(0);
 });
 
 test("account page exposes sign-in, registration and password recovery", async ({ page }) => {

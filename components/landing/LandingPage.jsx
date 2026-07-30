@@ -16,11 +16,13 @@ import UserRound from "lucide-react/dist/esm/icons/user-round.mjs";
 import WandSparkles from "lucide-react/dist/esm/icons/wand-sparkles.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useState } from "react";
+import { useAuthSession } from "../auth/AuthSessionProvider.jsx";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 export default function LandingPage() {
   const { t } = useLanguage();
+  const { user } = useAuthSession();
   const [comparisonPosition, setComparisonPosition] = useState(50);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -61,7 +63,12 @@ export default function LandingPage() {
         <div className="landing-header-actions">
           <a className="landing-header-cta" href="/create">{t("landing.createPattern")}</a>
           <LanguageSwitch className="landing-header-language" />
-          <a className="landing-icon-link" href="/account" aria-label={t("panel.account")}><UserRound size={18} /></a>
+          <a
+            className={`landing-icon-link${user ? " is-authenticated" : ""}`}
+            href={user ? "/projects" : "/login"}
+            aria-label={user ? t("common.signedIn") : t("auth.signIn")}
+            title={user?.email || t("auth.signIn")}
+          ><UserRound size={18} /></a>
           <a className="landing-icon-link" href="/projects" aria-label={t("landing.projects")}><ShoppingBag size={18} /></a>
           <button
             className="landing-menu"
@@ -191,7 +198,11 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <a className="landing-brand" href="/"><span className="brand-logo" aria-hidden="true"><img src="/logo-white.png" alt="" /></span><span>String Art Dnipro</span></a>
-        <div><a href="#process">{t("landing.howItWorks")}</a><a href="/projects">{t("landing.projects")}</a><a href="/account">{t("panel.account")}</a></div>
+        <div>
+          <a href="#process">{t("landing.howItWorks")}</a>
+          <a href="/projects">{t("landing.projects")}</a>
+          <a href={user ? "/projects" : "/login"}>{user ? t("common.signedIn") : t("auth.signIn")}</a>
+        </div>
       </footer>
     </main>
   );

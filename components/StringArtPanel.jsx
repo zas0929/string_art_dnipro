@@ -5,13 +5,17 @@ import FileText from "lucide-react/dist/esm/icons/file-text.mjs";
 import FolderOpen from "lucide-react/dist/esm/icons/folder-open.mjs";
 import ListChecks from "lucide-react/dist/esm/icons/list-checks.mjs";
 import LogIn from "lucide-react/dist/esm/icons/log-in.mjs";
+import LogOut from "lucide-react/dist/esm/icons/log-out.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import Save from "lucide-react/dist/esm/icons/save.mjs";
+import { signOut } from "../app/login/actions.js";
 import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "../core/limits.js";
+import { useAuthSession } from "./auth/AuthSessionProvider.jsx";
 import { useLanguage } from "./i18n/LanguageProvider.jsx";
 
 export default function StringArtPanel() {
   const { t } = useLanguage();
+  const { user } = useAuthSession();
 
   return (
     <aside className="panel">
@@ -80,10 +84,19 @@ export default function StringArtPanel() {
         {t("panel.myProjects")}
       </a>
 
-      <a className="command-link" href="/account">
-        <LogIn aria-hidden="true" size={18} strokeWidth={2} />
-        {t("panel.account")}
-      </a>
+      {user ? (
+        <form className="panel-auth-form" action={signOut}>
+          <button className="command-link" type="submit" title={user.email}>
+            <LogOut aria-hidden="true" size={18} strokeWidth={2} />
+            {t("auth.signOut")}
+          </button>
+        </form>
+      ) : (
+        <a className="command-link" href="/login">
+          <LogIn aria-hidden="true" size={18} strokeWidth={2} />
+          {t("auth.signInOrCreate")}
+        </a>
+      )}
 
       <div className="summary">
         <h2>{t("panel.details")}</h2>
