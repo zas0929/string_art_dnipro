@@ -4200,3 +4200,668 @@ textarea {
     }
   }
 }
+/* Dark workshop theme: the landing's warm editorial language inside a focused tool UI. */
+@media screen {
+  :where(
+    .app,
+    .build-page,
+    .build-loading,
+    .projects-page,
+    .auth-page,
+    .print-page,
+    .print-loading,
+    .print-empty
+  ) {
+    --bg: #0f1310;
+    --panel: #171c18;
+    --panel-2: #202620;
+    --text: #f3eee5;
+    --muted: #aaa79e;
+    --line: #394139;
+    --accent: #d0ad7d;
+    --accent-2: #d0ad7d;
+    --danger: #e2867e;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) .language-switch {
+    border-color: #4a5149;
+    background: #171c18;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) .language-switch button {
+    color: #aaa79e;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) .language-switch button.is-active {
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) :where(
+    .file-button,
+    button,
+    .command-link
+  ) {
+    border-color: #414941;
+    background: #1a201b;
+    color: #f3eee5;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) :where(
+    .file-button,
+    button,
+    .command-link
+  ):hover:not(:disabled) {
+    border-color: #9d7953;
+    background: #242a24;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) :where(
+    input:not([type="range"]):not([type="checkbox"]),
+    select,
+    textarea
+  ) {
+    border-color: #414941;
+    background: #111612;
+    color: #f3eee5;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) :where(
+    input:not([type="range"]):not([type="checkbox"]),
+    select,
+    textarea
+  ):focus {
+    border-color: #b38960;
+    box-shadow: 0 0 0 3px rgb(208 173 125 / 14%);
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) .back-link {
+    color: #aaa79e;
+  }
+
+  :where(.app, .build-page, .projects-page, .auth-page, .print-page) .back-link:hover {
+    color: #f3eee5;
+  }
+
+  /* Generator */
+  .workspace {
+    background: #0f1310;
+  }
+
+  .topbar {
+    border-bottom-color: #343b35;
+  }
+
+  .generator-brand-copy p,
+  .crop-control-heading,
+  .enhancement-control-heading {
+    color: #aaa79e;
+  }
+
+  .crop-control-heading output,
+  .enhancement-control-heading output {
+    color: #f3eee5;
+  }
+
+  .topbar-actions .file-button {
+    border-color: #766a58;
+    background: #171c18;
+    color: #f3eee5;
+    box-shadow: inset 0 0 0 1px rgb(238 231 220 / 4%);
+  }
+
+  .topbar-actions .file-button:hover {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  .topbar-actions .file-button:active {
+    border-color: #d8c5aa;
+    background: #d8c5aa;
+  }
+
+  .topbar-actions .file-button:focus-within {
+    outline: none;
+    border-color: #d0ad7d;
+    box-shadow: none;
+  }
+
+  #buildButton,
+  .mobile-build-button {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  #buildButton:hover:not(:disabled),
+  .mobile-build-button:hover:not(:disabled) {
+    border-color: #d8c5aa;
+    background: #d8c5aa;
+  }
+
+  .app canvas {
+    border-color: #545b54;
+    background: #070a08;
+  }
+
+  .result-column > #resultCanvas,
+  .source-column > #sourceCanvas {
+    box-shadow: 0 18px 44px rgb(0 0 0 / 30%);
+  }
+
+  #zoomInput::-webkit-slider-runnable-track {
+    border-color: #555e56;
+    background: linear-gradient(
+      to right,
+      #d0ad7d 0,
+      #d0ad7d var(--zoom-progress),
+      #303731 var(--zoom-progress),
+      #303731 100%
+    );
+  }
+
+  #zoomInput::-webkit-slider-thumb {
+    border-color: #0f1310;
+    background: #d0ad7d;
+    box-shadow: 0 0 0 1px #e3c59c;
+  }
+
+  .result-variant {
+    border-color: #3d463f;
+    background: #171c18;
+    color: #aaa79e;
+  }
+
+  .result-variant.is-selected {
+    border-color: #d0ad7d;
+    background: #25231d;
+    color: #f3eee5;
+    box-shadow: inset 0 0 0 1px #d0ad7d;
+  }
+
+  .panel {
+    border-left-color: #394139;
+    background: #171c18;
+  }
+
+  .panel label {
+    color: #aaa79e;
+  }
+
+  .panel :where(input, select, textarea),
+  .panel .actions button,
+  .panel textarea {
+    background: #111612;
+  }
+
+  .panel .command-link {
+    border-color: #394139;
+    background: transparent;
+  }
+
+  .panel .command-link:hover {
+    border-color: #9d7953;
+    background: transparent;
+    color: #d0ad7d;
+  }
+
+  .panel .summary dl div,
+  .build-summary div {
+    border-bottom-color: #394139;
+  }
+
+  /* Build mode */
+  .build-workspace {
+    background: #0f1310;
+  }
+
+  .build-header {
+    border-bottom-color: #343b35;
+  }
+
+  .voice-icon-toggle {
+    color: #aaa79e;
+  }
+
+  .voice-icon-toggle[aria-pressed="true"] {
+    background: #27271f;
+    color: #d0ad7d;
+  }
+
+  .voice-icon-toggle:hover:not(:disabled) {
+    background: #202620;
+  }
+
+  .build-canvas-wrap {
+    border-color: #736651;
+    background: #eee7dc;
+    box-shadow: 0 18px 48px rgb(0 0 0 / 34%);
+  }
+
+  .build-canvas {
+    background: #f7f1e7;
+  }
+
+  .build-progress-line,
+  .build-speed-heading,
+  .route-history,
+  .build-message {
+    color: #aaa79e;
+  }
+
+  .build-progress-line strong,
+  .build-speed-heading output {
+    color: #f3eee5;
+  }
+
+  .nail-readout {
+    border-color: #485049;
+    background: #151a16;
+  }
+
+  .nail-readout.is-next {
+    border-color: #d0ad7d;
+    background: #25231d;
+  }
+
+  .route-history li {
+    border-color: #485049;
+    background: #151a16;
+    color: #bdb9ae;
+  }
+
+  .route-history li.is-past {
+    border-color: #343b35;
+    color: #747a73;
+  }
+
+  .route-history li.is-current {
+    border-color: #d0ad7d;
+    background: #d0ad7d;
+    color: #171a17;
+  }
+
+  .route-history ol::before {
+    background: #424a43;
+  }
+
+  .build-transport .primary-transport {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  .build-transport .primary-transport:hover:not(:disabled) {
+    background: #d8c5aa;
+  }
+
+  .build-controls {
+    --panel: #151a16;
+    --panel-2: #202620;
+    --text: #f3eee5;
+    --muted: #aaa79e;
+    --line: #394139;
+    --accent: #d0ad7d;
+    --accent-2: #d0ad7d;
+    border-left-color: #394139;
+    background: #151a16;
+  }
+
+  .build-controls > button:hover:not(:disabled) {
+    background: #202620;
+  }
+
+  .build-complete strong {
+    color: #d0ad7d;
+  }
+
+  .lost-dialog-backdrop {
+    background: rgb(5 8 6 / 78%);
+  }
+
+  .lost-dialog {
+    border-color: #4b544c;
+    background: #171c18;
+    color: #f3eee5;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 48%);
+  }
+
+  .lost-dialog h2 {
+    color: #f3eee5;
+  }
+
+  .lost-dialog p,
+  .lost-point-inputs label {
+    color: #aaa79e;
+  }
+
+  .lost-point-inputs input {
+    border-color: #414941;
+    background: #0f1310;
+    color: #f3eee5;
+  }
+
+  .lost-search-button {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  /* Projects */
+  .projects-header {
+    border-bottom-color: #394139;
+  }
+
+  .projects-header p,
+  .project-meta,
+  .project-date,
+  .project-progress-label {
+    color: #aaa79e;
+  }
+
+  .project-create {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  .project-create:hover {
+    border-color: #d8c5aa;
+    background: #d8c5aa;
+    color: #171a17;
+  }
+
+  .project-card {
+    border-color: #394139;
+    background: #171c18;
+    box-shadow: 0 14px 34px rgb(0 0 0 / 22%);
+  }
+
+  .project-preview {
+    border-bottom-color: #394139;
+    background: #eee7dc;
+  }
+
+  .project-progress-track {
+    background: #303731;
+  }
+
+  .project-progress-track span {
+    background: #d0ad7d;
+  }
+
+  .projects-empty {
+    border-color: #394139;
+    background: #171c18;
+  }
+
+  .projects-empty h2 {
+    color: #f3eee5;
+  }
+
+  /* Authentication and account */
+  .auth-page {
+    background: #0f1310;
+  }
+
+  .auth-shell {
+    border-color: #4b544c;
+    background: #171c18;
+    box-shadow: 0 24px 70px rgb(0 0 0 / 34%);
+  }
+
+  .auth-heading p {
+    color: #d0ad7d;
+  }
+
+  .auth-heading span {
+    color: #aaa79e;
+  }
+
+  .auth-tabs {
+    border-color: #394139;
+    background: #101511;
+  }
+
+  .auth-tabs button {
+    background: transparent;
+    color: #aaa79e;
+  }
+
+  .auth-tabs button[aria-selected="true"] {
+    background: #252b25;
+    color: #f3eee5;
+  }
+
+  .auth-form input {
+    border-color: #414941;
+    background: #0f1310;
+    color: #f3eee5;
+  }
+
+  .auth-submit,
+  .account-action.command-link {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  .auth-submit:hover:not(:disabled),
+  .account-action.command-link:hover:not(:disabled) {
+    border-color: #d8c5aa;
+    background: #d8c5aa;
+    color: #171a17;
+  }
+
+  .auth-message {
+    background: #202620;
+  }
+
+  /* Print preparation screen. Printed sheets stay white. */
+  .print-page {
+    background: #0f1310;
+  }
+
+  .print-toolbar {
+    border-color: #414941;
+    background: rgb(23 28 24 / 97%);
+    box-shadow: 0 18px 48px rgb(0 0 0 / 34%);
+  }
+
+  .print-toolbar-title p,
+  .print-settings-group legend,
+  .print-document-heading p,
+  .print-document-heading > span {
+    color: #aaa79e;
+  }
+
+  .print-settings .print-check {
+    border-color: #414941;
+    background: #111612;
+  }
+
+  .print-action {
+    border-color: #eee7dc;
+    background: #eee7dc;
+    color: #171a17;
+  }
+
+  .print-action:hover:not(:disabled) {
+    border-color: #d8c5aa;
+    background: #d8c5aa;
+    color: #171a17;
+  }
+
+  .secondary-print-action {
+    border-color: #414941;
+    background: transparent;
+    color: #f3eee5;
+  }
+
+  .print-document-heading {
+    color: #f3eee5;
+  }
+
+  .print-loading,
+  .print-empty,
+  .build-loading {
+    background: #0f1310;
+    color: #aaa79e;
+  }
+
+  .print-empty h1 {
+    color: #f3eee5;
+  }
+
+  /* One sans-serif voice across the storefront and every application surface. */
+  :where(
+    .landing-page,
+    .app,
+    .build-page,
+    .projects-page,
+    .auth-page,
+    .print-page,
+    .lost-dialog
+  ),
+  :where(
+    .landing-page,
+    .app,
+    .build-page,
+    .projects-page,
+    .auth-page,
+    .print-page,
+    .lost-dialog
+  ) * {
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  }
+
+  .topbar-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    width: auto;
+    max-width: none;
+  }
+
+  .topbar-actions .file-button,
+  .topbar-actions #buildButton {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: max-content;
+    white-space: nowrap;
+  }
+
+  .panel #saveProjectButton,
+  .panel #buildModeLink,
+  .panel a.command-link[href="/projects"],
+  .panel a.command-link[href="/account"] {
+    min-height: 46px;
+    padding: 0 12px;
+    border: 1px solid #414941;
+    background: #151a16;
+  }
+
+  .panel #saveProjectButton:hover:not(:disabled),
+  .panel #buildModeLink:hover,
+  .panel a.command-link[href="/projects"]:hover,
+  .panel a.command-link[href="/account"]:hover {
+    border-color: #d0ad7d;
+    background: #24251f;
+    color: #f3eee5;
+  }
+
+  .build-route {
+    grid-template-columns: 220px 52px 220px;
+    gap: 28px;
+    min-height: 264px;
+  }
+
+  .nail-readout {
+    width: 220px;
+    max-width: none;
+    height: 220px;
+    aspect-ratio: auto;
+  }
+
+  .nail-readout strong {
+    min-width: 3ch;
+    font-size: clamp(64px, 6vw, 88px);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .route-history ol {
+    grid-template-columns: repeat(7, 38px);
+    gap: 9px;
+  }
+
+  .route-history li,
+  .route-history li.is-current {
+    width: 38px;
+    height: 38px;
+    transform: none;
+  }
+
+  @media (max-width: 980px) {
+    .panel {
+      border-top-color: #394139;
+      background: #171c18;
+    }
+
+    .build-controls {
+      border-top-color: #394139;
+      background: #151a16;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .topbar-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: 100%;
+    }
+
+    .topbar-actions .file-button,
+    .topbar-actions #buildButton {
+      width: 100%;
+      min-width: 0;
+      white-space: normal;
+    }
+
+    .build-route {
+      grid-template-columns: 140px 36px 140px;
+      gap: 8px;
+      min-height: 176px;
+    }
+
+    .nail-readout {
+      width: 140px;
+      height: 140px;
+    }
+
+    .nail-readout strong {
+      font-size: clamp(48px, 16vw, 64px);
+    }
+
+    .route-history {
+      gap: 8px;
+    }
+
+    .route-history ol {
+      grid-template-columns: repeat(7, 34px);
+      gap: 5px;
+    }
+
+    .route-history li,
+    .route-history li.is-current {
+      width: 34px;
+      height: 34px;
+    }
+  }
+}
