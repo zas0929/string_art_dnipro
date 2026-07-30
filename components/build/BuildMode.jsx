@@ -40,6 +40,9 @@ export default function BuildMode() {
   const primedSpeechRef = useRef(null);
   const voicePlayerRef = useRef(null);
   const projectStoreRef = useRef(null);
+  const wakeLockRef = useRef(null);
+  const wakeLockRequestRef = useRef(null);
+  const keepScreenAwakeRef = useRef(false);
 
   useEffect(() => {
     if (typeof Audio === "undefined") return undefined;
@@ -48,6 +51,20 @@ export default function BuildMode() {
     return () => {
       player.dispose();
       voicePlayerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const restoreWakeLock = () => {
+      if (document.visibilityState !== "visible" || !keepScreenAwakeRef.current) return;
+      void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
+    };
+
+    document.addEventListener("visibilitychange", restoreWakeLock);
+    return () => {
+      document.removeEventListener("visibilitychange", restoreWakeLock);
+      keepScreenAwakeRef.current = false;
+      void releaseScreenWakeLock(wakeLockRef);
     };
   }, []);
 
@@ -90,6 +107,12 @@ export default function BuildMode() {
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [state.hydrated, state.pattern, state.stepIndex, state.speedMs, state.voiceEnabled]);
+
+  useEffect(() => {
+    if (!state.hydrated || !state.pattern) return;
+    keepScreenAwakeRef.current = true;
+    void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
+  }, [state.hydrated, state.pattern]);
 
   useEffect(() => {
     if (state.playback !== "playing" || !state.pattern) return;
@@ -186,6 +209,12 @@ export default function BuildMode() {
     dispatch({ type: "SET_SPEED", speedMs: state.speedMs + delta });
   };
 
+  const keepScreenAwake = () => {
+    if (!state.pattern) return;
+    keepScreenAwakeRef.current = true;
+    void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
+  };
+
   if (!state.hydrated) {
     return (
       <main className="build-loading">
@@ -212,7 +241,11 @@ export default function BuildMode() {
       });
 
   return (
-    <main className="build-page">
+    <main
+      className="build-page"
+      onPointerDownCapture={keepScreenAwake}
+      onKeyDownCapture={keepScreenAwake}
+    >
       <LanguageSwitch />
       <section className="build-workspace">
         <header className="build-header">
@@ -569,6 +602,44 @@ function playBuildPoint(player, point, language, reportError, t) {
     if (result === "error") reportError(t("build.voiceStartError"));
   });
   return run;
+}
+
+async function acquireScreenWakeLock(wakeLockRef, requestRef) {
+  if (
+    typeof navigator === "undefined"
+    || !("wakeLock" in navigator)
+    || document.visibilityState !== "visible"
+    || wakeLockRef.current
+  ) {
+    return false;
+  }
+  if (requestRef.current) return requestRef.current;
+
+  const request = navigator.wakeLock.request("screen")
+    .then((sentinel) => {
+      wakeLockRef.current = sentinel;
+      sentinel.addEventListener("release", () => {
+        if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
+      }, { once: true });
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => {
+      if (requestRef.current === request) requestRef.current = null;
+    });
+  requestRef.current = request;
+  return request;
+}
+
+async function releaseScreenWakeLock(wakeLockRef) {
+  const sentinel = wakeLockRef.current;
+  wakeLockRef.current = null;
+  if (!sentinel || sentinel.released) return;
+  try {
+    await sentinel.release();
+  } catch {
+    // The browser may release the lock first when the page becomes hidden.
+  }
 }
 
 const BUILD_CANVAS_SIZE = 760;
