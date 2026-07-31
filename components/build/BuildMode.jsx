@@ -57,7 +57,7 @@ export default function BuildMode() {
   const speechRestartTimerRef = useRef(0);
   const keepListeningRef = useRef(false);
   const speechCommandHandlerRef = useRef(null);
-  const lastSpeechCommandRef = useRef({ transcript: "", at: 0 });
+  const lastSpeechCommandRef = useRef({ resultIndex: -1, transcript: "" });
   const languageRef = useRef(language);
   const translationRef = useRef(t);
   languageRef.current = language;
@@ -95,8 +95,8 @@ export default function BuildMode() {
     setSpeechControlSupported(true);
     const recognition = new Recognition();
     recognition.continuous = true;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 5;
     recognition.lang = speechRecognitionLanguage(languageRef.current);
     speechRecognitionRef.current = recognition;
 
@@ -118,18 +118,23 @@ export default function BuildMode() {
       }, 240);
     };
 
-    recognition.onstart = () => setSpeechControlEnabled(true);
+    recognition.onstart = () => {
+      lastSpeechCommandRef.current = { resultIndex: -1, transcript: "" };
+      setSpeechControlEnabled(true);
+    };
     recognition.onresult = (event) => {
       for (let index = event.resultIndex; index < event.results.length; index++) {
         const result = event.results[index];
-        if (!result.isFinal) continue;
-        const transcript = result[0]?.transcript?.trim();
-        if (!transcript) continue;
-        const now = Date.now();
-        const previous = lastSpeechCommandRef.current;
-        if (previous.transcript === transcript && now - previous.at < 900) continue;
-        lastSpeechCommandRef.current = { transcript, at: now };
-        speechCommandHandlerRef.current?.(transcript);
+        for (let alternativeIndex = 0; alternativeIndex < result.length; alternativeIndex++) {
+          const transcript = result[alternativeIndex]?.transcript?.trim();
+          if (!transcript) continue;
+          const previous = lastSpeechCommandRef.current;
+          if (previous.resultIndex === index && previous.transcript === transcript) break;
+          const handled = speechCommandHandlerRef.current?.(transcript);
+          if (!handled) continue;
+          lastSpeechCommandRef.current = { resultIndex: index, transcript };
+          break;
+        }
       }
     };
     recognition.onerror = (event) => {
@@ -393,7 +398,7 @@ export default function BuildMode() {
 
   speechCommandHandlerRef.current = (transcript) => {
     const command = parseBuildVoiceCommand(transcript, language);
-    if (!command || !state.pattern) return;
+    if (!command || !state.pattern) return false;
     setSpeechControlNotice(t("build.voiceCommandAccepted", { command: transcript }));
 
     switch (command.type) {
@@ -452,6 +457,7 @@ export default function BuildMode() {
       default:
         break;
     }
+    return true;
   };
 
   if (!state.hydrated) {
@@ -883,7 +889,12 @@ function playBuildPoint(player, point, language, reportError, t) {
 }
 
 function speechRecognitionLanguage(language) {
-  return language === "en" ? "en-US" : "uk-UA";
+  if (language === "en") return "en-US";
+  if (typeof navigator !== "undefined") {
+    const preferred = navigator.languages?.find((value) => /^(ru|uk)(-|$)/i.test(value));
+    if (preferred) return preferred;
+  }
+  return "uk-UA";
 }
 
 async function acquireScreenWakeLock(wakeLockRef, requestRef) {

@@ -5,10 +5,15 @@ import { parseBuildVoiceCommand } from "../core/build-voice-command.js";
 
 test("parses Ukrainian and common Russian build commands", () => {
   assert.deepEqual(parseBuildVoiceCommand("Старт", "uk"), { type: "play" });
+  assert.deepEqual(parseBuildVoiceCommand("продолжай", "uk"), { type: "play" });
   assert.deepEqual(parseBuildVoiceCommand("Далі", "uk"), { type: "next" });
+  assert.deepEqual(parseBuildVoiceCommand("далее", "uk"), { type: "next" });
   assert.deepEqual(parseBuildVoiceCommand("давай назад", "uk"), { type: "previous" });
   assert.deepEqual(parseBuildVoiceCommand("Ще раз", "uk"), { type: "repeat" });
   assert.deepEqual(parseBuildVoiceCommand("БЛЯ", "uk"), { type: "pause" });
+  assert.deepEqual(parseBuildVoiceCommand("блять", "uk"), { type: "pause" });
+  assert.deepEqual(parseBuildVoiceCommand("ну блин", "uk"), { type: "pause" });
+  assert.deepEqual(parseBuildVoiceCommand("бляха муха", "uk"), { type: "pause" });
   assert.deepEqual(parseBuildVoiceCommand("Я потерялся", "uk"), { type: "lost" });
   assert.deepEqual(parseBuildVoiceCommand("Вимкни звук", "uk"), { type: "voice_off" });
 });
