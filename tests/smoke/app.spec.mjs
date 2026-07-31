@@ -486,6 +486,32 @@ test("generator and build mode do not overflow a mobile viewport", async ({ page
   await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
 });
 
+test("generator header remains stable while resizing a desktop viewport", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chrome", "Desktop-only responsive assertion");
+
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await page.goto("/create");
+  await waitForGenerator(page);
+  await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
+
+  const workspaceBox = await page.locator(".workspace").boundingBox();
+  const panelBox = await page.locator(".panel").boundingBox();
+  expect(panelBox.y).toBeGreaterThanOrEqual(workspaceBox.y + workspaceBox.height - 1);
+
+  await page.setViewportSize({ width: 800, height: 900 });
+  await expect.poll(() => hasHorizontalOverflow(page)).toBe(false);
+  const brandBox = await page.locator(".generator-brand").boundingBox();
+  const actionBoxes = await page.locator(".topbar-actions > *").evaluateAll((elements) => (
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    })
+  ));
+  expect(actionBoxes).toHaveLength(3);
+  expect(actionBoxes[0].top).toBeGreaterThanOrEqual(brandBox.y + brandBox.height);
+  expect(new Set(actionBoxes.map(({ top }) => Math.round(top))).size).toBe(1);
+});
+
 test("build canvas survives repeated mobile seeking", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-chrome", "Mobile-only canvas assertion");
 
