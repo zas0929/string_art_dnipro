@@ -506,6 +506,7 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
     buffer: Buffer.from(longScheme),
   });
   await expect(page.locator("#sequenceOutput")).toHaveValue(/1 -> 74 -> 147/);
+  await page.waitForTimeout(750);
   await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByText("Step 1 of 1601")).toBeVisible();
 
@@ -523,6 +524,7 @@ test("build canvas survives repeated mobile seeking", async ({ page }, testInfo)
   );
   await page.waitForTimeout(700);
   const backwardFrame = await canvasSignature(page);
+  expect(backwardFrame).toEqual(immediateBackwardFrame);
   expect(backwardFrame.hash).not.toBe(forwardFrame.hash);
 
   await setRangeValue(seek, 1200);

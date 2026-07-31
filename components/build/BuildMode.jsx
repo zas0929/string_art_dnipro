@@ -693,7 +693,7 @@ async function releaseScreenWakeLock(wakeLockRef) {
 }
 
 const BUILD_CANVAS_SIZE = 760;
-const SEEK_PREVIEW_LINE_LIMIT = 480;
+const SEEK_CHECKPOINT_INTERVAL = 500;
 
 function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
   const { t } = useLanguage();
@@ -735,6 +735,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         pattern,
         base,
         baseCanvas,
+        checkpoints: new Map([[0, cloneCanvas(baseCanvas)]]),
         displayPoints,
         workPoints,
         allLines,
@@ -746,40 +747,34 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
     const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
     const linesToAdd = completedLines - renderCache.renderedLines;
     const canExtendCurrentFrame = linesToAdd >= 0 && linesToAdd <= 120;
-    let needsExactRebuild = !canExtendCurrentFrame;
-    let previewFrame = null;
     if (canExtendCurrentFrame && linesToAdd > 0) {
-      renderStringArtLines(renderCache.base, renderCache.allLines, renderCache.workPoints, {
-        canvasSize: BUILD_CANVAS_SIZE,
-        workSize: STRING_ART_WORK_SIZE,
-        threadMm: pattern.threadMm ?? 0.19,
-        startIndex: renderCache.renderedLines,
-        endIndex: completedLines,
-      });
+      const extendedFrame = renderLinesWithCheckpoints(
+        renderCache,
+        renderCache.base,
+        renderCache.renderedLines,
+        completedLines,
+        pattern.threadMm ?? 0.19,
+      );
+      renderCache.baseCanvas = extendedFrame.canvas;
+      renderCache.base = extendedFrame.context;
       renderCache.renderedLines = completedLines;
-    } else if (needsExactRebuild) {
-      previewFrame = createSeekPreviewFrame(
+    } else if (!canExtendCurrentFrame) {
+      const exactFrame = createExactSeekFrame(
         renderCache,
         completedLines,
         pattern.threadMm ?? 0.19,
       );
-      if (previewFrame.exact) {
-        renderCache.baseCanvas = previewFrame.canvas;
-        renderCache.base = previewFrame.context;
-        renderCache.renderedLines = completedLines;
-        needsExactRebuild = false;
-      }
+      renderCache.baseCanvas = exactFrame.canvas;
+      renderCache.base = exactFrame.context;
+      renderCache.renderedLines = completedLines;
     }
 
     const { displayPoints } = renderCache;
     const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
     const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
-    let activeBaseCanvas = previewFrame?.canvas ?? renderCache.baseCanvas;
+    const activeBaseCanvas = renderCache.baseCanvas;
     let animationStartedAt = performance.now();
-    let active = true;
     let animationFrame = 0;
-    let rebuildFrame = 0;
-    let rebuildTimer = 0;
 
     const render = (now) => {
       context.clearRect(0, 0, BUILD_CANVAS_SIZE, BUILD_CANVAS_SIZE);
@@ -825,52 +820,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
 
     restartAnimation();
 
-    if (needsExactRebuild) {
-      rebuildTimer = window.setTimeout(() => {
-        if (!active) return;
-        const nextCanvas = document.createElement("canvas");
-        nextCanvas.width = BUILD_CANVAS_SIZE;
-        nextCanvas.height = BUILD_CANVAS_SIZE;
-        const nextContext = nextCanvas.getContext("2d");
-        if (!nextContext) return;
-
-        renderStringArtBase(
-          nextContext,
-          renderCache.displayPoints.length,
-          BUILD_CANVAS_SIZE,
-          { outline: false },
-        );
-        let cursor = 0;
-        const renderChunk = () => {
-          if (!active) return;
-          const chunkEnd = Math.min(cursor + 160, completedLines);
-          renderStringArtLines(nextContext, renderCache.allLines, renderCache.workPoints, {
-            canvasSize: BUILD_CANVAS_SIZE,
-            workSize: STRING_ART_WORK_SIZE,
-            threadMm: pattern.threadMm ?? 0.19,
-            startIndex: cursor,
-            endIndex: chunkEnd,
-          });
-          cursor = chunkEnd;
-          if (cursor < completedLines) {
-            rebuildFrame = requestAnimationFrame(renderChunk);
-            return;
-          }
-
-          renderCache.baseCanvas = nextCanvas;
-          renderCache.base = nextContext;
-          renderCache.renderedLines = completedLines;
-          activeBaseCanvas = nextCanvas;
-          restartAnimation();
-        };
-        renderChunk();
-      }, 60);
-    }
-
     return () => {
-      active = false;
-      window.clearTimeout(rebuildTimer);
-      cancelAnimationFrame(rebuildFrame);
       cancelAnimationFrame(animationFrame);
     };
   }, [pattern, playback, speedMs, stepIndex]);
@@ -888,41 +838,56 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
   );
 }
 
-function createSeekPreviewFrame(renderCache, completedLines, threadMm) {
-  const canvas = document.createElement("canvas");
-  canvas.width = BUILD_CANVAS_SIZE;
-  canvas.height = BUILD_CANVAS_SIZE;
+function createExactSeekFrame(renderCache, completedLines, threadMm) {
+  const checkpointStep = findNearestCheckpoint(renderCache.checkpoints, completedLines);
+  const canvas = cloneCanvas(renderCache.checkpoints.get(checkpointStep));
   const context = canvas.getContext("2d");
-  if (!context) return { canvas, context: renderCache.base, exact: false };
-
-  renderStringArtBase(
+  return renderLinesWithCheckpoints(
+    renderCache,
     context,
-    renderCache.displayPoints.length,
-    BUILD_CANVAS_SIZE,
-    { outline: false },
+    checkpointStep,
+    completedLines,
+    threadMm,
   );
-  if (completedLines <= SEEK_PREVIEW_LINE_LIMIT) {
+}
+
+function renderLinesWithCheckpoints(renderCache, context, startIndex, endIndex, threadMm) {
+  let cursor = startIndex;
+  while (cursor < endIndex) {
+    const nextCheckpoint = (Math.floor(cursor / SEEK_CHECKPOINT_INTERVAL) + 1)
+      * SEEK_CHECKPOINT_INTERVAL;
+    const chunkEnd = Math.min(endIndex, nextCheckpoint);
     renderStringArtLines(context, renderCache.allLines, renderCache.workPoints, {
       canvasSize: BUILD_CANVAS_SIZE,
       workSize: STRING_ART_WORK_SIZE,
       threadMm,
-      endIndex: completedLines,
+      startIndex: cursor,
+      endIndex: chunkEnd,
     });
-    return { canvas, context, exact: true };
+    cursor = chunkEnd;
+    if (cursor === nextCheckpoint) {
+      if (!renderCache.checkpoints.has(cursor)) {
+        renderCache.checkpoints.set(cursor, cloneCanvas(context.canvas));
+      }
+      const continuationCanvas = cloneCanvas(renderCache.checkpoints.get(cursor));
+      context = continuationCanvas.getContext("2d");
+    }
   }
+  return { canvas: context.canvas, context };
+}
 
-  const stride = completedLines / SEEK_PREVIEW_LINE_LIMIT;
-  const sampledLines = Array.from(
-    { length: SEEK_PREVIEW_LINE_LIMIT },
-    (_, index) => renderCache.allLines[
-      Math.min(completedLines - 1, Math.floor((index + 0.5) * stride))
-    ],
-  );
-  renderStringArtLines(context, sampledLines, renderCache.workPoints, {
-    canvasSize: BUILD_CANVAS_SIZE,
-    workSize: STRING_ART_WORK_SIZE,
-    threadMm,
-    lineAlpha: 0.28,
+function findNearestCheckpoint(checkpoints, completedLines) {
+  let nearest = 0;
+  checkpoints.forEach((_, step) => {
+    if (step <= completedLines && step > nearest) nearest = step;
   });
-  return { canvas, context, exact: false };
+  return nearest;
+}
+
+function cloneCanvas(source) {
+  const canvas = document.createElement("canvas");
+  canvas.width = BUILD_CANVAS_SIZE;
+  canvas.height = BUILD_CANVAS_SIZE;
+  canvas.getContext("2d")?.drawImage(source, 0, 0);
+  return canvas;
 }
