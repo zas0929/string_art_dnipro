@@ -730,7 +730,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       const base = baseCanvas.getContext("2d");
       if (!base) return undefined;
 
-      renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE);
+      renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE, { outline: false });
       renderCache = {
         pattern,
         base,
@@ -838,6 +838,7 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
           nextContext,
           renderCache.displayPoints.length,
           BUILD_CANVAS_SIZE,
+          { outline: false },
         );
         let cursor = 0;
         const renderChunk = () => {
@@ -898,6 +899,7 @@ function createSeekPreviewFrame(renderCache, completedLines, threadMm) {
     context,
     renderCache.displayPoints.length,
     BUILD_CANVAS_SIZE,
+    { outline: false },
   );
   if (completedLines <= SEEK_PREVIEW_LINE_LIMIT) {
     renderStringArtLines(context, renderCache.allLines, renderCache.workPoints, {

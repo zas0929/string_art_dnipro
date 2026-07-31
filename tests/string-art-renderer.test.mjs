@@ -68,3 +68,28 @@ test("can render the String Art base without an opaque background", () => {
   assert.equal(clears, 1);
   assert.equal(fills, 0);
 });
+
+test("can render nails without connecting them with an outline", () => {
+  let strokes = 0;
+  let fills = 0;
+  const context = {
+    canvas: { width: 200 },
+    clearRect() {},
+    fillRect() {},
+    save() {},
+    beginPath() {},
+    arc() {},
+    clip() {},
+    restore() {},
+    stroke() { strokes++; },
+    fill() { fills++; },
+  };
+
+  renderStringArtBase(context, 4, 200, {
+    showLabels: false,
+    outline: false,
+  });
+
+  assert.equal(strokes, 0);
+  assert.equal(fills, 4);
+});

@@ -5108,8 +5108,12 @@ textarea {
     gap: 0;
   }
 
+  .generator-brand-copy h1 {
+    display: none;
+  }
+
   .topbar {
-    padding-top: 8px;
+    padding-top: 0;
   }
 
   .build-header {

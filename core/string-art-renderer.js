@@ -21,6 +21,7 @@ export function renderStringArtBase(
   const center = canvasSize / 2;
   const radius = center - 20;
   const drawBackground = options.background ?? true;
+  const drawOutline = options.outline ?? true;
   context.clearRect(0, 0, canvasSize, canvasSize);
 
   if (drawBackground) {
@@ -36,11 +37,13 @@ export function renderStringArtBase(
     context.restore();
   }
 
-  context.strokeStyle = "#2d2f34";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.arc(center, center, radius, 0, Math.PI * 2);
-  context.stroke();
+  if (drawOutline) {
+    context.strokeStyle = "#2d2f34";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(center, center, radius, 0, Math.PI * 2);
+    context.stroke();
+  }
   renderNails(
     context,
     createCirclePoints(pointCount, radius, center, center),
