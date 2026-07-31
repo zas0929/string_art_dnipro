@@ -2625,6 +2625,32 @@ input[type="range"] {
   grid-template-columns: minmax(90px, 0.7fr) minmax(100px, 0.85fr) minmax(130px, 1fr) minmax(150px, 1.1fr);
 }
 
+.qr-settings-grid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.qr-settings-grid .print-check {
+  flex: 1 1 230px;
+}
+
+.qr-settings-grid button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  gap: 7px;
+}
+
+.qr-settings-message {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .print-settings label {
   min-width: 0;
 }
@@ -2781,22 +2807,49 @@ input[type="range"] {
   text-align: center;
 }
 
-.cover-brand {
+.cover-footer {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8mm;
+  gap: 18mm;
+}
+
+.cover-brand,
+.cover-build-qr {
   display: grid;
   justify-items: center;
   gap: 2mm;
-  margin-top: 8mm;
   color: #111;
 }
 
-.cover-brand span {
+.cover-brand span,
+.cover-build-qr span {
+  max-width: 52mm;
   font-size: 3.1mm;
+  line-height: 1.25;
+  text-align: center;
 }
 
 .cover-brand img {
   display: block;
   width: 39mm;
   height: auto;
+}
+
+.cover-footer.has-build-qr .cover-brand img,
+.cover-build-qr img {
+  display: block;
+  width: 34mm;
+  height: 34mm;
+  object-fit: contain;
+}
+
+.shared-build-error {
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
 }
 
 .instruction-sheet {

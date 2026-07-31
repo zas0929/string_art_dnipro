@@ -450,6 +450,39 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("43");
 });
 
+test("a buyer QR link opens Build Mode and restores local progress", async ({ page }) => {
+  const token = "0123456789abcdef0123456789abcdef";
+  const projectId = "a2d5e131-5257-4ee8-939d-d19033956921";
+  await page.route("**/rest/v1/rpc/get_shared_pattern", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([{
+        project_id: projectId,
+        name: "Buyer portrait",
+        sequence: [1, 50, 25],
+        point_count: 240,
+        line_count: 2,
+        updated_at: "2026-07-31T10:00:00.000Z",
+      }]),
+    });
+  });
+
+  await page.goto(`/s/${token}`);
+  await expect(page.getByText("Step 1 of 2")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
+  await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
+  await page.getByRole("button", { name: "Next" }).click();
+  await expect(page.getByText("Step 2 of 2")).toBeVisible();
+  await expect.poll(() => readBuildProgressById(page, projectId)).toMatchObject({
+    stepIndex: 1,
+  });
+
+  await page.reload();
+  await expect(page.getByText("Step 2 of 2")).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator(".nail-readout strong").first()).toHaveText("50");
+});
+
 test("Print opens a configurable A4 instruction from the latest scheme", async ({ page }) => {
   test.slow();
   await page.goto("/create");
@@ -644,6 +677,28 @@ async function readBuildProgress(page) {
       database.close();
     }
   });
+}
+
+async function readBuildProgressById(page, projectId) {
+  return page.evaluate(async (id) => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("string-art-generator", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const request = database
+          .transaction("local-project", "readonly")
+          .objectStore("local-project")
+          .get(`build-progress:${id}`);
+        request.onsuccess = () => resolve(request.result ?? null);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      database.close();
+    }
+  }, projectId);
 }
 
 async function hasHorizontalOverflow(page) {

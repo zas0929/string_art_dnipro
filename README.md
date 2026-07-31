@@ -13,7 +13,10 @@ entirely in the browser, so source photos are not sent to a server.
 - Multiple thread thickness presets from `0.11 mm` to `0.30 mm`.
 - TXT pattern import and export, plus PNG artwork export.
 - Build Mode with animated progress, manual seeking, adjustable speed, voice
-  guidance, automatic progress restoration, and the "I'm lost" route finder.
+  guidance, voice commands, Wake Lock, automatic progress restoration, and the
+  "I'm lost" route finder.
+- Buyer QR links that open a published pattern directly in Build Mode without
+  requiring an account. Buyer progress stays on that device in IndexedDB.
 - Separate printable cover and instruction documents with configurable ranges,
   rows, preview image, sticker step, and English or Ukrainian copy.
 - English and Ukrainian application UI. Ukrainian is used by default, and the
@@ -49,12 +52,14 @@ progress updates arrive in batches.
 - `core/scheme-format.js` handles TXT and CSV pattern import and export.
 - `storage/local-project-store.js` stores the latest pattern and Build Mode progress in IndexedDB.
 - `storage/cloud-project-store.js` is the authenticated Supabase adapter for projects, previews, and Build Mode progress.
+- `storage/shared-pattern-store.js` publishes immutable pattern snapshots and loads them through unguessable buyer tokens.
 - `lib/supabase/` contains optional browser/server clients and cookie-based session refresh.
 - `supabase/migrations/` contains the database schema, row-level security policies, private preview storage, and the free-plan project limit.
 - `/` opens the bilingual product landing page.
 - `/create` opens the generator and imports existing TXT or CSV patterns.
 - `/build` opens Build Mode with voice guidance, playback speed, seeking, and IndexedDB progress restoration.
 - `/print` creates configurable cover and instruction PDFs in English or Ukrainian.
+- `/s/[token]` opens a published buyer pattern directly in Build Mode.
 
 This separation is safe under React Strict Mode: repeated mounts do not create
 duplicate event listeners.
@@ -116,8 +121,9 @@ profiles marked as `admin` or using the `unlimited` plan bypass that limit.
 ## Supabase Setup
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/202607280001_initial_projects.sql` in the Supabase
-   SQL editor or apply it with the Supabase CLI.
+2. Apply the SQL files in `supabase/migrations/` in filename order using the
+   Supabase SQL editor or CLI. The second migration adds buyer QR links and the
+   restricted public pattern RPC.
 3. Copy `.env.example` to `.env.local` and set the project URL and publishable
    key.
 4. Restart Next.js after changing environment variables.
@@ -137,6 +143,12 @@ The cover and instruction table are printed as separate documents. Instruction
 pages use four columns, include a wider left margin for binder attachment, and
 avoid generating an extra blank page. For manual double-sided printing, print
 even pages first, turn the sheets over, and then print odd pages.
+
+Authenticated sellers can create a buyer QR from the Print page. Publishing
+stores a snapshot of the current pin sequence. Updating the project does not
+change a printed kit until **Update buyer QR** is used. Disabling the link stops
+new loads without deleting the seller project or progress already stored on a
+buyer device.
 
 ## Comparing Patterns
 
