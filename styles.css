@@ -4924,8 +4924,7 @@ textarea {
 
 @media screen and (max-width: 720px) {
   .mobile-site-header {
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 1200;
     display: flex;
     min-height: 54px;
