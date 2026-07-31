@@ -7,6 +7,8 @@ import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
 import MapPin from "lucide-react/dist/esm/icons/map-pin.mjs";
+import Mic from "lucide-react/dist/esm/icons/mic.mjs";
+import MicOff from "lucide-react/dist/esm/icons/mic-off.mjs";
 import MonitorCheck from "lucide-react/dist/esm/icons/monitor-check.mjs";
 import MonitorOff from "lucide-react/dist/esm/icons/monitor-off.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
@@ -24,6 +26,7 @@ import {
   initialBuildSessionState,
 } from "../../core/build-session.js";
 import { createBuildVoicePlayer } from "../../core/build-voice-player.js";
+import { parseBuildVoiceCommand } from "../../core/build-voice-command.js";
 import {
   createCirclePoints,
   renderStringArtBase,
@@ -40,6 +43,9 @@ export default function BuildMode() {
   const [message, setMessage] = useState("");
   const [wakeLockEnabled, setWakeLockEnabled] = useState(true);
   const [wakeLockNotice, setWakeLockNotice] = useState("");
+  const [speechControlEnabled, setSpeechControlEnabled] = useState(false);
+  const [speechControlSupported, setSpeechControlSupported] = useState(null);
+  const [speechControlNotice, setSpeechControlNotice] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
   const primedSpeechRef = useRef(null);
   const voicePlayerRef = useRef(null);
@@ -47,6 +53,15 @@ export default function BuildMode() {
   const wakeLockRef = useRef(null);
   const wakeLockRequestRef = useRef(null);
   const keepScreenAwakeRef = useRef(true);
+  const speechRecognitionRef = useRef(null);
+  const speechRestartTimerRef = useRef(0);
+  const keepListeningRef = useRef(false);
+  const speechCommandHandlerRef = useRef(null);
+  const lastSpeechCommandRef = useRef({ transcript: "", at: 0 });
+  const languageRef = useRef(language);
+  const translationRef = useRef(t);
+  languageRef.current = language;
+  translationRef.current = t;
 
   useEffect(() => {
     if (typeof Audio === "undefined") return undefined;
@@ -63,6 +78,103 @@ export default function BuildMode() {
     const timeout = window.setTimeout(() => setWakeLockNotice(""), 3200);
     return () => window.clearTimeout(timeout);
   }, [wakeLockNotice]);
+
+  useEffect(() => {
+    if (!speechControlNotice) return undefined;
+    const timeout = window.setTimeout(() => setSpeechControlNotice(""), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [speechControlNotice]);
+
+  useEffect(() => {
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setSpeechControlSupported(false);
+      return undefined;
+    }
+
+    setSpeechControlSupported(true);
+    const recognition = new Recognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.lang = speechRecognitionLanguage(languageRef.current);
+    speechRecognitionRef.current = recognition;
+
+    const restart = () => {
+      window.clearTimeout(speechRestartTimerRef.current);
+      if (!keepListeningRef.current || document.visibilityState !== "visible") return;
+      speechRestartTimerRef.current = window.setTimeout(() => {
+        if (!keepListeningRef.current) return;
+        recognition.lang = speechRecognitionLanguage(languageRef.current);
+        try {
+          recognition.start();
+        } catch (error) {
+          if (error?.name !== "InvalidStateError") {
+            keepListeningRef.current = false;
+            setSpeechControlEnabled(false);
+            setSpeechControlNotice(translationRef.current("build.voiceControlStartError"));
+          }
+        }
+      }, 240);
+    };
+
+    recognition.onstart = () => setSpeechControlEnabled(true);
+    recognition.onresult = (event) => {
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results[index];
+        if (!result.isFinal) continue;
+        const transcript = result[0]?.transcript?.trim();
+        if (!transcript) continue;
+        const now = Date.now();
+        const previous = lastSpeechCommandRef.current;
+        if (previous.transcript === transcript && now - previous.at < 900) continue;
+        lastSpeechCommandRef.current = { transcript, at: now };
+        speechCommandHandlerRef.current?.(transcript);
+      }
+    };
+    recognition.onerror = (event) => {
+      if (event.error === "aborted" || event.error === "no-speech") return;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        keepListeningRef.current = false;
+        setSpeechControlEnabled(false);
+        setSpeechControlNotice(translationRef.current("build.voiceControlPermissionDenied"));
+        return;
+      }
+      if (event.error === "audio-capture") {
+        keepListeningRef.current = false;
+        setSpeechControlEnabled(false);
+        setSpeechControlNotice(translationRef.current("build.voiceControlNoMicrophone"));
+        return;
+      }
+      setSpeechControlNotice(translationRef.current("build.voiceControlError"));
+    };
+    recognition.onend = () => {
+      if (keepListeningRef.current) restart();
+      else setSpeechControlEnabled(false);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") restart();
+      else recognition.abort();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      keepListeningRef.current = false;
+      window.clearTimeout(speechRestartTimerRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      recognition.onend = null;
+      recognition.abort();
+      speechRecognitionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const recognition = speechRecognitionRef.current;
+    if (!recognition) return;
+    recognition.lang = speechRecognitionLanguage(language);
+    if (keepListeningRef.current) recognition.abort();
+  }, [language]);
 
   useEffect(() => {
     const restoreWakeLock = () => {
@@ -248,6 +360,100 @@ export default function BuildMode() {
       : t("build.wakeLockUnavailableNotice"));
   };
 
+  const toggleSpeechControl = () => {
+    const recognition = speechRecognitionRef.current;
+    if (keepListeningRef.current) {
+      keepListeningRef.current = false;
+      window.clearTimeout(speechRestartTimerRef.current);
+      recognition?.abort();
+      setSpeechControlEnabled(false);
+      setSpeechControlNotice(t("build.voiceControlDisabledNotice"));
+      return;
+    }
+
+    if (!recognition || speechControlSupported === false) {
+      setSpeechControlNotice(t("build.voiceControlUnavailable"));
+      return;
+    }
+
+    keepListeningRef.current = true;
+    recognition.lang = speechRecognitionLanguage(language);
+    try {
+      recognition.start();
+      setSpeechControlEnabled(true);
+      setSpeechControlNotice(t("build.voiceControlEnabledNotice"));
+    } catch (error) {
+      if (error?.name !== "InvalidStateError") {
+        keepListeningRef.current = false;
+        setSpeechControlEnabled(false);
+        setSpeechControlNotice(t("build.voiceControlStartError"));
+      }
+    }
+  };
+
+  speechCommandHandlerRef.current = (transcript) => {
+    const command = parseBuildVoiceCommand(transcript, language);
+    if (!command || !state.pattern) return;
+    setSpeechControlNotice(t("build.voiceCommandAccepted", { command: transcript }));
+
+    switch (command.type) {
+      case "play":
+        if (state.playback !== "playing" && state.playback !== "complete") {
+          handlePlaybackToggle();
+        }
+        break;
+      case "pause":
+        primedSpeechRef.current = null;
+        voicePlayerRef.current?.stop();
+        dispatch({ type: "PAUSE" });
+        break;
+      case "next":
+        dispatch({ type: "NEXT" });
+        break;
+      case "previous":
+        dispatch({ type: "PREVIOUS" });
+        break;
+      case "repeat": {
+        const repeatPoint = state.pattern.sequence[state.stepIndex + 1];
+        if (!repeatPoint) break;
+        const repeat = () => playBuildPoint(
+          voicePlayerRef.current,
+          repeatPoint,
+          language,
+          setMessage,
+          t,
+        );
+        if (state.playback === "playing") {
+          dispatch({ type: "PAUSE" });
+          window.setTimeout(repeat, 0);
+        } else {
+          repeat();
+        }
+        break;
+      }
+      case "faster":
+        changeSpeed(-250);
+        break;
+      case "slower":
+        changeSpeed(250);
+        break;
+      case "seek":
+        dispatch({ type: "SEEK", stepIndex: command.step - 1 });
+        break;
+      case "lost":
+        openLostDialog();
+        break;
+      case "voice_on":
+        dispatch({ type: "SET_VOICE", enabled: true });
+        break;
+      case "voice_off":
+        dispatch({ type: "SET_VOICE", enabled: false });
+        break;
+      default:
+        break;
+    }
+  };
+
   if (!state.hydrated) {
     return (
       <main className="build-loading">
@@ -287,6 +493,23 @@ export default function BuildMode() {
             {t("common.generator")}
           </a>
           <div className="build-header-actions">
+            <button
+              className="voice-control-toggle"
+              type="button"
+              title={speechControlEnabled
+                ? t("build.voiceControlOff")
+                : t("build.voiceControlOn")}
+              aria-label={speechControlEnabled
+                ? t("build.voiceControlOffAria")
+                : t("build.voiceControlOnAria")}
+              aria-pressed={speechControlEnabled}
+              disabled={speechControlSupported === false || !state.pattern}
+              onClick={toggleSpeechControl}
+            >
+              {speechControlEnabled
+                ? <Mic aria-hidden="true" size={20} />
+                : <MicOff aria-hidden="true" size={20} />}
+            </button>
             <button
               className="voice-icon-toggle"
               type="button"
@@ -502,6 +725,11 @@ export default function BuildMode() {
           {wakeLockNotice}
         </div>
       )}
+      {speechControlNotice && !wakeLockNotice && (
+        <div className="wake-lock-toast" role="status" aria-live="polite">
+          {speechControlNotice}
+        </div>
+      )}
     </main>
   );
 }
@@ -652,6 +880,10 @@ function playBuildPoint(player, point, language, reportError, t) {
     if (result === "error") reportError(t("build.voiceStartError"));
   });
   return run;
+}
+
+function speechRecognitionLanguage(language) {
+  return language === "en" ? "en-US" : "uk-UA";
 }
 
 async function acquireScreenWakeLock(wakeLockRef, requestRef) {
