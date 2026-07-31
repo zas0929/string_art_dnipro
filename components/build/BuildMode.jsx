@@ -34,10 +34,14 @@ import {
   STRING_ART_WORK_SIZE,
 } from "../../core/string-art-renderer.js";
 import { getProjectStore } from "../../storage/project-store.js";
+import {
+  loadBuildProgress,
+  saveBuildProgress,
+} from "../../storage/local-project-store.js";
 
 const ACTIVE_THREAD_COLOR = "#c79b67";
 
-export default function BuildMode() {
+export default function BuildMode({ sharedPattern = null }) {
   const { language, t } = useLanguage();
   const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
   const [message, setMessage] = useState("");
@@ -197,6 +201,25 @@ export default function BuildMode() {
 
   useEffect(() => {
     let active = true;
+    if (sharedPattern) {
+      projectStoreRef.current = {
+        saveProgress: saveBuildProgress,
+        loadProgress: loadBuildProgress,
+      };
+      loadBuildProgress(sharedPattern.id)
+        .then((progress) => {
+          if (active) dispatch({ type: "LOAD_PATTERN", pattern: sharedPattern, progress });
+        })
+        .catch((error) => {
+          if (!active) return;
+          setMessage(t("build.restoreError", { error: error.message }));
+          dispatch({ type: "LOAD_PATTERN", pattern: sharedPattern, progress: null });
+        });
+      return () => {
+        active = false;
+      };
+    }
+
     getProjectStore()
       .then(async (store) => {
         projectStoreRef.current = store;
@@ -217,7 +240,7 @@ export default function BuildMode() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [sharedPattern]);
 
   useEffect(() => {
     if (!state.hydrated || !state.pattern) return;
