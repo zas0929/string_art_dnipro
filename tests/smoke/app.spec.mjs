@@ -330,6 +330,35 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
 
 test("TXT import reaches build mode and restores saved progress", async ({ page }) => {
   test.setTimeout(75_000);
+  await page.addInitScript(() => {
+    class MockSpeechRecognition {
+      constructor() {
+        window.__buildSpeechRecognition = this;
+        this.continuous = false;
+        this.interimResults = false;
+        this.maxAlternatives = 1;
+        this.lang = "";
+      }
+
+      start() {
+        queueMicrotask(() => this.onstart?.());
+      }
+
+      abort() {
+        queueMicrotask(() => this.onend?.());
+      }
+    }
+
+    window.SpeechRecognition = MockSpeechRecognition;
+    window.__emitBuildVoiceCommand = (transcript) => {
+      const result = [{ transcript }];
+      result.isFinal = true;
+      window.__buildSpeechRecognition?.onresult?.({
+        resultIndex: 0,
+        results: [result],
+      });
+    };
+  });
   await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
@@ -367,6 +396,16 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
+
+  const voiceControl = page.getByRole("button", { name: "Turn voice commands on" });
+  await voiceControl.click();
+  await expect(page.getByRole("button", { name: "Turn voice commands off" }))
+    .toHaveAttribute("aria-pressed", "true");
+  await page.evaluate(() => window.__emitBuildVoiceCommand("next"));
+  await expect(page.getByText("Step 2 of 3")).toBeVisible();
+  await page.evaluate(() => window.__emitBuildVoiceCommand("back"));
+  await expect(page.getByText("Step 1 of 3")).toBeVisible();
+  await page.getByRole("button", { name: "Turn voice commands off" }).click();
 
   const englishVoiceRequest = page.waitForRequest(
     (request) => request.url().endsWith("/audio/build/en/50.m4a"),

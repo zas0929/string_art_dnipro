@@ -1519,6 +1519,7 @@ textarea {
   gap: 10px;
 }
 
+.voice-control-toggle,
 .voice-icon-toggle,
 .wake-lock-toggle {
   width: 42px;
@@ -1527,6 +1528,7 @@ textarea {
   color: var(--muted);
 }
 
+.voice-control-toggle[aria-pressed="true"],
 .voice-icon-toggle[aria-pressed="true"],
 .wake-lock-toggle[aria-pressed="true"] {
   border-color: var(--line);
@@ -1534,6 +1536,7 @@ textarea {
   background: #172019;
 }
 
+.voice-control-toggle:hover,
 .voice-icon-toggle:hover,
 .wake-lock-toggle:hover {
   border-color: var(--line);
@@ -3578,6 +3581,7 @@ textarea {
     border-bottom: 1px solid var(--line);
   }
 
+  .voice-control-toggle,
   .voice-icon-toggle,
   .wake-lock-toggle {
     border: 0;
@@ -3585,6 +3589,7 @@ textarea {
     color: #766c60;
   }
 
+  .voice-control-toggle[aria-pressed="true"],
   .voice-icon-toggle[aria-pressed="true"],
   .wake-lock-toggle[aria-pressed="true"] {
     border: 0;
@@ -3592,6 +3597,7 @@ textarea {
     color: #1a211b;
   }
 
+  .voice-control-toggle:hover:not(:disabled),
   .voice-icon-toggle:hover:not(:disabled),
   .wake-lock-toggle:hover:not(:disabled) {
     border-color: transparent;
@@ -4447,17 +4453,20 @@ textarea {
     border-bottom-color: #343b35;
   }
 
+  .voice-control-toggle,
   .voice-icon-toggle,
   .wake-lock-toggle {
     color: #aaa79e;
   }
 
+  .voice-control-toggle[aria-pressed="true"],
   .voice-icon-toggle[aria-pressed="true"],
   .wake-lock-toggle[aria-pressed="true"] {
     background: #27271f;
     color: #d0ad7d;
   }
 
+  .voice-control-toggle:hover:not(:disabled),
   .voice-icon-toggle:hover:not(:disabled),
   .wake-lock-toggle:hover:not(:disabled) {
     background: #202620;
