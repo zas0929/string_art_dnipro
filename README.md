@@ -21,6 +21,8 @@ entirely in the browser, so source photos are not sent to a server.
   rows, preview image, sticker step, and English or Ukrainian copy.
 - English and Ukrainian application UI. Ukrainian is used by default, and the
   selected language is saved in the browser.
+- Landing-page kit order requests with phone and contact preferences delivered
+  to a private Telegram chat through a server-only Next.js endpoint.
 
 ## How It Works
 
@@ -136,6 +138,23 @@ pnpm dev
 When the environment variables are absent, the application deliberately runs
 without Supabase and does not attempt to refresh an auth session. Never expose
 the Supabase service-role key in this application.
+
+## Telegram Order Notifications
+
+Create a bot with `@BotFather`, send the bot at least one message or add it to
+the destination group, and configure these server-only Vercel environment
+variables:
+
+```env
+TELEGRAM_BOT_TOKEN=123456789:bot-token
+TELEGRAM_CHAT_ID=123456789
+TELEGRAM_MESSAGE_THREAD_ID=
+```
+
+`TELEGRAM_MESSAGE_THREAD_ID` is optional and only needed when order messages
+should be delivered to a specific Telegram forum topic. Apply variables to the
+Production environment and redeploy. Never prefix the token with
+`NEXT_PUBLIC_` or commit its real value.
 
 ## Printing
 
