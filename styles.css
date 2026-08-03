@@ -900,7 +900,7 @@ textarea {
   color: #fff;
 }
 
-.landing-header a.landing-header-cta {
+.landing-header .landing-header-cta {
   color: #fff;
 }
 
@@ -1283,6 +1283,13 @@ textarea {
 .landing-final-cta > svg { margin-bottom: 18px; color: #806344; }
 .landing-final-cta p { max-width: 540px; margin: 16px 0 24px; color: var(--landing-muted); line-height: 1.5; }
 
+.landing-final-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
 .landing-footer {
   display: flex;
   align-items: flex-start;
@@ -1356,6 +1363,231 @@ textarea {
   .landing-primary-cta,
   .landing-secondary-cta,
   .landing-header nav a { transition: background-color 160ms ease, color 160ms ease; }
+}
+
+.landing-header .landing-header-cta {
+  border: 1px solid #171916;
+  background: #171916;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.order-modal-backdrop {
+  position: fixed;
+  z-index: 2200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgb(10 12 10 / 76%);
+  backdrop-filter: blur(5px);
+}
+
+.order-modal {
+  position: relative;
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 36px);
+  overflow: auto;
+  padding: 30px 24px 24px;
+  border: 1px solid #cfc4b4;
+  border-radius: 6px;
+  background: #f6f2eb;
+  color: #171916;
+  box-shadow: 0 30px 90px rgb(0 0 0 / 38%);
+}
+
+.order-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 38px;
+  min-height: 38px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #cfc4b4;
+  border-radius: 50%;
+  background: transparent;
+  color: #171916;
+}
+
+.order-form,
+.order-success {
+  display: grid;
+  gap: 16px;
+}
+
+.order-form h2,
+.order-success h2 {
+  max-width: 450px;
+  margin: 0 42px 0 0;
+  font-size: clamp(28px, 6vw, 42px);
+  line-height: 1.02;
+}
+
+.order-form > .landing-eyebrow,
+.order-success > .landing-eyebrow {
+  margin: 0;
+  color: #806344;
+}
+
+.order-intro,
+.order-success > p:not(.landing-eyebrow) {
+  margin: 0;
+  color: #69645d;
+  line-height: 1.55;
+}
+
+.order-phone-field {
+  display: grid;
+  gap: 8px;
+}
+
+.order-phone-field > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #4f4942;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.order-phone-field input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid #aaa196;
+  border-radius: 4px;
+  background: #fff;
+  color: #171916;
+  font: inherit;
+  font-size: 17px;
+}
+
+.order-phone-field input:focus {
+  border-color: #806344;
+  outline: 3px solid rgb(128 99 68 / 16%);
+}
+
+.order-honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.order-checkbox {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  padding: 13px 0;
+  border-bottom: 1px solid #ddd4c8;
+  cursor: pointer;
+}
+
+.order-checkbox input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: #806344;
+}
+
+.order-checkbox > span {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.order-checkbox strong {
+  color: #332f2a;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.order-checkbox svg {
+  color: #806344;
+}
+
+.order-checkbox small {
+  grid-column: 1 / -1;
+  color: #777169;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.order-help-copy {
+  margin: -2px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid #c79b67;
+  background: #eee7dc;
+  color: #554d44;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.order-error {
+  margin: 0;
+  color: #a42f2a;
+  font-size: 14px;
+}
+
+.order-submit {
+  width: 100%;
+  min-height: 52px;
+  cursor: pointer;
+}
+
+.order-submit:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.order-privacy {
+  margin: -6px 0 0;
+  color: #817b73;
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.order-success {
+  justify-items: start;
+  min-height: 360px;
+  align-content: center;
+}
+
+.order-success > svg {
+  color: #806344;
+}
+
+.order-success .landing-primary-cta,
+.order-success .landing-secondary-cta {
+  width: 100%;
+}
+
+@media (hover: hover) {
+  .landing-header .landing-header-cta:hover,
+  .order-submit:hover {
+    border-color: #33372f;
+    background: #33372f;
+  }
+
+  .order-modal-close:hover {
+    border-color: #806344;
+    background: #eee7dc;
+  }
+}
+
+@media (min-width: 720px) {
+  .order-modal { padding: 38px 38px 32px; }
 }
 
 .auth-page {

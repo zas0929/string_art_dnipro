@@ -30,6 +30,11 @@ test.beforeEach(async ({ page }, testInfo) => {
 });
 
 test("landing page leads to the generator", async ({ page }) => {
+  await page.route("**/api/orders", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ ok: true }),
+  }));
   await page.goto("/");
 
   await expect(page.getByRole("heading", {
@@ -55,7 +60,13 @@ test("landing page leads to the generator", async ({ page }) => {
     "--comparison-position",
     "100%",
   );
-  await page.locator('a[href="/create"]:visible').first().click();
+  await page.getByRole("button", { name: /Order a kit|Замовити набір/ }).first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.getByLabel(/Phone number|Номер телефону/).fill("+380 67 123 45 67");
+  await page.getByLabel(/I want to generate the pattern myself|Хочу згенерувати макет самостійно/).check();
+  await page.getByRole("button", { name: /Send request|Надіслати заявку/ }).click();
+  await expect(page.getByText(/Your request has been received|Заявку отримано/)).toBeVisible();
+  await page.getByRole("link", { name: /Open generator|Відкрити генератор/ }).click();
   await expect(page).toHaveURL(/\/create$/);
   await waitForGenerator(page);
 });

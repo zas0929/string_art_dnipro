@@ -19,12 +19,14 @@ import { useState } from "react";
 import { useAuthSession } from "../auth/AuthSessionProvider.jsx";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
+import OrderModal from "../order/OrderModal.jsx";
 
 export default function LandingPage() {
   const { t } = useLanguage();
   const { user } = useAuthSession();
   const [comparisonPosition, setComparisonPosition] = useState(50);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
 
   const featureCards = [
     { image: "/board.png", title: t("landing.featureMaterials"), copy: t("landing.featureMaterialsCopy") },
@@ -61,7 +63,9 @@ export default function LandingPage() {
           <LanguageSwitch className="landing-menu-language" />
         </nav>
         <div className="landing-header-actions">
-          <a className="landing-header-cta" href="/create">{t("landing.createPattern")}</a>
+          <button className="landing-header-cta" type="button" onClick={() => setOrderOpen(true)}>
+            {t("order.cta")}
+          </button>
           <LanguageSwitch className="landing-header-language" />
           <a
             className={`landing-icon-link${user ? " is-authenticated" : ""}`}
@@ -94,7 +98,9 @@ export default function LandingPage() {
             <li><Check size={16} />{t("landing.heroBenefitDelivery")}</li>
           </ul>
           <div className="landing-hero-actions">
-            <a className="landing-primary-cta" href="/create">{t("landing.createPattern")}<ArrowRight size={17} /></a>
+            <button className="landing-primary-cta" type="button" onClick={() => setOrderOpen(true)}>
+              {t("order.cta")}<ArrowRight size={17} />
+            </button>
             <a className="landing-secondary-cta" href="#process">{t("landing.howItWorks")}</a>
           </div>
         </div>
@@ -193,7 +199,14 @@ export default function LandingPage() {
         <ShieldCheck size={28} />
         <h2>{t("landing.finalTitle")}</h2>
         <p>{t("landing.finalCopy")}</p>
-        <a className="landing-primary-cta" href="/create">{t("landing.openGenerator")}<ArrowRight size={18} /></a>
+        <div className="landing-final-actions">
+          <button className="landing-primary-cta" type="button" onClick={() => setOrderOpen(true)}>
+            {t("order.cta")}<ArrowRight size={18} />
+          </button>
+          <a className="landing-secondary-cta" href="/create">
+            {t("landing.generator")}<ArrowRight size={18} />
+          </a>
+        </div>
       </section>
 
       <footer className="landing-footer">
@@ -204,6 +217,7 @@ export default function LandingPage() {
           <a href={user ? "/projects" : "/login"}>{user ? t("common.signedIn") : t("auth.signIn")}</a>
         </div>
       </footer>
+      <OrderModal open={orderOpen} onClose={() => setOrderOpen(false)} />
     </main>
   );
 }
