@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import ResetPasswordForm from "../../components/auth/ResetPasswordForm.jsx";
-import LanguageSwitch from "../../components/i18n/LanguageSwitch.jsx";
 import { isSupabaseConfigured } from "../../lib/supabase/config.js";
 import { createClient } from "../../lib/supabase/server.js";
 
@@ -18,7 +17,6 @@ export default async function ResetPasswordPage() {
 
   return (
     <main className="auth-page">
-      <LanguageSwitch />
       <ResetPasswordForm configured={configured} />
     </main>
   );

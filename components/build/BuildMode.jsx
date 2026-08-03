@@ -17,7 +17,6 @@ import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
 import VolumeX from "lucide-react/dist/esm/icons/volume-x.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useEffect, useReducer, useRef, useState } from "react";
-import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 import {
@@ -486,7 +485,6 @@ export default function BuildMode({ sharedPattern = null }) {
   if (!state.hydrated) {
     return (
       <main className="build-loading">
-        <LanguageSwitch />
         <span>{t("build.loading")}</span>
       </main>
     );
@@ -514,7 +512,6 @@ export default function BuildMode({ sharedPattern = null }) {
       onPointerDownCapture={keepScreenAwake}
       onKeyDownCapture={keepScreenAwake}
     >
-      <LanguageSwitch />
       <section className="build-workspace">
         <header className="build-header">
           <a className="back-link" href="/create">

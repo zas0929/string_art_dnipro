@@ -27,6 +27,7 @@ export default function MobileNavigation() {
   if (pathname?.startsWith("/print")) return null;
 
   const brandTitle = pathname === "/create" ? "String Art Generator" : "String Art Dnipro";
+  const isLanding = pathname === "/";
 
   const links = [
     { href: "/", label: t("common.home"), icon: Home },
@@ -36,7 +37,7 @@ export default function MobileNavigation() {
   ];
 
   return (
-    <header className="mobile-site-header">
+    <header className={`mobile-site-header${isLanding ? " is-landing" : ""}`}>
       <a className="mobile-site-brand" href="/" aria-label="String Art Dnipro">
         <img src="/logo-white-compact.png" alt="" />
         <span>{brandTitle}</span>

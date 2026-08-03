@@ -734,6 +734,10 @@ textarea {
   display: none;
 }
 
+.landing-desktop-generator-link {
+  display: none;
+}
+
 .landing-header nav.is-open {
   position: absolute;
   top: 63px;
@@ -1330,6 +1334,7 @@ textarea {
   .landing-header nav,
   .landing-header nav.is-open { position: static; display: flex; align-items: center; justify-content: center; gap: 28px; margin-left: auto; padding: 0; border: 0; background: transparent; box-shadow: none; }
   .landing-header nav a { color: inherit; font-size: 11px; font-weight: 650; text-decoration: none; }
+  .landing-header nav .landing-desktop-generator-link { display: inline-flex; }
   .landing-header nav.is-open a { padding: 0; border: 0; }
   .landing-header-actions { margin-left: 18px; }
   .landing-menu { display: none; }
@@ -2394,7 +2399,7 @@ textarea {
 
 .topbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   align-items: center;
   margin-bottom: 18px;
@@ -2483,6 +2488,52 @@ button svg,
   opacity: 0;
   width: 1px;
   height: 1px;
+}
+
+.workspace-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.desktop-canvas-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.desktop-canvas-actions > * {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.desktop-canvas-actions .file-button {
+  border-color: #766a58;
+  background: #171c18;
+  color: #f3eee5;
+}
+
+.desktop-canvas-actions .file-button:hover {
+  border-color: #eee7dc;
+  background: #eee7dc;
+  color: #171a17;
+}
+
+.desktop-canvas-actions #buildButton {
+  flex-grow: 0.82;
+}
+
+@media screen and (min-width: 721px) {
+  .topbar {
+    display: none;
+  }
+
+  .desktop-sidebar-redundant {
+    display: none !important;
+  }
 }
 
 button:hover,
@@ -5190,8 +5241,130 @@ textarea {
   }
 }
 
-/* Shared mobile navigation */
+/* Shared site navigation */
 .mobile-site-header {
+  position: relative;
+  z-index: 1200;
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  gap: 34px;
+  padding: 9px max(28px, calc((100vw - 1440px) / 2));
+  border-bottom: 1px solid #394139;
+  background: #0f1310;
+  color: #f3eee5;
+}
+
+.mobile-site-header.is-landing {
+  display: none;
+}
+
+.mobile-site-brand {
+  display: inline-flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 11px;
+  color: inherit;
+  font-size: 17px;
+  font-weight: 780;
+  text-decoration: none;
+}
+
+.mobile-site-brand img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.mobile-site-actions {
+  display: none;
+}
+
+.mobile-site-menu {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.mobile-site-menu nav,
+.mobile-site-menu-footer,
+.mobile-user-session {
+  display: flex;
+  align-items: center;
+}
+
+.mobile-site-menu nav {
+  gap: 5px;
+}
+
+.mobile-site-menu nav a,
+.mobile-login-link,
+.mobile-user-session button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #d7d4cd;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.mobile-site-menu nav a:hover,
+.mobile-site-menu nav a.is-active,
+.mobile-login-link:hover,
+.mobile-user-session button:hover {
+  border-color: #4a5149;
+  background: #1b211c;
+  color: #fff;
+}
+
+.mobile-site-menu nav a.is-active {
+  color: #d7b27f;
+}
+
+.mobile-site-menu-footer {
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+.mobile-site-menu-footer > .language-switch {
+  position: static;
+  min-width: 76px;
+  border-color: #4a5149;
+  background: #101511;
+}
+
+.mobile-user-session {
+  gap: 7px;
+}
+
+.mobile-user-session > span {
+  display: inline-flex;
+  max-width: 180px;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: #aaa79e;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-user-session form {
+  margin: 0;
+}
+
+.mobile-site-menu-toggle {
   display: none;
 }
 
@@ -5217,6 +5390,10 @@ textarea {
 }
 
 @media screen and (max-width: 720px) {
+  .desktop-canvas-actions {
+    display: none;
+  }
+
   .mobile-site-header {
     position: relative;
     z-index: 1200;
@@ -5229,6 +5406,10 @@ textarea {
     background: rgb(15 19 16 / 97%);
     color: #f3eee5;
     backdrop-filter: blur(14px);
+  }
+
+  .mobile-site-header.is-landing {
+    display: flex;
   }
 
   .mobile-site-brand {

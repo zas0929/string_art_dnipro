@@ -9,7 +9,6 @@ import Trash2 from "lucide-react/dist/esm/icons/trash-2.mjs";
 import { useEffect, useRef, useState } from "react";
 import { LOCAL_PROJECT_LIMIT } from "../../storage/local-project-store.js";
 import { getProjectStore } from "../../storage/project-store.js";
-import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 export default function ProjectsPage() {
@@ -88,7 +87,6 @@ export default function ProjectsPage() {
 
   return (
     <main className="projects-page">
-      <LanguageSwitch />
       <header className="projects-header">
         <div>
           <a className="back-link" href="/create">

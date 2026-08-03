@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import AuthForm from "../../components/auth/AuthForm.jsx";
-import LanguageSwitch from "../../components/i18n/LanguageSwitch.jsx";
 import { isSupabaseConfigured } from "../../lib/supabase/config.js";
 import { createClient } from "../../lib/supabase/server.js";
 
@@ -17,7 +16,6 @@ export default async function LoginPage() {
 
   return (
     <main className="auth-page">
-      <LanguageSwitch />
       <AuthForm configured={isSupabaseConfigured()} />
     </main>
   );

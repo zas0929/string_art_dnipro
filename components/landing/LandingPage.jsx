@@ -57,6 +57,7 @@ export default function LandingPage() {
           <span className="brand-name">String Art Dnipro</span>
         </a>
         <nav id="landing-navigation" className={menuOpen ? "is-open" : ""} aria-label={t("landing.navigation")}>
+          <a className="landing-desktop-generator-link" href="/create">{t("common.generator")}</a>
           <a href="#process" onClick={() => setMenuOpen(false)}>{t("landing.howItWorks")}</a>
           <a href="#kit" onClick={() => setMenuOpen(false)}>{t("landing.deliveryPayment")}</a>
           <a href="#faq" onClick={() => setMenuOpen(false)}>FAQ</a>

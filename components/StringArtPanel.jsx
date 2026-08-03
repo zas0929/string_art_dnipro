@@ -74,25 +74,25 @@ export default function StringArtPanel() {
         <span id="saveProjectLabel">{t("panel.saveProject")}</span>
       </button>
 
-      <a id="buildModeLink" className="command-link" href="/build">
+      <a id="buildModeLink" className="command-link desktop-sidebar-redundant" href="/build">
         <ListChecks aria-hidden="true" size={18} strokeWidth={2} />
         {t("panel.buildMode")}
       </a>
 
-      <a className="command-link" href="/projects">
+      <a className="command-link desktop-sidebar-redundant" href="/projects">
         <FolderOpen aria-hidden="true" size={18} strokeWidth={2} />
         {t("panel.myProjects")}
       </a>
 
       {user ? (
-        <form className="panel-auth-form" action={signOut}>
+        <form className="panel-auth-form desktop-sidebar-redundant" action={signOut}>
           <button className="command-link" type="submit" title={user.email}>
             <LogOut aria-hidden="true" size={18} strokeWidth={2} />
             {t("auth.signOut")}
           </button>
         </form>
       ) : (
-        <a className="command-link" href="/login">
+        <a className="command-link desktop-sidebar-redundant" href="/login">
           <LogIn aria-hidden="true" size={18} strokeWidth={2} />
           {t("auth.signInOrCreate")}
         </a>
