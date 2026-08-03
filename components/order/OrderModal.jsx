@@ -58,11 +58,16 @@ export default function OrderModal({ open, onClose }) {
       setStatus("success");
     } catch (requestError) {
       setStatus("error");
-      setError(requestError.message === "invalidPhone"
-        ? t("order.invalidPhone")
-        : requestError.message === "rateLimited"
-          ? t("order.rateLimited")
-          : t("order.submitError"));
+      const errorMessages = {
+        invalidPhone: "order.invalidPhone",
+        rateLimited: "order.rateLimited",
+        notConfigured: "order.notConfigured",
+        telegramUnauthorized: "order.telegramUnauthorized",
+        telegramChatNotFound: "order.telegramChatNotFound",
+        telegramThreadNotFound: "order.telegramThreadNotFound",
+        telegramBlocked: "order.telegramBlocked",
+      };
+      setError(t(errorMessages[requestError.message] || "order.submitError"));
     }
   };
 

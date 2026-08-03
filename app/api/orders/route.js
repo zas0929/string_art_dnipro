@@ -57,9 +57,12 @@ export async function POST(request) {
       cache: "no-store",
     });
     if (!response.ok) {
-      const details = await response.text();
-      console.error("Telegram order notification failed", response.status, details.slice(0, 300));
-      return Response.json({ error: "deliveryFailed" }, { status: 502 });
+      const details = await readTelegramError(response);
+      console.error("Telegram order notification failed", response.status, details.description);
+      return Response.json(
+        { error: classifyTelegramError(response.status, details.description) },
+        { status: 502 },
+      );
     }
   } catch (error) {
     console.error("Telegram order notification failed", error?.message || error);
@@ -67,6 +70,24 @@ export async function POST(request) {
   }
 
   return Response.json({ ok: true });
+}
+
+async function readTelegramError(response) {
+  try {
+    const payload = await response.json();
+    return { description: String(payload?.description || "Unknown Telegram error").slice(0, 300) };
+  } catch {
+    return { description: "Unreadable Telegram error" };
+  }
+}
+
+function classifyTelegramError(status, description) {
+  const message = description.toLowerCase();
+  if (status === 401 || message.includes("unauthorized")) return "telegramUnauthorized";
+  if (message.includes("chat not found")) return "telegramChatNotFound";
+  if (message.includes("message thread not found")) return "telegramThreadNotFound";
+  if (message.includes("bot was blocked") || message.includes("bot is blocked")) return "telegramBlocked";
+  return "deliveryFailed";
 }
 
 function isSameOriginRequest(request) {
