@@ -15,6 +15,7 @@ import { signOut } from "../../app/login/actions.js";
 import { useAuthSession } from "../auth/AuthSessionProvider.jsx";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
+import AccountMenu from "./AccountMenu.jsx";
 
 export default function MobileNavigation() {
   const pathname = usePathname();
@@ -64,20 +65,23 @@ export default function MobileNavigation() {
           ))}
         </nav>
         <div className="mobile-site-menu-footer">
-          <LanguageSwitch />
-          {user ? (
-            <div className="mobile-user-session">
-              <span title={user.email}><UserRound aria-hidden="true" size={18} />{user.email}</span>
-              <form action={signOut}>
-                <button type="submit"><LogOut aria-hidden="true" size={18} />{t("auth.signOut")}</button>
-              </form>
-            </div>
-          ) : (
-            <a className="mobile-login-link" href="/login">
-              <LogIn aria-hidden="true" size={18} />
-              {t("auth.signInOrCreate")}
-            </a>
-          )}
+          <LanguageSwitch className="mobile-footer-language" />
+          <AccountMenu className="desktop-account-menu" />
+          <div className="mobile-auth-actions">
+            {user ? (
+              <div className="mobile-user-session">
+                <span title={user.email}><UserRound aria-hidden="true" size={18} />{user.email}</span>
+                <form action={signOut}>
+                  <button type="submit"><LogOut aria-hidden="true" size={18} />{t("auth.signOut")}</button>
+                </form>
+              </div>
+            ) : (
+              <a className="mobile-login-link" href="/login">
+                <LogIn aria-hidden="true" size={18} />
+                {t("auth.signInOrCreate")}
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </header>

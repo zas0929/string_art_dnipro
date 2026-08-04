@@ -11,14 +11,13 @@ import Headphones from "lucide-react/dist/esm/icons/headphones.mjs";
 import Menu from "lucide-react/dist/esm/icons/menu.mjs";
 import Package from "lucide-react/dist/esm/icons/package.mjs";
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.mjs";
-import ShoppingBag from "lucide-react/dist/esm/icons/shopping-bag.mjs";
-import UserRound from "lucide-react/dist/esm/icons/user-round.mjs";
 import WandSparkles from "lucide-react/dist/esm/icons/wand-sparkles.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
 import { useState } from "react";
 import { useAuthSession } from "../auth/AuthSessionProvider.jsx";
 import LanguageSwitch from "../i18n/LanguageSwitch.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
+import AccountMenu from "../navigation/AccountMenu.jsx";
 import OrderModal from "../order/OrderModal.jsx";
 
 export default function LandingPage() {
@@ -67,14 +66,7 @@ export default function LandingPage() {
           <button className="landing-header-cta" type="button" onClick={() => setOrderOpen(true)}>
             {t("order.cta")}
           </button>
-          <LanguageSwitch className="landing-header-language" />
-          <a
-            className={`landing-icon-link${user ? " is-authenticated" : ""}`}
-            href={user ? "/projects" : "/login"}
-            aria-label={user ? t("common.signedIn") : t("auth.signIn")}
-            title={user?.email || t("auth.signIn")}
-          ><UserRound size={18} /></a>
-          <a className="landing-icon-link" href="/projects" aria-label={t("landing.projects")}><ShoppingBag size={18} /></a>
+          <AccountMenu className="landing-account-menu" tone="light" />
           <button
             className="landing-menu"
             type="button"

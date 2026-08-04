@@ -4132,7 +4132,7 @@ textarea {
   .projects-header {
     align-items: end;
     max-width: 1280px;
-    margin: 42px auto 38px;
+    margin: 0 auto 38px;
     padding-bottom: 24px;
     border-bottom: 1px solid var(--line);
   }
@@ -5337,8 +5337,13 @@ textarea {
   gap: 10px;
 }
 
+.mobile-auth-actions {
+  display: none;
+}
+
 .mobile-site-menu-footer > .language-switch {
   position: static;
+  display: none;
   min-width: 76px;
   border-color: #4a5149;
   background: #101511;
@@ -5368,20 +5373,218 @@ textarea {
   display: none;
 }
 
-.landing-icon-link {
+.account-menu {
   position: relative;
+  flex: 0 0 auto;
+  font-family: inherit;
 }
 
-.landing-icon-link.is-authenticated::after {
+.account-menu-trigger {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #4a5149;
+  border-radius: 4px;
+  background: #101511;
+  color: #f3eee5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.account-menu-trigger {
+  max-width: 230px;
+  cursor: pointer;
+}
+
+.account-menu-trigger:hover,
+.account-menu-trigger[aria-expanded="true"] {
+  border-color: #887052;
+  background: #1b211c;
+  color: #fff;
+}
+
+.account-menu-avatar {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.account-menu-avatar > span {
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 6px;
-  height: 6px;
-  border: 1px solid #fff;
+  right: -2px;
+  bottom: -2px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #101511;
   border-radius: 50%;
-  background: #4f9b66;
-  content: "";
+  background: #6eb47c;
+}
+
+.account-menu-email {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-trigger > svg:last-child {
+  flex: 0 0 auto;
+  transition: transform 150ms ease;
+}
+
+.account-menu-trigger > svg:last-child.is-open {
+  transform: rotate(180deg);
+}
+
+.account-menu-popover {
+  position: absolute;
+  z-index: 1300;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  width: min(280px, calc(100vw - 28px));
+  padding: 8px;
+  border: 1px solid #4a5149;
+  border-radius: 5px;
+  background: #151a16;
+  box-shadow: 0 18px 38px rgb(0 0 0 / 38%);
+  color: #f3eee5;
+}
+
+.account-menu-identity {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px 12px;
+  border-bottom: 1px solid #394139;
+}
+
+.account-menu-identity span {
+  color: #989b94;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.account-menu-identity strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-menu-identity p {
+  margin: 0;
+  color: #aaa79e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.account-menu-language {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #394139;
+}
+
+.account-menu-language > span {
+  color: #aaa79e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.account-menu-language > .language-switch {
+  position: static;
+  min-width: 76px;
+  border-color: #4a5149;
+  background: #101511;
+}
+
+.account-menu-popover > a,
+.account-menu-popover form button {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.account-menu-popover form {
+  margin: 0;
+}
+
+.account-menu-popover > a:hover,
+.account-menu-popover form button:hover {
+  border-color: #4a5149;
+  background: #202620;
+}
+
+.account-menu--light .account-menu-trigger {
+  border-color: #cfc8bd;
+  background: #fff;
+  color: #171916;
+}
+
+.account-menu--light .account-menu-trigger:hover,
+.account-menu--light .account-menu-trigger[aria-expanded="true"] {
+  border-color: #806344;
+  background: #eee7dc;
+}
+
+.account-menu--light .account-menu-avatar > span {
+  border-color: #fff;
+}
+
+.account-menu--light .account-menu-popover {
+  border-color: #cfc8bd;
+  background: #f8f4ed;
+  box-shadow: 0 18px 38px rgb(45 38 29 / 18%);
+  color: #171916;
+}
+
+.account-menu--light .account-menu-identity {
+  border-color: #d9d1c5;
+}
+
+.account-menu--light .account-menu-identity p,
+.account-menu--light .account-menu-language > span {
+  color: #716d65;
+}
+
+.account-menu--light .account-menu-language {
+  border-color: #d9d1c5;
+}
+
+.account-menu--light .account-menu-language > .language-switch {
+  border-color: #cfc8bd;
+  background: #fff;
+}
+
+.account-menu--light .account-menu-language > .language-switch button.is-active {
+  background: #171916;
+  color: #fff;
+}
+
+.account-menu--light .account-menu-popover > a:hover,
+.account-menu--light .account-menu-popover form button:hover {
+  border-color: #d4cabd;
+  background: #eee7dc;
 }
 
 .panel-auth-form,
@@ -5521,9 +5724,18 @@ textarea {
 
   .mobile-site-menu-footer > .language-switch {
     position: static;
+    display: inline-grid;
     justify-self: start;
     border-color: #4a5149;
     background: #101511;
+  }
+
+  .desktop-account-menu {
+    display: none;
+  }
+
+  .mobile-auth-actions {
+    display: block;
   }
 
   .mobile-user-session {
