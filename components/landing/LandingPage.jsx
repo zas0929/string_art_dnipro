@@ -4,10 +4,8 @@ import ArrowLeftRight from "lucide-react/dist/esm/icons/arrow-left-right.mjs";
 import ArrowRight from "lucide-react/dist/esm/icons/arrow-right.mjs";
 import Camera from "lucide-react/dist/esm/icons/camera.mjs";
 import Check from "lucide-react/dist/esm/icons/check.mjs";
-import Clock3 from "lucide-react/dist/esm/icons/clock-3.mjs";
-import Globe2 from "lucide-react/dist/esm/icons/globe-2.mjs";
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
-import Headphones from "lucide-react/dist/esm/icons/headphones.mjs";
+import MessageCircle from "lucide-react/dist/esm/icons/message-circle.mjs";
 import Menu from "lucide-react/dist/esm/icons/menu.mjs";
 import Package from "lucide-react/dist/esm/icons/package.mjs";
 import ShieldCheck from "lucide-react/dist/esm/icons/shield-check.mjs";
@@ -28,21 +26,31 @@ export default function LandingPage() {
   const [orderOpen, setOrderOpen] = useState(false);
 
   const featureCards = [
-    { image: "/board.png", title: t("landing.featureMaterials"), copy: t("landing.featureMaterialsCopy") },
-    { image: "/instruction.png", title: t("landing.featureGuide"), copy: t("landing.featureGuideCopy") },
+    {
+      images: ["/circle.jpeg", "/square.jpeg"],
+      imageClass: "is-foundation-pair",
+      title: t("landing.featureMaterials"),
+      copy: t("landing.featureMaterialsCopy"),
+    },
+    {
+      image: "/instruction.png",
+      overlayImage: "/app-build-mode-2.jpeg",
+      imageClass: "has-app-overlay",
+      title: t("landing.featureGuide"),
+      copy: t("landing.featureGuideCopy"),
+    },
     { image: "/owners.png", title: t("landing.featurePersonal"), copy: t("landing.featurePersonalCopy") },
     { image: "/support.png", title: t("landing.featureSupport"), copy: t("landing.featureSupportCopy") },
   ];
 
-  const benefits = [
-    { icon: WandSparkles, title: t("landing.freePattern"), copy: t("landing.freePatternCopy") },
-    { icon: Clock3, title: t("landing.production"), copy: t("landing.productionCopy") },
-    { icon: Globe2, title: t("landing.delivery"), copy: t("landing.deliveryCopy") },
-    { icon: Headphones, title: t("landing.support"), copy: t("landing.supportCopy") },
-  ];
-
   const steps = [
     { icon: Camera, title: t("landing.stepPhoto"), copy: t("landing.stepPhotoCopy") },
+    {
+      icon: MessageCircle,
+      title: t("landing.stepInstagram"),
+      copy: t("landing.stepInstagramCopy"),
+      href: "https://www.instagram.com/string_art_dnipro/",
+    },
     { icon: WandSparkles, title: t("landing.stepPattern"), copy: t("landing.stepPatternCopy") },
     { icon: Package, title: t("landing.stepKit"), copy: t("landing.stepKitCopy") },
     { icon: Hammer, title: t("landing.stepBuild"), copy: t("landing.stepBuildCopy") },
@@ -87,8 +95,9 @@ export default function LandingPage() {
           <p>{t("landing.heroCopy")}</p>
           <ul>
             <li><Check size={16} />{t("landing.heroBenefitPattern")}</li>
-            <li><Check size={16} />{t("landing.heroBenefitSpeed")}</li>
-            <li><Check size={16} />{t("landing.heroBenefitDelivery")}</li>
+            <li><Check size={16} />{t("landing.heroBenefitGenerator")}</li>
+            <li><Check size={16} />{t("landing.heroBenefitPhotoHelp")}</li>
+            <li><Check size={16} />{t("landing.heroBenefitShipping")}</li>
           </ul>
           <div className="landing-hero-actions">
             <button className="landing-primary-cta" type="button" onClick={() => setOrderOpen(true)}>
@@ -105,37 +114,83 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="landing-benefits" aria-label={t("landing.keyFeatures")}>
-        {benefits.map(({ icon: Icon, title, copy }) => (
-          <div key={title}><span><Icon size={20} /></span><p><strong>{title}</strong>{copy}</p></div>
-        ))}
+      <section id="process" className="landing-section landing-process landing-process-primary">
+        <div className="landing-section-heading">
+          <p>{t("landing.processEyebrow")}</p>
+          <h2>{t("landing.processTitle")}</h2>
+        </div>
+        <ol>
+          {steps.map(({ icon: Icon, title, copy, href }) => (
+            <li key={title}>
+              <div className="landing-process-step-head">
+                <span className="landing-process-icon"><Icon aria-hidden="true" size={23} /></span>
+              </div>
+              <h3>{title}</h3>
+              <p>{copy}</p>
+              {href ? (
+                <a className="landing-instagram-link" href={href} target="_blank" rel="noreferrer">
+                  @string_art_dnipro <ArrowRight aria-hidden="true" size={15} />
+                </a>
+              ) : null}
+            </li>
+          ))}
+        </ol>
       </section>
 
       <section className="landing-feature-gallery" aria-label={t("landing.keyFeatures")}>
         {featureCards.map((item, index) => (
           <article key={item.title}>
-            <div className={`landing-feature-image feature-${index + 1}`}><img src={item.image} alt="" /></div>
+            <div className={`landing-feature-image feature-${index + 1} ${item.imageClass || ""}`}>
+              {item.images
+                ? item.images.map((image) => <img key={image} src={image} alt="" />)
+                : <img src={item.image} alt="" />}
+              {item.overlayImage ? (
+                <span className="landing-feature-phone" aria-hidden="true">
+                  <img src={item.overlayImage} alt="" />
+                </span>
+              ) : null}
+            </div>
             <h2>{item.title}</h2>
             <p>{item.copy}</p>
           </article>
         ))}
       </section>
 
-      <section id="process" className="landing-section landing-process">
-        <div className="landing-section-heading">
-          <p>{t("landing.processEyebrow")}</p>
-          <h2>{t("landing.processTitle")}</h2>
-        </div>
-        <ol>
-          {steps.map(({ icon: Icon, title, copy }, index) => (
-            <li key={title}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <Icon aria-hidden="true" size={21} />
-              <h3>{title}</h3>
-              <p>{copy}</p>
-            </li>
-          ))}
-        </ol>
+      <section id="kit" className="landing-section landing-product-grid">
+        <article className="landing-kit-panel">
+          <div className="landing-panel-copy">
+            <p className="landing-eyebrow">{t("landing.kitEyebrow")}</p>
+            <h2>{t("landing.kitTitle")}</h2>
+            <ul>
+              <li><Check size={16} />{t("landing.kitBoard")}</li>
+              <li><Check size={16} />{t("landing.kitMaterials")}</li>
+              <li><Check size={16} />{t("landing.kitGuide")}</li>
+              <li><Check size={16} />{t("landing.kitPackaging")}</li>
+            </ul>
+            <div className="landing-kit-prices" aria-label={t("landing.kitPrices")}>
+              <p><span>{t("landing.kitRound")}</span><strong>{t("landing.kitRoundPrice")}</strong></p>
+              <p><span>{t("landing.kitSquare")}</span><strong>{t("landing.kitSquarePrice")}</strong></p>
+            </div>
+          </div>
+          <div className="landing-kit-visual" aria-hidden="true">
+            <img src="/kit.png" alt="" />
+          </div>
+        </article>
+        <article className="landing-build-panel">
+          <div className="landing-panel-copy landing-build-info">
+            <p className="landing-eyebrow">{t("landing.buildEyebrow")}</p>
+            <h2>{t("landing.buildTitle")}</h2>
+            <ul>
+              <li><Check size={16} />{t("landing.buildVoice")}</li>
+              <li><Check size={16} />{t("landing.buildSync")}</li>
+              <li><Check size={16} />{t("landing.buildRecovery")}</li>
+              <li><Check size={16} />{t("landing.buildControls")}</li>
+            </ul>
+          </div>
+          <div className="landing-build-visual">
+            <img src="/build-mode-preview-v2.png" alt={t("landing.buildTitle")} />
+          </div>
+        </article>
       </section>
 
       <section className="landing-generator-demo">
@@ -162,30 +217,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="kit" className="landing-section landing-product-grid">
-        <article className="landing-kit-panel">
-          <div className="landing-panel-copy">
-            <p className="landing-eyebrow">{t("landing.kitEyebrow")}</p>
-            <h2>{t("landing.kitTitle")}</h2>
-            <ul>
-              <li><Check size={16} />{t("landing.kitBoard")}</li>
-              <li><Check size={16} />{t("landing.kitMaterials")}</li>
-              <li><Check size={16} />{t("landing.kitGuide")}</li>
-              <li><Check size={16} />{t("landing.kitPackaging")}</li>
-            </ul>
+      <section className="landing-photo-guide">
+        <div className="landing-photo-guide-heading">
+          <p className="landing-eyebrow">{t("landing.photoGuideEyebrow")}</p>
+          <h2>{t("landing.photoGuideTitle")}</h2>
+        </div>
+        <div className="landing-photo-guide-content">
+          <div className="landing-photo-guide-copy">
+            <div className="landing-photo-guide-list is-good">
+              <h3><Check aria-hidden="true" size={19} />{t("landing.photoGuideGood")}</h3>
+              <ul>
+                <li>{t("landing.photoGuideGoodContrast")}</li>
+                <li>{t("landing.photoGuideGoodFaces")}</li>
+                <li>{t("landing.photoGuideGoodDetails")}</li>
+              </ul>
+            </div>
+            <div className="landing-photo-guide-list is-bad">
+              <h3><X aria-hidden="true" size={19} />{t("landing.photoGuideBad")}</h3>
+              <ul>
+                <li>{t("landing.photoGuideBadDistance")}</li>
+                <li>{t("landing.photoGuideBadGroup")}</li>
+                <li>{t("landing.photoGuideBadQuality")}</li>
+              </ul>
+            </div>
           </div>
-          <div className="landing-kit-visual" aria-hidden="true">
-            <img src="/kit.png" alt="" />
+          <div className="landing-photo-guide-visual" aria-label={t("landing.photoGuideExamples")}>
+            <span className="photo-guide-example is-good is-top" aria-hidden="true">
+              <span className="photo-guide-example-circle" />
+            </span>
+            <span className="photo-guide-example is-bad is-top" aria-hidden="true">
+              <span className="photo-guide-example-circle" />
+            </span>
+            <span className="photo-guide-example is-good is-bottom" aria-hidden="true">
+              <span className="photo-guide-example-circle" />
+            </span>
+            <span className="photo-guide-example is-bad is-bottom" aria-hidden="true">
+              <span className="photo-guide-example-circle" />
+            </span>
+            <span className="photo-guide-mark is-good is-top"><Check aria-hidden="true" size={22} /></span>
+            <span className="photo-guide-mark is-bad is-top"><X aria-hidden="true" size={22} /></span>
+            <span className="photo-guide-mark is-good is-bottom"><Check aria-hidden="true" size={22} /></span>
+            <span className="photo-guide-mark is-bad is-bottom"><X aria-hidden="true" size={22} /></span>
           </div>
-        </article>
-        <article className="landing-build-panel">
-          <div className="landing-build-copy">
-            <p>{t("landing.buildMode")}</p>
-            <span>{t("landing.buildStep")} 1247 / 4000</span>
-            <strong>48 <ArrowRight size={22} /> 173</strong>
-            <div><button type="button">{t("landing.back")}</button><button type="button">{t("landing.nextStep")}</button></div>
-          </div>
-        </article>
+        </div>
       </section>
 
       <section id="faq" className="landing-final-cta">
