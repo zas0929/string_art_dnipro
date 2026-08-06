@@ -56,6 +56,14 @@ export default function LandingPage() {
     { icon: Hammer, title: t("landing.stepBuild"), copy: t("landing.stepBuildCopy") },
   ];
 
+  const faqItems = [
+    { question: t("landing.faqPhotoQuestion"), answer: t("landing.faqPhotoAnswer") },
+    { question: t("landing.faqKitQuestion"), answer: t("landing.faqKitAnswer") },
+    { question: t("landing.faqTimingQuestion"), answer: t("landing.faqTimingAnswer") },
+    { question: t("landing.faqExperienceQuestion"), answer: t("landing.faqExperienceAnswer") },
+    { question: t("landing.faqGeneratorQuestion"), answer: t("landing.faqGeneratorAnswer") },
+  ];
+
   return (
     <main className="landing-page">
       <header className="landing-header">
@@ -142,8 +150,8 @@ export default function LandingPage() {
           <article key={item.title}>
             <div className={`landing-feature-image feature-${index + 1} ${item.imageClass || ""}`}>
               {item.images
-                ? item.images.map((image) => <img key={image} src={image} alt="" />)
-                : <img src={item.image} alt="" />}
+                ? item.images.map((image) => <img key={image} src={image} alt={item.title} loading="lazy" />)
+                : <img src={item.image} alt={item.title} loading="lazy" />}
               {item.overlayImage ? (
                 <span className="landing-feature-phone" aria-hidden="true">
                   <img src={item.overlayImage} alt="" />
@@ -172,8 +180,8 @@ export default function LandingPage() {
               <p><span>{t("landing.kitSquare")}</span><strong>{t("landing.kitSquarePrice")}</strong></p>
             </div>
           </div>
-          <div className="landing-kit-visual" aria-hidden="true">
-            <img src="/kit.png" alt="" />
+          <div className="landing-kit-visual">
+            <img src="/kit.png" alt={t("landing.kitTitle")} loading="lazy" />
           </div>
         </article>
         <article className="landing-build-panel">
@@ -188,7 +196,7 @@ export default function LandingPage() {
             </ul>
           </div>
           <div className="landing-build-visual">
-            <img src="/build-mode-preview-v2.png" alt={t("landing.buildTitle")} />
+            <img src="/build-mode-preview-v2.png" alt={t("landing.buildTitle")} loading="lazy" />
           </div>
         </article>
       </section>
@@ -262,7 +270,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section id="faq" className="landing-final-cta">
+      <section className="landing-final-cta">
         <ShieldCheck size={28} />
         <h2>{t("landing.finalTitle")}</h2>
         <p>{t("landing.finalCopy")}</p>
@@ -273,6 +281,21 @@ export default function LandingPage() {
           <a className="landing-secondary-cta" href="/create">
             {t("landing.generator")}<ArrowRight size={18} />
           </a>
+        </div>
+      </section>
+
+      <section id="faq" className="landing-section landing-faq">
+        <div className="landing-section-heading">
+          <p>{t("landing.faqEyebrow")}</p>
+          <h2>{t("landing.faqTitle")}</h2>
+        </div>
+        <div className="landing-faq-list">
+          {faqItems.map(({ question, answer }) => (
+            <details key={question}>
+              <summary>{question}</summary>
+              <p>{answer}</p>
+            </details>
+          ))}
         </div>
       </section>
 

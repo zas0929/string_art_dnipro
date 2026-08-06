@@ -4,7 +4,11 @@ import { isSupabaseConfigured } from "../../lib/supabase/config.js";
 import { createClient } from "../../lib/supabase/server.js";
 
 export const metadata = {
-  title: "Reset password · String Art Generator",
+  title: "Відновлення пароля",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default async function ResetPasswordPage() {

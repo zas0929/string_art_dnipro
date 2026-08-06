@@ -1,7 +1,11 @@
 import BuildMode from "../../components/build/BuildMode.jsx";
 
 export const metadata = {
-  title: "Build Mode · String Art Generator",
+  title: "Режим складання",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function BuildPage() {

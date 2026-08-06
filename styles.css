@@ -1550,6 +1550,68 @@ textarea {
   object-fit: contain;
 }
 
+.landing-faq {
+  display: grid;
+  gap: 34px;
+  scroll-margin-top: 24px;
+  border-top: 1px solid var(--landing-rule);
+  border-bottom: 1px solid var(--landing-rule);
+  background: #f4eee5;
+}
+
+.landing-faq .landing-section-heading {
+  align-self: start;
+}
+
+.landing-faq-list {
+  border-top: 1px solid #cfc5b7;
+}
+
+.landing-faq-list details {
+  border-bottom: 1px solid #cfc5b7;
+}
+
+.landing-faq-list summary {
+  position: relative;
+  padding: 20px 42px 20px 0;
+  color: #171916;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.35;
+  list-style: none;
+}
+
+.landing-faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.landing-faq-list summary::after {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 20px;
+  color: #806344;
+  content: "+";
+  font-size: 24px;
+  font-weight: 400;
+  text-align: center;
+  transform: translateY(-50%);
+  transition: transform 160ms ease;
+}
+
+.landing-faq-list details[open] summary::after {
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.landing-faq-list details > p {
+  max-width: 720px;
+  margin: -4px 42px 20px 0;
+  color: #686158;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
 .landing-final-cta {
   display: grid;
   justify-items: center;
@@ -6141,6 +6203,13 @@ textarea {
     min-width: 0;
     padding-right: 10px;
     padding-left: 10px;
+  }
+}
+
+@media screen and (min-width: 980px) {
+  .landing-faq {
+    grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+    align-items: start;
   }
 }
 

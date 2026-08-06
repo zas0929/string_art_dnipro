@@ -3,7 +3,11 @@ import { isSupabaseConfigured } from "../../lib/supabase/config.js";
 import { createClient } from "../../lib/supabase/server.js";
 
 export const metadata = {
-  title: "Account · String Art Generator",
+  title: "Акаунт",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default async function AccountPage() {

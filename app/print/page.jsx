@@ -1,7 +1,11 @@
 import PrintInstruction from "../../components/print/PrintInstruction.jsx";
 
 export const metadata = {
-  title: "Print Instructions · String Art Generator",
+  title: "Інструкція для друку",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function PrintPage() {

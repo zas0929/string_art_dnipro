@@ -5,12 +5,56 @@ import MobileNavigation from "../components/navigation/MobileNavigation.jsx";
 import ServiceWorkerRegistration from "../components/pwa/ServiceWorkerRegistration.jsx";
 import { isSupabaseConfigured } from "../lib/supabase/config.js";
 import { createClient } from "../lib/supabase/server.js";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, SOCIAL_IMAGE } from "../lib/site.js";
 
 export const metadata = {
-  title: "String Art Generator",
-  description: "Generate String Art patterns from your photos",
-  applicationName: "String Art Dnipro",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Картини ниткою за фото та String Art набори",
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "arts and crafts",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    type: "website",
+    locale: "uk_UA",
+    alternateLocale: "en_US",
+    siteName: SITE_NAME,
+    title: "Картини ниткою за фото та String Art набори",
+    description: SITE_DESCRIPTION,
+    images: [
+      {
+        url: SOCIAL_IMAGE,
+        width: 1672,
+        height: 941,
+        alt: "Персональна картина String Art в інтер'єрі",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Картини ниткою за фото та String Art набори",
+    description: SITE_DESCRIPTION,
+    images: [SOCIAL_IMAGE],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  ...(process.env.GOOGLE_SITE_VERIFICATION
+    ? { verification: { google: process.env.GOOGLE_SITE_VERIFICATION } }
+    : {}),
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -58,7 +102,7 @@ export default async function RootLayout({ children }) {
   }
 
   return (
-    <html lang="en">
+    <html lang="uk">
       <body>
         <LanguageProvider>
           <AuthSessionProvider user={user}>
