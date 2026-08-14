@@ -11,7 +11,10 @@ export const metadata = {
   },
 };
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const initialError = params?.confirmation === "failed" ? "authCallbackFailed" : "";
+
   if (isSupabaseConfigured()) {
     const supabase = await createClient();
     const { data } = await supabase.auth.getClaims();
@@ -20,7 +23,7 @@ export default async function LoginPage() {
 
   return (
     <main className="auth-page">
-      <AuthForm configured={isSupabaseConfigured()} />
+      <AuthForm configured={isSupabaseConfigured()} initialError={initialError} />
     </main>
   );
 }

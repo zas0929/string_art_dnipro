@@ -119,22 +119,19 @@ test("shared mobile menu connects the main application pages", async ({ page }, 
 
 test("account page exposes sign-in, registration and password recovery", async ({ page }) => {
   await page.goto("/login");
-  const englishSwitch = page.locator('.language-switch button').first();
-  if (await englishSwitch.getAttribute("aria-pressed") !== "true") {
-    await englishSwitch.click();
-  }
 
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign in" }).last()).toBeVisible();
-  await page.getByRole("tab", { name: "Create account" }).click();
-  await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
-  await page.getByRole("tab", { name: "Sign in" }).click();
-  await page.getByRole("button", { name: "Forgot password?" }).click();
-  await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send reset link" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Welcome back|З поверненням/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Continue with Google|Продовжити з Google/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Sign in$|^Увійти$/ }).last()).toBeVisible();
+  await page.getByRole("tab", { name: /Create account|Створити акаунт/ }).click();
+  await expect(page.getByRole("heading", { name: /Create your account|Створіть акаунт/ })).toBeVisible();
+  await page.getByRole("tab", { name: /^Sign in$|^Увійти$/ }).click();
+  await page.getByRole("button", { name: /Forgot password\?|Забули пароль\?/ }).click();
+  await expect(page.getByRole("heading", { name: /Reset your password|Відновлення пароля/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Send reset link|Надіслати посилання/ })).toBeVisible();
   await expect(page.getByRole("tab")).toHaveCount(0);
-  await page.getByRole("button", { name: "Back to sign in" }).click();
-  await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
+  await page.getByRole("button", { name: /Back to sign in|Повернутися до входу/ }).click();
+  await expect(page.getByRole("heading", { name: /Welcome back|З поверненням/ })).toBeVisible();
 });
 
 test("generator and build mode share working navigation", async ({ page }) => {
