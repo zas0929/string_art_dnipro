@@ -6218,3 +6218,136 @@ textarea {
     display: none !important;
   }
 }
+
+.build-checkpoint-backdrop {
+  position: fixed;
+  z-index: 1600;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 10, 7, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.build-checkpoint-modal {
+  position: relative;
+  width: min(100%, 480px);
+  padding: 38px 36px 32px;
+  border: 1px solid #6b5a42;
+  border-radius: 6px;
+  background: #121813;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+  color: #f3eee5;
+}
+
+.build-checkpoint-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #414941;
+  border-radius: 4px;
+  background: transparent;
+  color: #c7c4bb;
+  cursor: pointer;
+}
+
+.build-checkpoint-close:hover {
+  border-color: #d0ad7d;
+  color: #f3eee5;
+}
+
+.build-checkpoint-eyebrow {
+  margin: 0 48px 12px 0;
+  color: #d0ad7d;
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.build-checkpoint-modal h2 {
+  margin: 0 42px 14px 0;
+  color: #f8f3ea;
+  font-family: inherit;
+  font-size: clamp(25px, 5vw, 34px);
+  line-height: 1.08;
+  letter-spacing: 0;
+}
+
+.build-checkpoint-message {
+  margin: 0;
+  color: #b9b6ad;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.build-checkpoint-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.build-checkpoint-actions button {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 750;
+  line-height: 1.25;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  cursor: pointer;
+}
+
+.build-checkpoint-stay {
+  border: 1px solid #4d554e;
+  background: transparent;
+  color: #d0cdc5;
+}
+
+.build-checkpoint-stay:hover {
+  border-color: #d0ad7d;
+  color: #f8f3ea;
+}
+
+.build-checkpoint-continue {
+  border: 1px solid #eee6d9;
+  background: #eee6d9;
+  color: #111712;
+}
+
+.build-checkpoint-continue:hover {
+  border-color: #d8b47e;
+  background: #d8b47e;
+}
+
+@media screen and (max-width: 720px) {
+  .build-checkpoint-backdrop {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .build-checkpoint-modal {
+    padding: 34px 24px 24px;
+  }
+
+  .build-checkpoint-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .build-checkpoint-backdrop {
+    display: none !important;
+  }
+}

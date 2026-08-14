@@ -24,6 +24,10 @@ import {
   findRecentPointMatches,
   initialBuildSessionState,
 } from "../../core/build-session.js";
+import {
+  BUILD_CHECKPOINTS,
+  getCrossedBuildCheckpoints,
+} from "../../core/build-checkpoints.js";
 import { createBuildVoicePlayer } from "../../core/build-voice-player.js";
 import { parseBuildVoiceCommand } from "../../core/build-voice-command.js";
 import {
@@ -50,6 +54,7 @@ export default function BuildMode({ sharedPattern = null }) {
   const [speechControlSupported, setSpeechControlSupported] = useState(null);
   const [speechControlNotice, setSpeechControlNotice] = useState("");
   const [lostDialogOpen, setLostDialogOpen] = useState(false);
+  const [buildCheckpoint, setBuildCheckpoint] = useState(null);
   const primedSpeechRef = useRef(null);
   const voicePlayerRef = useRef(null);
   const projectStoreRef = useRef(null);
@@ -61,6 +66,11 @@ export default function BuildMode({ sharedPattern = null }) {
   const keepListeningRef = useRef(false);
   const speechCommandHandlerRef = useRef(null);
   const lastSpeechCommandRef = useRef({ resultIndex: -1, transcript: "" });
+  const checkpointPatternRef = useRef(null);
+  const checkpointPreviousStepRef = useRef(0);
+  const checkpointShownRef = useRef(new Set());
+  const checkpointQueueRef = useRef([]);
+  const checkpointResumePlaybackRef = useRef(false);
   const languageRef = useRef(language);
   const translationRef = useRef(t);
   languageRef.current = language;
@@ -242,6 +252,49 @@ export default function BuildMode({ sharedPattern = null }) {
   }, [sharedPattern]);
 
   useEffect(() => {
+    if (!state.hydrated || !state.pattern) {
+      checkpointPatternRef.current = null;
+      checkpointPreviousStepRef.current = 0;
+      checkpointShownRef.current = new Set();
+      checkpointQueueRef.current = [];
+      checkpointResumePlaybackRef.current = false;
+      setBuildCheckpoint(null);
+      return;
+    }
+
+    if (checkpointPatternRef.current !== state.pattern) {
+      checkpointPatternRef.current = state.pattern;
+      checkpointPreviousStepRef.current = state.stepIndex;
+      checkpointShownRef.current = new Set(
+        BUILD_CHECKPOINTS.filter((checkpoint) => state.stepIndex >= checkpoint),
+      );
+      checkpointQueueRef.current = [];
+      checkpointResumePlaybackRef.current = false;
+      setBuildCheckpoint(null);
+      return;
+    }
+
+    const previousStep = checkpointPreviousStepRef.current;
+    checkpointPreviousStepRef.current = state.stepIndex;
+    const totalSteps = Math.max(0, state.pattern.sequence.length - 1);
+    const crossed = getCrossedBuildCheckpoints(
+      previousStep,
+      state.stepIndex,
+      totalSteps,
+    ).filter((checkpoint) => !checkpointShownRef.current.has(checkpoint));
+
+    if (crossed.length === 0) return;
+    crossed.forEach((checkpoint) => checkpointShownRef.current.add(checkpoint));
+    checkpointQueueRef.current.push(...crossed);
+
+    if (buildCheckpoint === null) {
+      checkpointResumePlaybackRef.current = state.playback === "playing";
+      dispatch({ type: "PAUSE" });
+      setBuildCheckpoint(checkpointQueueRef.current.shift() ?? null);
+    }
+  }, [buildCheckpoint, state.hydrated, state.pattern, state.stepIndex]);
+
+  useEffect(() => {
     if (!state.hydrated || !state.pattern) return;
     const timeout = window.setTimeout(() => {
       const projectStore = projectStoreRef.current;
@@ -357,6 +410,33 @@ export default function BuildMode({ sharedPattern = null }) {
     dispatch({ type: "SEEK", stepIndex });
     setLostDialogOpen(false);
     setMessage(t("build.restored", { count: stepIndex }));
+  };
+
+  const continueAfterBuildCheckpoint = () => {
+    const nextCheckpoint = checkpointQueueRef.current.shift() ?? null;
+    if (nextCheckpoint !== null) {
+      setBuildCheckpoint(nextCheckpoint);
+      return;
+    }
+
+    const shouldResume = checkpointResumePlaybackRef.current;
+    checkpointResumePlaybackRef.current = false;
+    setBuildCheckpoint(null);
+    if (shouldResume && state.playback !== "complete") {
+      dispatch({ type: "TOGGLE_PLAY" });
+    }
+  };
+
+  const stayAtBuildCheckpoint = () => {
+    if (buildCheckpoint === null) return;
+    checkpointQueueRef.current = [];
+    checkpointResumePlaybackRef.current = false;
+    checkpointShownRef.current = new Set(
+      [...checkpointShownRef.current].filter((checkpoint) => checkpoint <= buildCheckpoint),
+    );
+    checkpointPreviousStepRef.current = buildCheckpoint;
+    dispatch({ type: "SEEK", stepIndex: buildCheckpoint });
+    setBuildCheckpoint(null);
   };
 
   const changeSpeed = (delta) => {
@@ -746,6 +826,14 @@ export default function BuildMode({ sharedPattern = null }) {
           onRestore={restoreLostPosition}
         />
       )}
+      {buildCheckpoint !== null && (
+        <BuildCheckpointDialog
+          checkpoint={buildCheckpoint}
+          t={t}
+          onContinue={continueAfterBuildCheckpoint}
+          onStay={stayAtBuildCheckpoint}
+        />
+      )}
       {wakeLockNotice && (
         <div className="wake-lock-toast" role="status" aria-live="polite">
           {wakeLockNotice}
@@ -757,6 +845,73 @@ export default function BuildMode({ sharedPattern = null }) {
         </div>
       )}
     </main>
+  );
+}
+
+function BuildCheckpointDialog({ checkpoint, onContinue, onStay, t }) {
+  const continueButtonRef = useRef(null);
+  const isLateCheckpoint = checkpoint >= 4000;
+
+  useEffect(() => {
+    continueButtonRef.current?.focus();
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onStay();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onStay]);
+
+  return (
+    <div
+      className="build-checkpoint-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onStay();
+      }}
+    >
+      <section
+        className="build-checkpoint-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="build-checkpoint-title"
+      >
+        <button
+          className="build-checkpoint-close"
+          type="button"
+          aria-label={t("build.checkpointClose")}
+          onClick={onStay}
+        >
+          <X aria-hidden="true" size={20} strokeWidth={2} />
+        </button>
+        <p className="build-checkpoint-eyebrow">
+          {t(isLateCheckpoint
+            ? "build.checkpoint4000Eyebrow"
+            : "build.checkpoint3500Eyebrow")}
+        </p>
+        <h2 id="build-checkpoint-title">
+          {t(isLateCheckpoint
+            ? "build.checkpoint4000Title"
+            : "build.checkpoint3500Title")}
+        </h2>
+        <p className="build-checkpoint-message">
+          {t(isLateCheckpoint
+            ? "build.checkpoint4000Message"
+            : "build.checkpoint3500Message")}
+        </p>
+        <div className="build-checkpoint-actions">
+          <button className="build-checkpoint-stay" type="button" onClick={onStay}>
+            {t("build.checkpointStay")}
+          </button>
+          <button
+            ref={continueButtonRef}
+            className="build-checkpoint-continue"
+            type="button"
+            onClick={onContinue}
+          >
+            {t("build.checkpointContinue")}
+          </button>
+        </div>
+      </section>
+    </div>
   );
 }
 
