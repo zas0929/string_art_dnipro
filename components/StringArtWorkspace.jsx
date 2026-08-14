@@ -31,6 +31,20 @@ export default function StringArtWorkspace() {
       <div className="stage">
         <div className="canvas-column source-column">
           <canvas id="sourceCanvas" width="760" height="760" aria-label={t("generator.sourceCanvas")} />
+          <div className="desktop-canvas-actions">
+            <label className="file-button photo-upload" htmlFor="imageInput">
+              <ImagePlus aria-hidden="true" size={18} strokeWidth={2} />
+              {t("generator.uploadPhoto")}
+            </label>
+            <label className="file-button scheme-upload" htmlFor="schemeInput">
+              <Upload aria-hidden="true" size={18} strokeWidth={2} />
+              {t("generator.uploadPattern")}
+            </label>
+            <button id="buildButton" type="button" disabled>
+              <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
+              {t("generator.generate")}
+            </button>
+          </div>
           <div className="crop-controls">
             <div className="crop-control-heading">
               <label htmlFor="zoomInput">{t("generator.photoZoom")}</label>
@@ -118,20 +132,6 @@ export default function StringArtWorkspace() {
         </div>
         <div className="canvas-column result-column">
           <canvas id="resultCanvas" width="760" height="760" aria-label={t("generator.resultCanvas")} />
-          <div className="desktop-canvas-actions">
-            <label className="file-button photo-upload" htmlFor="imageInput">
-              <ImagePlus aria-hidden="true" size={18} strokeWidth={2} />
-              {t("generator.uploadPhoto")}
-            </label>
-            <label className="file-button scheme-upload" htmlFor="schemeInput">
-              <Upload aria-hidden="true" size={18} strokeWidth={2} />
-              {t("generator.uploadPattern")}
-            </label>
-            <button id="buildButton" type="button" disabled>
-              <Play aria-hidden="true" size={18} fill="currentColor" strokeWidth={2} />
-              {t("generator.generate")}
-            </button>
-          </div>
           <div id="resultVariants" className="result-variants" aria-label={t("generator.lineVariants")} hidden>
             {[3500, 4000, 4500, 5000].map((lineCount) => (
               <button
