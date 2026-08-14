@@ -99,6 +99,9 @@ function createCloudAdapter(cloud) {
     async saveLatestPattern(pattern) {
       const localResult = await saveLatestPattern(pattern);
       const savedPattern = await cloud.saveProject(localResult.pattern);
+      if (savedPattern.id !== localResult.pattern.id) {
+        await saveLatestPattern(savedPattern);
+      }
       return { ...localResult, pattern: savedPattern, savedToCloud: true };
     },
     async activateProject(projectId) {

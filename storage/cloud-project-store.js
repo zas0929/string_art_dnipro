@@ -83,23 +83,37 @@ export function createCloudProjectStore(supabase, userId) {
     },
 
     async saveProject(pattern) {
-      const { data: existing, error: lookupError } = await supabase
-        .from("projects")
-        .select("id,source_preview_path,artwork_preview_path")
-        .eq("id", pattern.id)
-        .maybeSingle();
-      if (lookupError) throw lookupError;
+      let effectivePattern = pattern;
+      let existing = await findProjectRow(supabase, pattern.id);
 
-      const previewPaths = await uploadPreviews(pattern, userId, supabase, {
+      if (!existing) {
+        const initialRow = patternToCloudProject(pattern, userId);
+        const { error: insertError } = await supabase.from("projects").insert(initialRow);
+
+        if (insertError && !isUniqueViolation(insertError)) throw insertError;
+        if (insertError) {
+          existing = await findProjectRow(supabase, pattern.id);
+          if (!existing) {
+            effectivePattern = { ...pattern, id: crypto.randomUUID() };
+            const { error: retryError } = await supabase
+              .from("projects")
+              .insert(patternToCloudProject(effectivePattern, userId));
+            if (retryError) throw retryError;
+          }
+        }
+      }
+
+      const previewPaths = await uploadPreviews(effectivePattern, userId, supabase, {
         source: existing?.source_preview_path || null,
         artwork: existing?.artwork_preview_path || null,
       });
-      const row = patternToCloudProject(pattern, userId, previewPaths);
-
-      const query = existing
-        ? supabase.from("projects").update(row).eq("id", pattern.id)
-        : supabase.from("projects").insert(row);
-      const { data, error } = await query.select(PROJECT_COLUMNS).single();
+      const row = patternToCloudProject(effectivePattern, userId, previewPaths);
+      const { data, error } = await supabase
+        .from("projects")
+        .update(row)
+        .eq("id", effectivePattern.id)
+        .select(PROJECT_COLUMNS)
+        .single();
       if (error) throw error;
       return hydratePattern(data);
     },
@@ -153,6 +167,20 @@ export function createCloudProjectStore(supabase, userId) {
     ]);
     return cloudProjectToPattern(row, { source, artwork });
   }
+}
+
+async function findProjectRow(supabase, projectId) {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id,source_preview_path,artwork_preview_path")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+function isUniqueViolation(error) {
+  return error?.code === "23505";
 }
 
 async function uploadPreviews(pattern, userId, supabase, existingPaths = {}) {

@@ -14,7 +14,8 @@ test("project migration skips a stale preview that resolves to JSON", async (t) 
 
   const uploads = [];
   const insertedRows = [];
-  const supabase = createSupabaseStub({ uploads, insertedRows });
+  const updatedRows = [];
+  const supabase = createSupabaseStub({ uploads, insertedRows, updatedRows });
   const store = createCloudProjectStore(supabase, "user-1");
 
   const saved = await store.saveProject({
@@ -31,10 +32,45 @@ test("project migration skips a stale preview that resolves to JSON", async (t) 
   assert.equal(uploads.length, 0);
   assert.equal(insertedRows.length, 1);
   assert.equal(insertedRows[0].source_preview_path, null);
+  assert.equal(updatedRows.length, 1);
   assert.equal(saved.sourcePreviewDataUrl, null);
 });
 
-function createSupabaseStub({ uploads, insertedRows }) {
+test("project migration assigns a new id when another account owns the local id", async () => {
+  const insertedRows = [];
+  const updatedRows = [];
+  const supabase = createSupabaseStub({
+    uploads: [],
+    insertedRows,
+    updatedRows,
+    hiddenProjectCollision: true,
+  });
+  const store = createCloudProjectStore(supabase, "user-2");
+
+  const saved = await store.saveProject({
+    id: "project-owned-by-another-user",
+    name: "Imported project",
+    sequence: [1, 2, 3],
+    pointCount: 240,
+    lineCount: 2,
+    sourcePreviewDataUrl: null,
+    artworkPreviewDataUrl: null,
+    settings: {},
+  });
+
+  assert.equal(insertedRows.length, 2);
+  assert.equal(insertedRows[0].id, "project-owned-by-another-user");
+  assert.notEqual(insertedRows[1].id, insertedRows[0].id);
+  assert.equal(saved.id, insertedRows[1].id);
+});
+
+function createSupabaseStub({
+  uploads,
+  insertedRows,
+  updatedRows,
+  hiddenProjectCollision = false,
+}) {
+  let collisionReturned = false;
   const savedRow = (row) => ({
     ...row,
     created_at: "2026-08-14T12:00:00.000Z",
@@ -58,11 +94,26 @@ function createSupabaseStub({ uploads, insertedRows }) {
         },
         insert(row) {
           insertedRows.push(row);
+          if (hiddenProjectCollision && !collisionReturned) {
+            collisionReturned = true;
+            return Promise.resolve({
+              data: null,
+              error: { code: "23505", message: "duplicate key value" },
+            });
+          }
+          return Promise.resolve({ data: null, error: null });
+        },
+        update(row) {
+          updatedRows.push(row);
           return {
-            select() {
+            eq() {
               return {
-                async single() {
-                  return { data: savedRow(row), error: null };
+                select() {
+                  return {
+                    async single() {
+                      return { data: savedRow(row), error: null };
+                    },
+                  };
                 },
               };
             },
