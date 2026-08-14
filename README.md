@@ -139,6 +139,24 @@ When the environment variables are absent, the application deliberately runs
 without Supabase and does not attempt to refresh an auth session. Never expose
 the Supabase service-role key in this application.
 
+### Supabase Auth Email Templates
+
+Branded source templates for registration confirmation and password recovery
+live in `supabase/email-templates/`. Hosted Supabase projects do not deploy
+these files from migrations, so copy them into **Authentication -> Email
+Templates** in the Supabase Dashboard:
+
+| Supabase template | Subject | Source file |
+| --- | --- | --- |
+| Confirm sign up | `Підтвердіть реєстрацію у String Art Dnipro` | `confirm-signup.html` |
+| Reset password | `Відновлення пароля — String Art Dnipro` | `reset-password.html` |
+
+Both templates intentionally use `{{ .ConfirmationURL }}`. Supabase fills it
+with the secure one-time action URL and preserves the redirects configured in
+`app/login/actions.js`. The logo is loaded from the production site, so
+`https://www.stringartdnipro.com/logo-white-compact.png` must remain publicly
+available.
+
 ## Telegram Order Notifications
 
 Create a bot with `@BotFather`, send the bot at least one message or add it to

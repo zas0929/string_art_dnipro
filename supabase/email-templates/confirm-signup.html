@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Підтвердіть реєстрацію</title>
+  </head>
+  <body style="margin:0;padding:0;background:#ece7de;color:#151815;font-family:Arial,Helvetica,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+      Підтвердіть email, щоб зберігати макети та продовжувати складання на різних пристроях.
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#ece7de;">
+      <tr>
+        <td align="center" style="padding:28px 0;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;background:#f8f4ed;border:1px solid #d8cdbc;">
+            <tr>
+              <td align="center" style="padding:30px 32px;background:#0d130f;border-bottom:3px solid #cda975;">
+                <img src="https://www.stringartdnipro.com/logo-white-compact.png" width="64" height="64" alt="String Art Dnipro" style="display:block;width:64px;height:64px;margin:0 auto 12px;border:0;object-fit:contain;">
+                <div style="color:#f8f4ed;font-size:21px;line-height:28px;font-weight:700;letter-spacing:.2px;">STRING ART DNIPRO</div>
+                <div style="margin-top:5px;color:#c9c5bc;font-size:12px;line-height:18px;letter-spacing:1.5px;text-transform:uppercase;">Картини ниткою за вашим фото</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:42px 42px 18px;">
+                <div style="color:#8f7048;font-size:12px;line-height:18px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;">Майже готово</div>
+                <h1 style="margin:10px 0 18px;color:#151815;font-size:34px;line-height:40px;font-weight:700;letter-spacing:-.4px;">Підтвердіть свій email</h1>
+                <p style="margin:0;color:#5d605a;font-size:17px;line-height:27px;">Ви створили акаунт для <strong style="color:#151815;">{{ .Email }}</strong>. Підтвердіть адресу, щоб зберігати власні макети та продовжувати складання картини з будь-якого пристрою.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:16px 42px 34px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center" bgcolor="#cda975" style="background:#cda975;border:1px solid #b7905b;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:15px 28px;color:#111510;font-size:16px;line-height:20px;font-weight:700;text-decoration:none;">Підтвердити реєстрацію</a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 42px 38px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#eee7dc;border-left:3px solid #cda975;">
+                  <tr>
+                    <td style="padding:18px 20px;color:#5d605a;font-size:14px;line-height:22px;">Після підтвердження ви одразу повернетеся до String Art Dnipro. Якщо ви не створювали акаунт, просто проігноруйте цей лист.</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 42px;background:#e5ded2;border-top:1px solid #d8cdbc;">
+                <p style="margin:0 0 8px;color:#6c6d68;font-size:12px;line-height:18px;">Не відкривається кнопка? Скопіюйте посилання у браузер:</p>
+                <p style="margin:0;word-break:break-all;color:#6c5638;font-size:11px;line-height:17px;"><a href="{{ .ConfirmationURL }}" style="color:#6c5638;text-decoration:underline;">{{ .ConfirmationURL }}</a></p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:16px 0 0;color:#797a75;font-size:11px;line-height:17px;">© String Art Dnipro · <a href="https://www.stringartdnipro.com" style="color:#6c5638;text-decoration:none;">stringartdnipro.com</a></p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
