@@ -232,10 +232,25 @@ export function mountStringArtApp(root = document) {
     await saveCurrentProject();
   });
 
-  listen(buildModeLink, "click", async (event) => {
-    if (state.sequence.length < 2 || state.running) return;
+  listen(document, "click", (event) => {
+    if (event.defaultPrevented
+      || event.button !== 0
+      || event.metaKey
+      || event.ctrlKey
+      || event.shiftKey
+      || event.altKey
+      || state.sequence.length < 2
+      || state.running) return;
+
+    const anchor = event.target instanceof Element
+      ? event.target.closest('a[href="/build"]')
+      : null;
+    if (!anchor || (anchor.target && anchor.target !== "_self")) return;
+
     event.preventDefault();
-    if (await saveCurrentProject()) window.location.assign(buildModeLink.href);
+    void saveCurrentProject().then((saved) => {
+      if (saved && !destroyed) window.location.assign(anchor.href);
+    });
   });
 
   listen(pointsInput, "input", () => {
@@ -394,7 +409,7 @@ export function mountStringArtApp(root = document) {
     state.sequence = [0];
     state.sequenceDisplayStart = 0;
 
-    drawSourceFromPrepared(prepared, settings);
+    drawInteractiveSourcePreview();
     drawResultBase(settings);
 
     try {
@@ -510,13 +525,8 @@ export function mountStringArtApp(root = document) {
   }
 
   function prepareImage(settings) {
-    const previewFrame = createSourceFrame(settings, WORK_SIZE);
-    paintOutsideCircle(previewFrame, 18);
-    previewFrame.ctx.putImageData(previewFrame.imageData, 0, 0);
-
     const referenceFrame = createSourceFrame(settings, REFERENCE_WORK_SIZE);
     return {
-      canvas: previewFrame.canvas,
       target: createReferenceTarget(
         referenceFrame.data,
         REFERENCE_WORK_SIZE,
@@ -543,37 +553,13 @@ export function mountStringArtApp(root = document) {
     const imageData = context.getImageData(0, 0, size, size);
     applyImageEnhancements(imageData, size, size, settings);
     context.putImageData(imageData, 0, 0);
-    const mask = new Uint8Array(size * size);
-    const radius = size / 2 - 8 * scale;
-    const center = size / 2;
-
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const index = y * size + x;
-        const dx = x - center;
-        const dy = y - center;
-        mask[index] = dx * dx + dy * dy <= radius * radius ? 1 : 0;
-      }
-    }
 
     return {
       canvas,
       ctx: context,
       imageData,
       data: imageData.data,
-      mask,
     };
-  }
-
-  function paintOutsideCircle(frame, value) {
-    for (let index = 0; index < frame.mask.length; index++) {
-      if (frame.mask[index]) continue;
-      const offset = index * 4;
-      frame.data[offset] = value;
-      frame.data[offset + 1] = value;
-      frame.data[offset + 2] = value;
-      frame.data[offset + 3] = 255;
-    }
   }
 
   async function importScheme(text) {
@@ -694,7 +680,7 @@ export function mountStringArtApp(root = document) {
         || settings.clarity > 0
       )
     ) {
-      const frame = createSourceFrame(settings, WORK_SIZE);
+      const frame = createSourceFrame(settings, sourceCanvas.width);
       sourceCtx.drawImage(frame.canvas, 0, 0, sourceCanvas.width, sourceCanvas.height);
     } else {
       const fit = getImageFit(state.image, WORK_SIZE, settings);
@@ -927,29 +913,6 @@ export function mountStringArtApp(root = document) {
       drawInitialResult();
       drawRecalculationPlaceholder();
     }
-  }
-
-  function drawSourceFromPrepared(prepared, settings) {
-    sourceCtx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-    sourceCtx.fillStyle = "#050506";
-    sourceCtx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
-    sourceCtx.drawImage(
-      prepared.canvas,
-      0,
-      0,
-      sourceCanvas.width,
-      sourceCanvas.height,
-    );
-    drawNails(
-      sourceCtx,
-      buildCirclePoints(
-        settings.points,
-        sourceCanvas.width / 2 - 16,
-        sourceCanvas.width / 2,
-        sourceCanvas.height / 2,
-      ),
-      sourceCanvas.width,
-    );
   }
 
   function drawInitialResult() {
