@@ -91,9 +91,15 @@ export default async function RootLayout({ children }) {
       const supabase = await createClient();
       const { data } = await supabase.auth.getClaims();
       if (data?.claims?.sub) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.claims.sub)
+          .maybeSingle();
         user = {
           id: data.claims.sub,
           email: data.claims.email || "",
+          role: profile?.role === "admin" ? "admin" : "user",
         };
       }
     } catch {

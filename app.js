@@ -37,6 +37,7 @@ export function mountStringArtApp(root = document) {
     if (!element) throw new Error(`Required element #${id} was not found`);
     return element;
   };
+  const getOptionalElement = (id) => root.querySelector(`#${id}`);
 
   const resultCanvas = getElement("resultCanvas");
   const sourceCanvas = getElement("sourceCanvas");
@@ -65,19 +66,19 @@ export function mountStringArtApp(root = document) {
   const buildButton = getElement("buildButton");
   const mobileBuildButton = getElement("mobileBuildButton");
   const buildButtons = [buildButton, mobileBuildButton];
-  const pngButton = getElement("pngButton");
-  const txtButton = getElement("txtButton");
-  const printButton = getElement("printButton");
+  const pngButton = getOptionalElement("pngButton");
+  const txtButton = getOptionalElement("txtButton");
+  const printButton = getOptionalElement("printButton");
   const saveProjectButton = getElement("saveProjectButton");
   const saveProjectLabel = getElement("saveProjectLabel");
   const buildModeLink = getElement("buildModeLink");
   const statusText = getElement("status");
   const progress = getElement("progress");
-  const pointsOut = getElement("pointsOut");
-  const linesOut = getElement("linesOut");
-  const stepOut = getElement("stepOut");
-  const lengthOut = getElement("lengthOut");
-  const sequenceOutput = getElement("sequenceOutput");
+  const pointsOut = getOptionalElement("pointsOut");
+  const linesOut = getOptionalElement("linesOut");
+  const stepOut = getOptionalElement("stepOut");
+  const lengthOut = getOptionalElement("lengthOut");
+  const sequenceOutput = getOptionalElement("sequenceOutput");
 
   const state = {
     image: null,
@@ -117,6 +118,7 @@ export function mountStringArtApp(root = document) {
   let saveLabelResetTimer = 0;
 
   const listen = (target, type, handler, options = {}) => {
+    if (!target) return;
     target.addEventListener(type, handler, {
       ...options,
       signal: listenerController.signal,
@@ -416,10 +418,12 @@ export function mountStringArtApp(root = document) {
       const result = await runReferenceWorker(settings, prepared.target, renderedLines);
       state.cancelled = result.cancelled;
       updateSummary(settings, renderedLines.length);
-      sequenceOutput.value = formatSequence(
-        state.sequence,
-        state.sequenceDisplayStart,
-      );
+      if (sequenceOutput) {
+        sequenceOutput.value = formatSequence(
+          state.sequence,
+          state.sequenceDisplayStart,
+        );
+      }
       progress.value = state.cancelled
         ? renderedLines.length / settings.lines
         : 1;
@@ -613,10 +617,12 @@ export function mountStringArtApp(root = document) {
     configureResultVariants(renderedLines, settings);
     drawSchemePlaceholder(pointCount, lineCount);
     updateSummary(settings, lineCount);
-    sequenceOutput.value = formatSequence(
-      state.sequence,
-      state.sequenceDisplayStart,
-    );
+    if (sequenceOutput) {
+      sequenceOutput.value = formatSequence(
+        state.sequence,
+        state.sequenceDisplayStart,
+      );
+    }
     progress.value = 1;
     setExportEnabled(true);
     setStatus("generator.patternUploaded", { count: lineCount });
@@ -901,11 +907,11 @@ export function mountStringArtApp(root = document) {
     state.sequence = [];
     state.sequenceDisplayStart = 0;
     setExportEnabled(false);
-    sequenceOutput.value = "";
-    pointsOut.textContent = "-";
-    linesOut.textContent = "-";
-    stepOut.textContent = "-";
-    lengthOut.textContent = "-";
+    if (sequenceOutput) sequenceOutput.value = "";
+    if (pointsOut) pointsOut.textContent = "-";
+    if (linesOut) linesOut.textContent = "-";
+    if (stepOut) stepOut.textContent = "-";
+    if (lengthOut) lengthOut.textContent = "-";
     progress.value = 0;
     state.resultNeedsRecalculation = true;
     setStatus(null);
@@ -1139,6 +1145,7 @@ export function mountStringArtApp(root = document) {
   }
 
   function updateSummary(settings, lineCount) {
+    if (!pointsOut || !linesOut || !stepOut || !lengthOut) return;
     pointsOut.textContent = String(settings.points);
     linesOut.textContent = String(lineCount);
     stepOut.textContent = state.sequence.length > 1
@@ -1202,9 +1209,9 @@ export function mountStringArtApp(root = document) {
   }
 
   function setExportEnabled(enabled) {
-    pngButton.disabled = !enabled;
-    txtButton.disabled = !enabled;
-    printButton.disabled = !enabled;
+    if (pngButton) pngButton.disabled = !enabled;
+    if (txtButton) txtButton.disabled = !enabled;
+    if (printButton) printButton.disabled = !enabled;
     saveProjectButton.disabled = !enabled;
   }
 

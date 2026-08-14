@@ -5,7 +5,7 @@ import { createContext, useContext, useMemo } from "react";
 const AuthSessionContext = createContext({ user: null });
 
 export function AuthSessionProvider({ user, children }) {
-  const value = useMemo(() => ({ user }), [user?.id, user?.email]);
+  const value = useMemo(() => ({ user }), [user?.id, user?.email, user?.role]);
   return (
     <AuthSessionContext.Provider value={value}>
       {children}

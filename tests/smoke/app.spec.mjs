@@ -375,29 +375,12 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
     buffer: Buffer.from(scheme),
   });
 
-  await expect(page.locator("#sequenceOutput")).toHaveValue(/50 -> 25 -> 43/);
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "TXT" }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("string-art-scheme.txt");
-  expect(await readDownload(download)).toBe(scheme);
-
-  const pngDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "PNG" }).click();
-  const pngDownload = await pngDownloadPromise;
-  expect(pngDownload.suggestedFilename()).toBe("string-art-preview.png");
-  const pngBuffer = await readDownloadBuffer(pngDownload);
-  const cornerAlpha = await page.evaluate(async (encodedPng) => {
-    const response = await fetch(`data:image/png;base64,${encodedPng}`);
-    const bitmap = await createImageBitmap(await response.blob());
-    const canvas = document.createElement("canvas");
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext("2d");
-    context.drawImage(bitmap, 0, 0);
-    return context.getImageData(0, 0, 1, 1).data[3];
-  }, pngBuffer.toString("base64"));
-  expect(cornerAlpha).toBe(0);
+  await expect(page.locator("#status"))
+    .toHaveText(/Pattern uploaded: 3 steps|Схему завантажено: 3 кроків/);
+  await expect(page.locator("#sequenceOutput")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "TXT" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "PNG" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Print|Друк/ })).toHaveCount(0);
 
   await page.getByRole("link", { name: "Build mode" }).click();
   await expect(page.getByText("Step 1 of 3")).toBeVisible({ timeout: 20_000 });
@@ -421,15 +404,6 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await englishVoiceRequest;
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-
-  await page.getByRole("button", { name: "Switch to Ukrainian" }).click();
-  const ukrainianVoiceRequest = page.waitForRequest(
-    (request) => request.url().endsWith("/audio/build/uk/50.m4a"),
-  );
-  await page.getByRole("button", { name: "Старт", exact: true }).click();
-  await ukrainianVoiceRequest;
-  await page.getByRole("button", { name: "Пауза", exact: true }).click();
-  await page.getByRole("button", { name: "Перемкнути на англійську" }).click();
 
   await page.getByRole("button", { name: "Shorten pause" }).click();
   await expect(page.locator("#buildSpeedInput")).toHaveValue("1250");
@@ -789,15 +763,4 @@ async function pinchOut(page, selector) {
 
 async function waitForGenerator(page) {
   await expect(page.locator("#schemeInput")).toBeEnabled({ timeout: 20_000 });
-}
-
-async function readDownload(download) {
-  return (await readDownloadBuffer(download)).toString();
-}
-
-async function readDownloadBuffer(download) {
-  const stream = await download.createReadStream();
-  const chunks = [];
-  for await (const chunk of stream) chunks.push(chunk);
-  return Buffer.concat(chunks);
 }

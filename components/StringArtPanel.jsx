@@ -16,6 +16,7 @@ import { useLanguage } from "./i18n/LanguageProvider.jsx";
 export default function StringArtPanel() {
   const { t } = useLanguage();
   const { user } = useAuthSession();
+  const isAdmin = user?.role === "admin";
 
   return (
     <aside className="panel">
@@ -54,20 +55,22 @@ export default function StringArtPanel() {
         </label>
       </div>
 
-      <div className="actions">
-        <button id="pngButton" type="button" disabled>
-          <FileImage aria-hidden="true" size={17} strokeWidth={2} />
-          PNG
-        </button>
-        <button id="txtButton" type="button" disabled>
-          <FileText aria-hidden="true" size={17} strokeWidth={2} />
-          TXT
-        </button>
-        <button id="printButton" type="button" disabled>
-          <Printer aria-hidden="true" size={17} strokeWidth={2} />
-          {t("panel.print")}
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="actions">
+          <button id="pngButton" type="button" disabled>
+            <FileImage aria-hidden="true" size={17} strokeWidth={2} />
+            PNG
+          </button>
+          <button id="txtButton" type="button" disabled>
+            <FileText aria-hidden="true" size={17} strokeWidth={2} />
+            TXT
+          </button>
+          <button id="printButton" type="button" disabled>
+            <Printer aria-hidden="true" size={17} strokeWidth={2} />
+            {t("panel.print")}
+          </button>
+        </div>
+      )}
 
       <button id="saveProjectButton" className="command-link" type="button" disabled>
         <Save aria-hidden="true" size={18} strokeWidth={2} />
@@ -98,22 +101,24 @@ export default function StringArtPanel() {
         </a>
       )}
 
-      <div className="summary">
-        <h2>{t("panel.details")}</h2>
-        <dl>
-          <div><dt>{t("panel.pins")}</dt><dd id="pointsOut">-</dd></div>
-          <div><dt>{t("panel.lines")}</dt><dd id="linesOut">-</dd></div>
-          <div><dt>{t("panel.step")}</dt><dd id="stepOut">-</dd></div>
-          <div><dt>{t("panel.threadLength")}</dt><dd id="lengthOut">-</dd></div>
-        </dl>
-        <textarea
-          id="sequenceOutput"
-          readOnly
-          spellCheck="false"
-          placeholder={t("panel.sequencePlaceholder")}
-          aria-label={t("panel.sequenceLabel")}
-        />
-      </div>
+      {isAdmin && (
+        <div className="summary">
+          <h2>{t("panel.details")}</h2>
+          <dl>
+            <div><dt>{t("panel.pins")}</dt><dd id="pointsOut">-</dd></div>
+            <div><dt>{t("panel.lines")}</dt><dd id="linesOut">-</dd></div>
+            <div><dt>{t("panel.step")}</dt><dd id="stepOut">-</dd></div>
+            <div><dt>{t("panel.threadLength")}</dt><dd id="lengthOut">-</dd></div>
+          </dl>
+          <textarea
+            id="sequenceOutput"
+            readOnly
+            spellCheck="false"
+            placeholder={t("panel.sequencePlaceholder")}
+            aria-label={t("panel.sequenceLabel")}
+          />
+        </div>
+      )}
     </aside>
   );
 }
