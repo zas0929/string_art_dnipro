@@ -8,10 +8,11 @@ const templateFiles = [
 ];
 
 for (const templateFile of templateFiles) {
-  test(`${templateFile} keeps the Supabase action link and email-safe markup`, async () => {
+  test(`${templateFile} keeps a first-party action link and email-safe markup`, async () => {
     const html = await readFile(new URL(`../${templateFile}`, import.meta.url), "utf8");
 
-    assert.match(html, /href="\{\{ \.ConfirmationURL \}\}"/);
+    assert.match(html, /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}/);
+    assert.doesNotMatch(html, /\.ConfirmationURL/);
     assert.match(html, /\{\{ \.Email \}\}/);
     assert.match(html, /https:\/\/www\.stringartdnipro\.com\/logo-white-compact\.png/);
     assert.match(html, /<table role="presentation"/);

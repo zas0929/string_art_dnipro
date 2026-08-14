@@ -151,9 +151,10 @@ Templates** in the Supabase Dashboard:
 | Confirm sign up | `Підтвердіть реєстрацію у String Art Dnipro` | `confirm-signup.html` |
 | Reset password | `Відновлення пароля — String Art Dnipro` | `reset-password.html` |
 
-Both templates intentionally use `{{ .ConfirmationURL }}`. Supabase fills it
-with the secure one-time action URL and preserves the redirects configured in
-`app/login/actions.js`. The logo is loaded from the production site, so
+Both templates build a first-party link from `{{ .SiteURL }}` and
+`{{ .TokenHash }}`. The `/auth/confirm` route verifies the one-time token and
+keeps authentication links on the same domain as the sender. The logo is
+loaded from the production site, so
 `https://www.stringartdnipro.com/logo-white-compact.png` must remain publicly
 available.
 

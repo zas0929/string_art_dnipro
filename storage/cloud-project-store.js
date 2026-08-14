@@ -159,12 +159,16 @@ async function uploadPreviews(pattern, userId, supabase, existingPaths = {}) {
   const paths = { ...existingPaths };
   const uploads = [];
   if (pattern.sourcePreviewDataUrl) uploads.push((async () => {
-    paths.source = `${userId}/${pattern.id}/source.jpg`;
-    await uploadDataUrl(supabase, paths.source, pattern.sourcePreviewDataUrl);
+    const path = `${userId}/${pattern.id}/source.jpg`;
+    if (await uploadDataUrl(supabase, path, pattern.sourcePreviewDataUrl)) {
+      paths.source = path;
+    }
   })());
   if (pattern.artworkPreviewDataUrl) uploads.push((async () => {
-    paths.artwork = `${userId}/${pattern.id}/artwork.png`;
-    await uploadDataUrl(supabase, paths.artwork, pattern.artworkPreviewDataUrl);
+    const path = `${userId}/${pattern.id}/artwork.png`;
+    if (await uploadDataUrl(supabase, path, pattern.artworkPreviewDataUrl)) {
+      paths.artwork = path;
+    }
   })());
   await Promise.all(uploads);
   return paths;
@@ -172,11 +176,14 @@ async function uploadPreviews(pattern, userId, supabase, existingPaths = {}) {
 
 async function uploadDataUrl(supabase, path, dataUrl) {
   const response = await fetch(dataUrl);
+  if (!response.ok) return false;
   const blob = await response.blob();
+  if (!blob.type.toLowerCase().startsWith("image/")) return false;
   const { error } = await supabase.storage
     .from(PREVIEW_BUCKET)
     .upload(path, blob, { contentType: blob.type, upsert: true });
   if (error) throw error;
+  return true;
 }
 
 async function createSignedPreviewUrl(supabase, path) {
