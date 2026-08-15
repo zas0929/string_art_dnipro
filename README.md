@@ -113,7 +113,10 @@ and printing. On the first authenticated visit, local projects that do not
 already exist in the account are migrated to the cloud.
 
 Account access supports email registration, confirmation, sign-in, sign-out,
-and password recovery through Supabase Auth.
+and password recovery through Supabase Auth. Google Identity Services signs
+users in on the first-party website and exchanges the returned ID token for a
+Supabase session, so the Google account chooser does not expose the technical
+Supabase project hostname.
 
 Route calculation stays on the device. The cloud schema stores the generated
 pin sequence and settings, while source and artwork previews use a private
@@ -127,7 +130,8 @@ profiles marked as `admin` or using the `unlimited` plan bypass that limit.
    Supabase SQL editor or CLI. The second migration adds buyer QR links and the
    restricted public pattern RPC.
 3. Copy `.env.example` to `.env.local` and set the project URL and publishable
-   key.
+   key. To enable first-party Google sign-in, also set
+   `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the Web OAuth client's public ID.
 4. Restart Next.js after changing environment variables.
 
 ```bash

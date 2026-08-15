@@ -4,7 +4,8 @@ import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import LogIn from "lucide-react/dist/esm/icons/log-in.mjs";
 import Mail from "lucide-react/dist/esm/icons/mail.mjs";
 import UserPlus from "lucide-react/dist/esm/icons/user-plus.mjs";
-import { useActionState, useState } from "react";
+import Script from "next/script";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import {
   requestPasswordReset,
   signIn,
@@ -14,12 +15,15 @@ import { createClient } from "../../lib/supabase/client.js";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 const INITIAL_STATE = { error: "", success: "" };
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
 
 export default function AuthForm({ configured, initialError = "" }) {
   const { t } = useLanguage();
   const [mode, setMode] = useState("signin");
+  const [googleReady, setGoogleReady] = useState(false);
   const [oauthPending, setOauthPending] = useState(false);
   const [oauthError, setOauthError] = useState(initialError);
+  const googleButtonRef = useRef(null);
   const [signInState, signInAction, signInPending] = useActionState(signIn, INITIAL_STATE);
   const [signUpState, signUpAction, signUpPending] = useActionState(signUp, INITIAL_STATE);
   const [resetState, resetAction, resetPending] = useActionState(
@@ -43,7 +47,63 @@ export default function AuthForm({ configured, initialError = "" }) {
       ? t("auth.signUpTitle")
       : t("auth.forgotPasswordTitle");
 
-  async function continueWithGoogle() {
+  const completeGoogleSignIn = useCallback(async (response) => {
+    if (!configured || !response?.credential) return;
+    setOauthError("");
+    setOauthPending(true);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithIdToken({
+        provider: "google",
+        token: response.credential,
+      });
+      if (error) throw error;
+      window.location.assign("/projects");
+    } catch (error) {
+      console.error("Supabase Google ID-token sign-in failed", {
+        code: error?.code,
+        status: error?.status,
+        message: error?.message,
+      });
+      setOauthError("googleSignInFailed");
+      setOauthPending(false);
+    }
+  }, [configured]);
+
+  useEffect(() => {
+    const buttonHost = googleButtonRef.current;
+    const googleIdentity = window.google?.accounts?.id;
+    if (!GOOGLE_CLIENT_ID || !googleReady || !buttonHost || !googleIdentity) return undefined;
+
+    googleIdentity.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: completeGoogleSignIn,
+      auto_select: false,
+      use_fedcm_for_prompt: true,
+    });
+
+    const renderButton = () => {
+      const width = Math.max(240, Math.min(400, Math.floor(buttonHost.clientWidth)));
+      buttonHost.replaceChildren();
+      googleIdentity.renderButton(buttonHost, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "continue_with",
+        shape: "rectangular",
+        logo_alignment: "left",
+        width,
+      });
+    };
+
+    renderButton();
+    const resizeObserver = new ResizeObserver(renderButton);
+    resizeObserver.observe(buttonHost);
+    return () => resizeObserver.disconnect();
+  }, [completeGoogleSignIn, googleReady]);
+
+  async function continueWithGoogleOAuth() {
     if (!configured || pending) return;
     setOauthError("");
     setOauthPending(true);
@@ -77,6 +137,13 @@ export default function AuthForm({ configured, initialError = "" }) {
 
   return (
     <section className="auth-shell">
+      {GOOGLE_CLIENT_ID && (
+        <Script
+          src="https://accounts.google.com/gsi/client"
+          strategy="afterInteractive"
+          onReady={() => setGoogleReady(true)}
+        />
+      )}
       <a className="back-link" href="/create">
         <ArrowLeft aria-hidden="true" size={18} />
         {t("common.generator")}
@@ -100,15 +167,25 @@ export default function AuthForm({ configured, initialError = "" }) {
 
       {mode !== "forgot" && (
         <>
-          <button
-            className="auth-google-button"
-            type="button"
-            disabled={!configured || pending}
-            onClick={continueWithGoogle}
-          >
-            <span className="auth-google-mark" aria-hidden="true">G</span>
-            {oauthPending ? t("auth.googleWorking") : t("auth.continueWithGoogle")}
-          </button>
+          {GOOGLE_CLIENT_ID ? (
+            <div
+              className={`auth-google-button-host${pending ? " is-disabled" : ""}`}
+              aria-busy={oauthPending}
+              aria-disabled={!configured || pending}
+            >
+              <div ref={googleButtonRef} />
+            </div>
+          ) : (
+            <button
+              className="auth-google-button"
+              type="button"
+              disabled={!configured || pending}
+              onClick={continueWithGoogleOAuth}
+            >
+              <span className="auth-google-mark" aria-hidden="true">G</span>
+              {oauthPending ? t("auth.googleWorking") : t("auth.continueWithGoogle")}
+            </button>
+          )}
           <div className="auth-divider" aria-hidden="true">
             <span>{t("auth.or")}</span>
           </div>

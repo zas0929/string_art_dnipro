@@ -2027,6 +2027,23 @@ textarea {
   background: var(--panel-2);
 }
 
+.auth-google-button-host {
+  display: grid;
+  min-height: 50px;
+  place-items: center;
+}
+
+.auth-google-button-host > div {
+  display: grid;
+  width: 100%;
+  place-items: center;
+}
+
+.auth-google-button-host.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .auth-google-mark {
   display: grid;
   width: 24px;
