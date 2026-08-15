@@ -148,15 +148,14 @@ Templates** in the Supabase Dashboard:
 
 | Supabase template | Subject | Source file |
 | --- | --- | --- |
-| Confirm sign up | `Підтвердіть реєстрацію у String Art Dnipro` | `confirm-signup.html` |
-| Reset password | `Відновлення пароля — String Art Dnipro` | `reset-password.html` |
+| Confirm sign up | `Підтвердження email` | `confirm-signup.html` |
+| Reset password | `Відновлення пароля` | `reset-password.html` |
 
 Both templates build a first-party link from `{{ .SiteURL }}` and
 `{{ .TokenHash }}`. The `/auth/confirm` route verifies the one-time token and
-keeps authentication links on the same domain as the sender. The logo is
-loaded from the production site, so
-`https://www.stringartdnipro.com/logo-white-compact.png` must remain publicly
-available.
+keeps authentication links on the same domain as the sender. The templates
+intentionally contain one action link, no remote images, no hidden content,
+and no recipient interpolation to improve transactional-email deliverability.
 
 ## Telegram Order Notifications
 

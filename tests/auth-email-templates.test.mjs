@@ -13,11 +13,13 @@ for (const templateFile of templateFiles) {
 
     assert.match(html, /href="\{\{ \.SiteURL \}\}\/auth\/confirm\?token_hash=\{\{ \.TokenHash \}\}/);
     assert.doesNotMatch(html, /\.ConfirmationURL/);
-    assert.match(html, /\{\{ \.Email \}\}/);
-    assert.match(html, /https:\/\/www\.stringartdnipro\.com\/logo-white-compact\.png/);
+    assert.equal((html.match(/href=/g) || []).length, 1);
+    assert.doesNotMatch(html, /\{\{ \.Email \}\}/);
+    assert.doesNotMatch(html, /<img\b/i);
+    assert.doesNotMatch(html, /display:\s*none/i);
     assert.match(html, /<table role="presentation"/);
     assert.doesNotMatch(html, /<script\b/i);
     assert.doesNotMatch(html, /<form\b/i);
-    assert.doesNotMatch(html, /src="\//);
+    assert.doesNotMatch(html, /https?:\/\//i);
   });
 }
