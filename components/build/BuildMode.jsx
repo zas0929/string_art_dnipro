@@ -3,6 +3,7 @@
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
+import FolderOpen from "lucide-react/dist/esm/icons/folder-open.mjs";
 import Minus from "lucide-react/dist/esm/icons/minus.mjs";
 import Pause from "lucide-react/dist/esm/icons/pause.mjs";
 import Play from "lucide-react/dist/esm/icons/play.mjs";
@@ -791,6 +792,10 @@ export default function BuildMode({ sharedPattern = null }) {
           <div className="empty-build-state">
             <strong>{t("build.noPattern")}</strong>
             <span>{t("build.noPatternHint")}</span>
+            <a className="command-link empty-build-projects" href="/projects">
+              <FolderOpen aria-hidden="true" size={19} />
+              {t("build.chooseFromProjects")}
+            </a>
           </div>
         )}
 

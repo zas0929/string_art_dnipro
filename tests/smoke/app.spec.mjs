@@ -94,6 +94,7 @@ test("UI language switches from Ukrainian by default and persists across pages",
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.goto("/build");
   await expect(page.getByText("No active pattern")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Choose from my projects" })).toHaveAttribute("href", "/projects");
   await page.goto("/print");
   await expect(page.getByRole("heading", { name: "No pattern available" })).toBeVisible();
 });

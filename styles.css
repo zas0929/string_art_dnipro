@@ -2527,6 +2527,10 @@ textarea {
   font-size: 24px;
 }
 
+.empty-build-projects {
+  margin-top: 12px;
+}
+
 .build-transport {
   display: grid;
   grid-template-columns: repeat(3, minmax(110px, 160px));
