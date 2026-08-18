@@ -2,6 +2,8 @@
 
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import Ban from "lucide-react/dist/esm/icons/ban.mjs";
+import Check from "lucide-react/dist/esm/icons/check.mjs";
+import Copy from "lucide-react/dist/esm/icons/copy.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import QrCode from "lucide-react/dist/esm/icons/qr-code.mjs";
 import { useEffect, useMemo, useState } from "react";
@@ -43,6 +45,28 @@ const COVER_COPY = {
   },
 };
 
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch {
+      // Some mobile browsers expose Clipboard API but deny it outside a trusted context.
+    }
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Copy failed");
+}
+
 export default function PrintInstruction() {
   const { language: uiLanguage, t } = useLanguage();
   const [pattern, setPattern] = useState(null);
@@ -59,6 +83,7 @@ export default function PrintInstruction() {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
   const [shareMessage, setShareMessage] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -122,6 +147,10 @@ export default function PrintInstruction() {
     return () => {
       active = false;
     };
+  }, [sharedPattern?.active, sharedPattern?.url]);
+
+  useEffect(() => {
+    setLinkCopied(false);
   }, [sharedPattern?.active, sharedPattern?.url]);
 
   const pages = useMemo(
@@ -190,6 +219,19 @@ export default function PrintInstruction() {
       setShareMessage(error?.message || t("print.qrDisableError"));
     } finally {
       setShareBusy(false);
+    }
+  };
+
+  const copyBuyerLink = async () => {
+    const shareUrl = sharedPattern?.active ? sharedPattern.url : "";
+    if (!shareUrl) return;
+    try {
+      await copyText(shareUrl);
+      setLinkCopied(true);
+      setShareMessage("");
+      window.setTimeout(() => setLinkCopied(false), 2200);
+    } catch {
+      setShareMessage(t("print.buyerLinkCopyError"));
     }
   };
 
@@ -336,6 +378,30 @@ export default function PrintInstruction() {
                 </button>
               )}
             </div>
+            {sharedPattern?.active && (
+              <div className="qr-share-link">
+                <label htmlFor="buyerBuildLink">{t("print.buyerLink")}</label>
+                <div className="qr-share-link-row">
+                  <input
+                    id="buyerBuildLink"
+                    type="url"
+                    readOnly
+                    value={sharedPattern.url}
+                    onFocus={(event) => event.currentTarget.select()}
+                  />
+                  <button
+                    type="button"
+                    className={linkCopied ? "is-copied" : ""}
+                    onClick={copyBuyerLink}
+                  >
+                    {linkCopied
+                      ? <Check aria-hidden="true" size={18} />
+                      : <Copy aria-hidden="true" size={18} />}
+                    {linkCopied ? t("print.buyerLinkCopied") : t("print.copyBuyerLink")}
+                  </button>
+                </div>
+              </div>
+            )}
             {shareMessage && <p className="qr-settings-message" role="status">{shareMessage}</p>}
           </fieldset>
         </div>

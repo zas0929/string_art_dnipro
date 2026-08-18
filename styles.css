@@ -3357,6 +3357,53 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.qr-share-link {
+  display: grid;
+  margin-top: 10px;
+  gap: 6px;
+}
+
+.qr-share-link > label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.qr-share-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.qr-share-link-row input {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.qr-share-link-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.qr-share-link-row button.is-copied {
+  border-color: #d0ad7d;
+  color: #d0ad7d;
+}
+
+@media (max-width: 680px) {
+  .qr-share-link-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .print-settings label {
   min-width: 0;
 }
