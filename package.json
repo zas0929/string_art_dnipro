@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "next dev --webpack",
@@ -10,9 +13,26 @@
     "start": "next start",
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "playwright test",
-    "compare": "node tools/compare-schemes.mjs"
+    "compare": "node tools/compare-schemes.mjs",
+    "mobile:sync": "cap sync",
+    "mobile:doctor": "cap doctor",
+    "mobile:ios": "cap open ios",
+    "mobile:android": "cap open android",
+    "mobile:run:ios": "cap run ios",
+    "mobile:run:android": "cap run android",
+    "mobile:dev:ios": "CAPACITOR_SERVER_URL=http://localhost:3000 cap run ios",
+    "mobile:dev:android": "CAPACITOR_SERVER_URL=http://10.0.2.2:3000 cap run android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/camera": "^8.2.2",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.8",
     "lucide-react": "1.25.0",
@@ -22,6 +42,10 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@playwright/test": "^1.61.1",
+    "typescript": "^7.0.2"
   }
 }

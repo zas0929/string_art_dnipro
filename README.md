@@ -79,6 +79,22 @@ pnpm install
 pnpm dev
 ```
 
+## Mobile Applications
+
+The repository includes Capacitor projects for iOS and Android. Mobile builds
+open the generator directly and share the same Supabase backend, projects, and
+String Art core as the web application.
+
+```bash
+pnpm mobile:sync
+pnpm mobile:doctor
+pnpm mobile:ios
+pnpm mobile:android
+```
+
+See [`mobile/README.md`](mobile/README.md) for local simulator URLs, native
+requirements, deep links, and the store-release boundary.
+
 Then open the address printed by Next.js, usually
 `http://localhost:3000/`.
 
