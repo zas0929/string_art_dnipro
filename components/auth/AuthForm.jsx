@@ -13,6 +13,7 @@ import {
 } from "../../app/login/actions.js";
 import { createClient } from "../../lib/supabase/client.js";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
+import PasswordField from "./PasswordField.jsx";
 
 const INITIAL_STATE = { error: "", success: "" };
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
@@ -198,17 +199,17 @@ export default function AuthForm({ configured, initialError = "" }) {
           <input name="email" type="email" autoComplete="email" required disabled={!configured || pending} />
         </label>
         {mode !== "forgot" && (
-          <label>
-            {t("auth.password")}
-            <input
-              name="password"
-              type="password"
-              minLength={mode === "signup" ? 8 : undefined}
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              required
-              disabled={!configured || pending}
-            />
-          </label>
+          <PasswordField
+            label={t("auth.password")}
+            showLabel={t("auth.showPassword")}
+            hideLabel={t("auth.hidePassword")}
+            id="authPassword"
+            name="password"
+            minLength={mode === "signup" ? 8 : undefined}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+            required
+            disabled={!configured || pending}
+          />
         )}
         <button className="auth-submit" type="submit" disabled={!configured || pending}>
           {mode === "signin" && <LogIn aria-hidden="true" size={18} />}

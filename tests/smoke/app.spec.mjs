@@ -120,6 +120,13 @@ test("shared mobile menu connects the main application pages", async ({ page }, 
 
 test("account page exposes sign-in, registration and password recovery", async ({ page }) => {
   await page.goto("/login");
+  const passwordInput = page.getByLabel(/^Password$|^Пароль$/);
+  const passwordToggle = page.getByRole("button", { name: /Show password|Показати пароль/ });
+  await expect(passwordInput).toHaveAttribute("type", "password");
+  await passwordToggle.click();
+  await expect(passwordInput).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: /Hide password|Приховати пароль/ }).click();
+  await expect(passwordInput).toHaveAttribute("type", "password");
 
   await expect(page.getByRole("heading", { name: /Welcome back|З поверненням/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Continue with Google|Продовжити з Google/ })).toBeVisible();
@@ -192,6 +199,7 @@ test("saved patterns appear in the local project library", async ({ page }) => {
   await expect(page.getByText("240 pins · 3 connections")).toBeVisible();
   await expect(page.getByText("Not started")).toBeVisible();
   await expect(page.getByText("0%")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Print" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Rename project" }).click();
   await page.getByLabel("Project name").fill("Family portrait");

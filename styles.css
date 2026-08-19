@@ -2082,6 +2082,15 @@ textarea {
   font-size: 14px;
 }
 
+.auth-form-field {
+  display: grid;
+  gap: 7px;
+}
+
+.auth-password-field {
+  position: relative;
+}
+
 .auth-form input {
   width: 100%;
   min-height: 48px;
@@ -2090,6 +2099,37 @@ textarea {
   border-radius: 8px;
   background: #111318;
   color: var(--text);
+}
+
+.auth-password-field input {
+  padding-right: 52px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  transform: translateY(-50%);
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.auth-password-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  background: rgb(255 255 255 / 7%);
+  color: var(--text);
+}
+
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .auth-submit {
@@ -2689,9 +2729,15 @@ textarea {
 
 .project-title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
+}
+
+.project-title-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .project-title-row h2 {
@@ -2755,13 +2801,13 @@ textarea {
 }
 
 .project-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+  display: flex;
   gap: 8px;
   margin-top: 16px;
 }
 
 .project-actions button {
+  flex: 1 1 0;
   min-width: 0;
   padding: 0 10px;
 }
@@ -3767,15 +3813,6 @@ textarea {
     aspect-ratio: auto;
     border-right: 1px solid var(--line);
     border-bottom: 0;
-  }
-
-  .project-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .project-delete {
-    grid-column: 1 / -1;
-    width: 100%;
   }
 
   .workspace,

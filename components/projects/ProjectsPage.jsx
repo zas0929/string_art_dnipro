@@ -9,10 +9,13 @@ import Trash2 from "lucide-react/dist/esm/icons/trash-2.mjs";
 import { useEffect, useRef, useState } from "react";
 import { LOCAL_PROJECT_LIMIT } from "../../storage/local-project-store.js";
 import { getProjectStore } from "../../storage/project-store.js";
+import { useAuthSession } from "../auth/AuthSessionProvider.jsx";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 export default function ProjectsPage() {
   const { language, t } = useLanguage();
+  const { user } = useAuthSession();
+  const isAdmin = user?.role === "admin";
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -132,34 +135,47 @@ export default function ProjectsPage() {
                 )}
               </div>
               <div className="project-card-body">
-                {editingId === project.id ? (
-                  <form className="project-rename" onSubmit={(event) => saveName(event, project.id)}>
-                    <input
-                      value={draftName}
-                      maxLength={80}
-                      autoFocus
-                      aria-label={t("projects.name")}
-                      onChange={(event) => setDraftName(event.target.value)}
-                    />
-                    <button type="submit">{t("projects.save")}</button>
-                  </form>
-                ) : (
-                  <div className="project-title-row">
+                <div className="project-title-row">
+                  {editingId === project.id ? (
+                    <form className="project-rename" onSubmit={(event) => saveName(event, project.id)}>
+                      <input
+                        value={draftName}
+                        maxLength={80}
+                        autoFocus
+                        aria-label={t("projects.name")}
+                        onChange={(event) => setDraftName(event.target.value)}
+                      />
+                      <button type="submit">{t("projects.save")}</button>
+                    </form>
+                  ) : (
                     <h2>{project.name || t("projects.untitled")}</h2>
+                  )}
+                  <div className="project-title-actions">
+                    {editingId !== project.id && (
+                      <button
+                        className="project-icon-button"
+                        type="button"
+                        title={t("projects.rename")}
+                        aria-label={t("projects.rename")}
+                        onClick={() => {
+                          setEditingId(project.id);
+                          setDraftName(project.name || t("projects.untitled"));
+                        }}
+                      >
+                        <Pencil aria-hidden="true" size={16} />
+                      </button>
+                    )}
                     <button
-                      className="project-icon-button"
+                      className="project-icon-button project-delete"
                       type="button"
-                      title={t("projects.rename")}
-                      aria-label={t("projects.rename")}
-                      onClick={() => {
-                        setEditingId(project.id);
-                        setDraftName(project.name || t("projects.untitled"));
-                      }}
+                      title={t("projects.delete")}
+                      aria-label={t("projects.delete")}
+                      onClick={() => removeProject(project)}
                     >
-                      <Pencil aria-hidden="true" size={16} />
+                      <Trash2 aria-hidden="true" size={17} />
                     </button>
                   </div>
-                )}
+                </div>
                 <p className="project-meta">
                   {t("projects.summary", {
                     pins: project.pointCount,
@@ -175,19 +191,12 @@ export default function ProjectsPage() {
                     <Hammer aria-hidden="true" size={17} />
                     {t("projects.build")}
                   </button>
-                  <button type="button" onClick={() => openProject(project.id, "/print")}>
-                    <Printer aria-hidden="true" size={17} />
-                    {t("projects.print")}
-                  </button>
-                  <button
-                    className="project-delete"
-                    type="button"
-                    title={t("projects.delete")}
-                    aria-label={t("projects.delete")}
-                    onClick={() => removeProject(project)}
-                  >
-                    <Trash2 aria-hidden="true" size={17} />
-                  </button>
+                  {isAdmin && (
+                    <button type="button" onClick={() => openProject(project.id, "/print")}>
+                      <Printer aria-hidden="true" size={17} />
+                      {t("projects.print")}
+                    </button>
+                  )}
                 </div>
               </div>
             </article>

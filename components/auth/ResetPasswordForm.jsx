@@ -5,6 +5,7 @@ import KeyRound from "lucide-react/dist/esm/icons/key-round.mjs";
 import { useActionState } from "react";
 import { updatePassword } from "../../app/reset-password/actions.js";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
+import PasswordField from "./PasswordField.jsx";
 
 const INITIAL_STATE = { error: "" };
 
@@ -24,28 +25,28 @@ export default function ResetPasswordForm({ configured }) {
         <span>{t("auth.newPasswordSubtitle")}</span>
       </div>
       <form className="auth-form" action={action}>
-        <label>
-          {t("auth.newPassword")}
-          <input
-            name="password"
-            type="password"
-            minLength="8"
-            autoComplete="new-password"
-            required
-            disabled={!configured || pending}
-          />
-        </label>
-        <label>
-          {t("auth.confirmPassword")}
-          <input
-            name="passwordConfirmation"
-            type="password"
-            minLength="8"
-            autoComplete="new-password"
-            required
-            disabled={!configured || pending}
-          />
-        </label>
+        <PasswordField
+          label={t("auth.newPassword")}
+          showLabel={t("auth.showPassword")}
+          hideLabel={t("auth.hidePassword")}
+          id="newPassword"
+          name="password"
+          minLength="8"
+          autoComplete="new-password"
+          required
+          disabled={!configured || pending}
+        />
+        <PasswordField
+          label={t("auth.confirmPassword")}
+          showLabel={t("auth.showPassword")}
+          hideLabel={t("auth.hidePassword")}
+          id="passwordConfirmation"
+          name="passwordConfirmation"
+          minLength="8"
+          autoComplete="new-password"
+          required
+          disabled={!configured || pending}
+        />
         <button className="auth-submit" type="submit" disabled={!configured || pending}>
           <KeyRound aria-hidden="true" size={18} />
           {pending ? t("auth.working") : t("auth.updatePassword")}
