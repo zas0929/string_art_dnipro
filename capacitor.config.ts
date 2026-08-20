@@ -1,22 +1,22 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-const productionUrl = "https://stringartdnipro.com/create";
 const developmentUrl = process.env.CAPACITOR_SERVER_URL?.trim();
-const appUrl = developmentUrl || productionUrl;
 
 const config: CapacitorConfig = {
   appId: "com.stringartdnipro.app",
   appName: "String Art Dnipro",
-  webDir: "mobile-shell",
-  server: {
-    url: appUrl,
-    cleartext: appUrl.startsWith("http://"),
-    allowNavigation: [
-      "stringartdnipro.com",
-      "www.stringartdnipro.com",
-      "*.supabase.co",
-    ],
-  },
+  webDir: "mobile-dist",
+  server: developmentUrl
+    ? {
+        url: developmentUrl,
+        cleartext: developmentUrl.startsWith("http://"),
+        allowNavigation: [
+          "stringartdnipro.com",
+          "www.stringartdnipro.com",
+          "*.supabase.co",
+        ],
+      }
+    : undefined,
   ios: {
     contentInset: "automatic",
     preferredContentMode: "mobile",

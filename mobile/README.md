@@ -1,9 +1,9 @@
 # String Art Dnipro Mobile
 
-The mobile application uses Capacitor 8 and opens the production generator at
-`https://stringartdnipro.com/create`. The native projects are kept in `ios/` and
-`android/`; the existing Next.js application remains the source of the UI and
-server functionality during the prototype stage.
+The mobile application uses Capacitor 8 and bundles the generator, projects,
+build mode, and shared build links inside the native application. The native
+projects are kept in `ios/` and `android/`; the same React components and String
+Art core are shared with the Next.js website.
 
 ## Requirements
 
@@ -57,14 +57,17 @@ device needs a reachable LAN URL, for example:
 CAPACITOR_SERVER_URL=http://192.168.1.20:3000 pnpm mobile:run:ios
 ```
 
-Run `pnpm mobile:sync` after changing Capacitor plugins or native configuration.
+Run `pnpm mobile:sync` after changing the shared UI, generator core, Capacitor
+plugins, or native configuration. The command builds `mobile-dist/` first and
+then copies it into both native projects.
 
 ## Native integrations
 
 - Photo upload opens the platform photo library instead of the browser file picker.
 - PNG export writes a temporary native file and opens the system share sheet, where
   the artwork can be saved to Photos or Files or sent to another application.
-- Projects and build progress are written to IndexedDB first. Interrupted cloud
+- The installed bundle can cold-start without a network connection. Projects and
+  build progress are written to IndexedDB first. Interrupted cloud
   updates stay in a local queue and are retried automatically when the device is
   online again.
 - Browser builds keep the existing file-picker and download behavior.
@@ -77,8 +80,7 @@ store signing identifiers and will be enabled before TestFlight and Play testing
 
 ## Store release boundary
 
-The current remote-server shell is intended for device testing. Before store
-submission, the generator and build-mode client UI will be bundled with the app,
-then platform authentication will be connected. Local-first drafts now protect
-work while the app is already open and the network is unstable; bundling the UI is
-still required for a completely offline cold start.
+The core workspace now runs from the installed bundle and supports a completely
+offline cold start. Platform authentication is the next release step; until it is
+connected, the native build intentionally works as a local guest workspace and
+keeps account controls out of its menu.
