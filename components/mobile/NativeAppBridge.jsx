@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { App } from "@capacitor/app";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
 import { getMobileAppDestination } from "../../core/mobile-link.js";
 
@@ -11,6 +12,7 @@ export default function NativeAppBridge() {
 
     let disposed = false;
     let listenerHandle;
+    let photoPickerOpen = false;
 
     document.documentElement.dataset.nativeApp = "true";
 
@@ -20,7 +22,55 @@ export default function NativeAppBridge() {
       }
     };
 
+    const pickPhoto = async () => {
+      if (photoPickerOpen) return;
+
+      const input = document.querySelector("#imageInput");
+      if (!(input instanceof HTMLInputElement) || input.disabled) return;
+
+      photoPickerOpen = true;
+      try {
+        const photo = await Camera.getPhoto({
+          source: CameraSource.Photos,
+          resultType: CameraResultType.Uri,
+          quality: 100,
+          correctOrientation: true,
+          allowEditing: false,
+        });
+        if (!photo.webPath) throw new Error("Native photo picker did not return an image");
+
+        const response = await fetch(photo.webPath);
+        if (!response.ok) throw new Error("Selected photo could not be read");
+
+        const blob = await response.blob();
+        const extension = photo.format || blob.type.split("/")[1] || "jpeg";
+        const file = new File([blob], `string-art-photo.${extension}`, {
+          type: blob.type || `image/${extension}`,
+          lastModified: Date.now(),
+        });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      } catch (error) {
+        const message = error instanceof Error ? error.message.toLowerCase() : "";
+        const cancelled = message.includes("cancel") || message.includes("canceled");
+        if (!cancelled && !disposed) input.click();
+      } finally {
+        photoPickerOpen = false;
+      }
+    };
+
     const handleDocumentClick = (event) => {
+      const photoUpload = event.target instanceof Element
+        ? event.target.closest(".photo-upload")
+        : null;
+      if (photoUpload) {
+        event.preventDefault();
+        void pickPhoto();
+        return;
+      }
+
       const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
       if (!anchor) return;
 

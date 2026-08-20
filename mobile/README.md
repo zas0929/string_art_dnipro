@@ -59,6 +59,16 @@ CAPACITOR_SERVER_URL=http://192.168.1.20:3000 pnpm mobile:run:ios
 
 Run `pnpm mobile:sync` after changing Capacitor plugins or native configuration.
 
+## Native integrations
+
+- Photo upload opens the platform photo library instead of the browser file picker.
+- PNG export writes a temporary native file and opens the system share sheet, where
+  the artwork can be saved to Photos or Files or sent to another application.
+- Projects and build progress are written to IndexedDB first. Interrupted cloud
+  updates stay in a local queue and are retried automatically when the device is
+  online again.
+- Browser builds keep the existing file-picker and download behavior.
+
 ## Links
 
 The apps accept the custom scheme `stringartdnipro://` and Android App Links for
@@ -68,7 +78,7 @@ store signing identifiers and will be enabled before TestFlight and Play testing
 ## Store release boundary
 
 The current remote-server shell is intended for device testing. Before store
-submission, the generator and build-mode client UI will be bundled with the app
-and the native photo picker, sharing, offline drafts, and platform authentication
-will be connected. This keeps the app useful when the network is unstable and
-gives it native functionality beyond a website wrapper.
+submission, the generator and build-mode client UI will be bundled with the app,
+then platform authentication will be connected. Local-first drafts now protect
+work while the app is already open and the network is unstable; bundling the UI is
+still required for a completely offline cold start.
