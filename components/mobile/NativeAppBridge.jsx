@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 import { App } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Capacitor } from "@capacitor/core";
 import { getMobileAppDestination } from "../../core/mobile-link.js";
+import { parseNativeAuthCallback } from "../../core/native-auth.js";
+import { createClient } from "../../lib/supabase/client.js";
 
 export default function NativeAppBridge() {
   useEffect(() => {
@@ -81,7 +84,34 @@ export default function NativeAppBridge() {
       window.location.assign(`/create${destination.search}${destination.hash}`);
     };
 
-    const openAppUrl = ({ url }) => {
+    const openAppUrl = async ({ url }) => {
+      const authCallback = parseNativeAuthCallback(url);
+      if (authCallback) {
+        try {
+          await Browser.close();
+        } catch {
+          // Android closes the custom tab automatically when the app regains focus.
+        }
+
+        if (authCallback.error) {
+          window.location.assign("/login?confirmation=failed");
+          return;
+        }
+
+        const supabase = createClient();
+        const result = authCallback.code
+          ? await supabase.auth.exchangeCodeForSession(authCallback.code)
+          : authCallback.accessToken && authCallback.refreshToken
+            ? await supabase.auth.setSession({
+                access_token: authCallback.accessToken,
+                refresh_token: authCallback.refreshToken,
+              })
+            : { error: new Error("Authentication callback has no session code") };
+
+        window.location.assign(result.error ? "/login?confirmation=failed" : "/projects");
+        return;
+      }
+
       const destination = getMobileAppDestination(url);
       if (!destination) return;
 
@@ -89,7 +119,9 @@ export default function NativeAppBridge() {
       if (destination !== current) window.location.assign(destination);
     };
 
-    void App.addListener("appUrlOpen", openAppUrl).then((handle) => {
+    void App.addListener("appUrlOpen", (event) => {
+      void openAppUrl(event);
+    }).then((handle) => {
       if (disposed) {
         void handle.remove();
         return;
@@ -98,7 +130,7 @@ export default function NativeAppBridge() {
     });
 
     void App.getLaunchUrl().then((launch) => {
-      if (!disposed && launch?.url) openAppUrl(launch);
+      if (!disposed && launch?.url) void openAppUrl(launch);
     });
 
     keepInsideWorkspace();

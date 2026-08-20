@@ -72,7 +72,7 @@ export default function MobileNavigation() {
         <div className="mobile-site-menu-footer">
           <LanguageSwitch className="mobile-footer-language" />
           <AccountMenu className="desktop-account-menu" />
-          <div className="mobile-auth-actions" hidden={isNativeApp}>
+          <div className="mobile-auth-actions">
             {user ? (
               <div className="mobile-user-session">
                 <span title={user.email}><UserRound aria-hidden="true" size={18} />{user.email}</span>

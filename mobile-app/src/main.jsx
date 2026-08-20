@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import "../../app/globals.css";
 import StringArtGenerator from "../../components/StringArtGenerator.jsx";
 import { AuthSessionProvider } from "../../components/auth/AuthSessionProvider.jsx";
+import MobileAuthForm from "../../components/auth/MobileAuthForm.jsx";
 import BuildMode from "../../components/build/BuildMode.jsx";
 import SharedBuildMode from "../../components/build/SharedBuildMode.jsx";
 import { LanguageProvider } from "../../components/i18n/LanguageProvider.jsx";
@@ -11,7 +12,7 @@ import NativeAppBridge from "../../components/mobile/NativeAppBridge.jsx";
 import MobileNavigation from "../../components/navigation/MobileNavigation.jsx";
 import ProjectsPage from "../../components/projects/ProjectsPage.jsx";
 
-const MOBILE_ROUTES = new Set(["/create", "/projects", "/build"]);
+const MOBILE_ROUTES = new Set(["/create", "/projects", "/build", "/login"]);
 
 function normalizePathname(pathname) {
   const normalized = pathname.replace(/\/+$/, "") || "/";
@@ -53,6 +54,7 @@ function MobileApp() {
   let content = <StringArtGenerator />;
   if (route.page === "projects") content = <ProjectsPage />;
   if (route.page === "build") content = <BuildMode />;
+  if (route.page === "login") content = <MobileAuthForm />;
   if (route.page === "shared") content = <SharedBuildMode token={route.token} />;
 
   return (
