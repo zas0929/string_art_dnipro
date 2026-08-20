@@ -42,6 +42,14 @@ pnpm mobile:dev:ios
 pnpm mobile:dev:android
 ```
 
+If the iOS command reports that no simulator runtime is installed, open
+Xcode > Settings > Components and install the latest iOS Simulator. The same
+download can be started from Terminal with:
+
+```bash
+xcodebuild -downloadPlatform iOS
+```
+
 The Android Emulator reaches the host machine through `10.0.2.2`. A physical
 device needs a reachable LAN URL, for example:
 

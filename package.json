@@ -20,7 +20,7 @@
     "mobile:android": "cap open android",
     "mobile:run:ios": "cap run ios",
     "mobile:run:android": "cap run android",
-    "mobile:dev:ios": "CAPACITOR_SERVER_URL=http://localhost:3000 cap run ios",
+    "mobile:dev:ios": "node tools/mobile-preflight.mjs ios && CAPACITOR_SERVER_URL=http://localhost:3000 cap run ios",
     "mobile:dev:android": "CAPACITOR_SERVER_URL=http://10.0.2.2:3000 cap run android"
   },
   "dependencies": {

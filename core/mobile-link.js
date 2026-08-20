@@ -8,7 +8,8 @@ export function getMobileAppDestination(value) {
     const url = new URL(value);
 
     if (url.protocol === "https:" && APP_HOSTS.has(url.hostname)) {
-      return `${url.pathname || "/create"}${url.search}${url.hash}`;
+      const pathname = !url.pathname || url.pathname === "/" ? "/create" : url.pathname;
+      return `${pathname}${url.search}${url.hash}`;
     }
 
     if (url.protocol === APP_SCHEME) {

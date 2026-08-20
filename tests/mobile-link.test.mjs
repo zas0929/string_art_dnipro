@@ -7,6 +7,7 @@ test("maps first-party shared pattern URLs to an internal route", () => {
     getMobileAppDestination("https://stringartdnipro.com/s/buyer-token?step=25#canvas"),
     "/s/buyer-token?step=25#canvas",
   );
+  assert.equal(getMobileAppDestination("https://stringartdnipro.com/"), "/create");
 });
 
 test("maps custom-scheme routes to an internal route", () => {
