@@ -32,6 +32,10 @@ const mobilePublicAssets = {
       path.resolve(projectRoot, "public/logo-white-compact.png"),
       path.join(mobileOutput, "logo-white-compact.png"),
     );
+    copyFileSync(
+      path.resolve(projectRoot, "public/favicon.ico"),
+      path.join(mobileOutput, "favicon.ico"),
+    );
   },
 };
 

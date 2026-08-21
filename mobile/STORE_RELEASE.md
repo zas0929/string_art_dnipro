@@ -117,4 +117,6 @@ pnpm mobile:release:android
 ```
 
 `mobile:release:check` never prints signing secrets. The Android release command
-fails before Gradle starts when the upload key is missing.
+fails before Gradle starts when the upload key is missing. The release check also
+runs the mobile production-bundle smoke suite before validating native signing
+and domain-link configuration.

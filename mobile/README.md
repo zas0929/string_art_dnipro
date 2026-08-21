@@ -61,6 +61,16 @@ Run `pnpm mobile:sync` after changing the shared UI, generator core, Capacitor
 plugins, or native configuration. The command builds `mobile-dist/` first and
 then copies it into both native projects.
 
+Verify the production bundle routes without opening a simulator:
+
+```bash
+pnpm mobile:test:smoke
+```
+
+The smoke test opens the generator, projects, build mode, login, and a shared
+pattern route from `mobile-dist/`. It fails on route chunk errors, browser
+runtime errors, missing assets, or redirect loops.
+
 ## Native integrations
 
 - Photo upload opens the platform photo library instead of the browser file picker.

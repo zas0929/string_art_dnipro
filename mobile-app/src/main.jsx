@@ -1,16 +1,17 @@
-import { StrictMode, useEffect, useState } from "react";
+import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 
 import "../../app/globals.css";
-import StringArtGenerator from "../../components/StringArtGenerator.jsx";
 import { AuthSessionProvider } from "../../components/auth/AuthSessionProvider.jsx";
-import MobileAuthForm from "../../components/auth/MobileAuthForm.jsx";
-import BuildMode from "../../components/build/BuildMode.jsx";
-import SharedBuildMode from "../../components/build/SharedBuildMode.jsx";
 import { LanguageProvider } from "../../components/i18n/LanguageProvider.jsx";
 import NativeAppBridge from "../../components/mobile/NativeAppBridge.jsx";
 import MobileNavigation from "../../components/navigation/MobileNavigation.jsx";
-import ProjectsPage from "../../components/projects/ProjectsPage.jsx";
+
+const StringArtGenerator = lazy(() => import("../../components/StringArtGenerator.jsx"));
+const ProjectsPage = lazy(() => import("../../components/projects/ProjectsPage.jsx"));
+const BuildMode = lazy(() => import("../../components/build/BuildMode.jsx"));
+const SharedBuildMode = lazy(() => import("../../components/build/SharedBuildMode.jsx"));
+const MobileAuthForm = lazy(() => import("../../components/auth/MobileAuthForm.jsx"));
 
 const MOBILE_ROUTES = new Set(["/create", "/projects", "/build", "/login"]);
 
@@ -29,6 +30,14 @@ function readRoute() {
     return { pathname, page: pathname.slice(1), token: null };
   }
   return { pathname: "/create", page: "create", token: null };
+}
+
+function MobileRouteFallback() {
+  return (
+    <main className="build-loading" role="status" aria-live="polite">
+      <span>String Art Dnipro</span>
+    </main>
+  );
 }
 
 function MobileApp() {
@@ -62,7 +71,9 @@ function MobileApp() {
       <AuthSessionProvider user={null}>
         <NativeAppBridge />
         <MobileNavigation />
-        {content}
+        <Suspense fallback={<MobileRouteFallback />}>
+          {content}
+        </Suspense>
       </AuthSessionProvider>
     </LanguageProvider>
   );
