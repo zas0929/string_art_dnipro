@@ -67,13 +67,27 @@ app they continue to open the website.
 
 ## 4. Build TestFlight
 
+Before every new upload, increment the shared native build number:
+
+```bash
+pnpm mobile:version:build
+```
+
+For a new public release, update both platforms together. This also increments
+the build number:
+
+```bash
+pnpm mobile:version:set 1.1.0
+```
+
+Confirm that Android and iOS are synchronized with `pnpm mobile:version`.
+
 ```bash
 pnpm mobile:release:ios
 ```
 
 In Xcode select `Any iOS Device (arm64)`, run Product > Archive, then Distribute
-App > App Store Connect > Upload. Increment `CURRENT_PROJECT_VERSION` before
-every upload. Increment `MARKETING_VERSION` for a new public version.
+App > App Store Connect > Upload.
 
 ## 5. Build Google Play
 
@@ -87,9 +101,8 @@ The signed bundle is written to:
 android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-Increment `versionCode` before every Play upload. Change `versionName` for a new
-public version. Upload the first build to Internal testing, add testers, and only
-then promote it to Closed testing or Production.
+Upload the first build to Internal testing, add testers, and only then promote
+it to Closed testing or Production.
 
 ## 6. Store declarations
 

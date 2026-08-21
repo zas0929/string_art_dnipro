@@ -87,6 +87,14 @@ check(Boolean(androidVersion), "Android versionCode/versionName is missing");
 check(Boolean(iosBuild && iosVersion), "iOS build/version is missing");
 check(Number(androidVersion?.[1]) > 0, "Android versionCode must be positive");
 check(Number(iosBuild?.[1]) > 0, "iOS build number must be positive");
+check(
+  androidVersion?.[2] === iosVersion?.[1].trim(),
+  "Android versionName and iOS MARKETING_VERSION must match",
+);
+check(
+  Number(androidVersion?.[1]) === Number(iosBuild?.[1]),
+  "Android versionCode and iOS CURRENT_PROJECT_VERSION must match",
+);
 
 const keystoreFile = path.join(root, "android/keystore.properties");
 const keyProperties = fs.existsSync(keystoreFile) ? parseProperties(fs.readFileSync(keystoreFile, "utf8")) : {};

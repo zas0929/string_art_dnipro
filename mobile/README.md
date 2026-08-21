@@ -50,6 +50,12 @@ download can be started from Terminal with:
 xcodebuild -downloadPlatform iOS
 ```
 
+The native run and release commands perform an early environment check. Android
+requires Android SDK, Platform-Tools, and Java; on macOS the usual SDK value is
+`ANDROID_HOME=$HOME/Library/Android/sdk`. iOS release builds require the full
+Xcode application selected through `xcode-select`; Command Line Tools alone are
+not sufficient.
+
 The Android Emulator reaches the host machine through `10.0.2.2`. A physical
 device needs a reachable LAN URL, for example:
 
@@ -70,6 +76,18 @@ pnpm mobile:test:smoke
 The smoke test opens the generator, projects, build mode, login, and a shared
 pattern route from `mobile-dist/`. It fails on route chunk errors, browser
 runtime errors, missing assets, or redirect loops.
+
+Keep Android and iOS release versions synchronized:
+
+```bash
+pnpm mobile:version
+pnpm mobile:version:build
+pnpm mobile:version:set 1.1.0
+```
+
+The build command increments the internal build number for another store
+upload. The set command updates the public version on both platforms and also
+increments the build number.
 
 ## Native integrations
 

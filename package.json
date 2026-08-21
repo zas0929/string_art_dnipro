@@ -18,15 +18,18 @@
     "mobile:build": "vite build --config mobile-app/vite.config.mjs",
     "mobile:sync": "pnpm mobile:build && cap sync",
     "mobile:doctor": "cap doctor",
+    "mobile:version": "node tools/mobile-version.mjs show",
+    "mobile:version:build": "node tools/mobile-version.mjs build",
+    "mobile:version:set": "node tools/mobile-version.mjs version",
     "mobile:ios": "cap open ios",
     "mobile:android": "cap open android",
-    "mobile:run:ios": "pnpm mobile:sync && cap run ios",
-    "mobile:run:android": "pnpm mobile:sync && cap run android",
+    "mobile:run:ios": "node tools/mobile-preflight.mjs ios && pnpm mobile:sync && cap run ios",
+    "mobile:run:android": "node tools/mobile-preflight.mjs android && pnpm mobile:sync && cap run android",
     "mobile:dev:ios": "node tools/mobile-preflight.mjs ios && CAPACITOR_SERVER_URL=http://localhost:3000 cap run ios",
-    "mobile:dev:android": "CAPACITOR_SERVER_URL=http://10.0.2.2:3000 cap run android",
+    "mobile:dev:android": "node tools/mobile-preflight.mjs android && CAPACITOR_SERVER_URL=http://10.0.2.2:3000 cap run android",
     "mobile:release:check": "pnpm mobile:sync && pnpm mobile:test:smoke && node tools/mobile-release-check.mjs",
-    "mobile:release:android": "pnpm mobile:sync && pnpm mobile:test:smoke && node tools/mobile-release-check.mjs --android && cd android && ./gradlew bundleRelease",
-    "mobile:release:ios": "pnpm mobile:sync && pnpm mobile:test:smoke && node tools/mobile-release-check.mjs --ios && cap open ios"
+    "mobile:release:android": "node tools/mobile-preflight.mjs android && pnpm mobile:sync && pnpm mobile:test:smoke && node tools/mobile-release-check.mjs --android && cd android && ./gradlew bundleRelease",
+    "mobile:release:ios": "node tools/mobile-preflight.mjs ios-release && pnpm mobile:sync && pnpm mobile:test:smoke && node tools/mobile-release-check.mjs --ios && cap open ios"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
