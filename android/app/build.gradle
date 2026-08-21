@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def releaseStoreFile = System.getenv('ANDROID_KEYSTORE_FILE') ?: keystoreProperties['storeFile']
+def releaseStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD') ?: keystoreProperties['storePassword']
+def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS') ?: keystoreProperties['keyAlias']
+def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD') ?: keystoreProperties['keyPassword']
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     namespace = "com.stringartdnipro.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +28,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

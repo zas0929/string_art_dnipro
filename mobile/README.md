@@ -92,13 +92,15 @@ users can complete those flows in the browser and then sign in to the app.
 
 ## Links
 
-The apps accept the custom scheme `stringartdnipro://` and Android App Links for
-`https://stringartdnipro.com/s/...`. Full Universal Link verification requires
-store signing identifiers and will be enabled before TestFlight and Play testing.
+The apps accept the custom scheme `stringartdnipro://` and verified HTTPS links
+for `https://stringartdnipro.com/s/...` and the `www` host. Domain verification
+requires the Apple application ID and Android signing certificate fingerprint in
+Vercel. See [STORE_RELEASE.md](./STORE_RELEASE.md).
 
 ## Store release boundary
 
-The core workspace now runs from the installed bundle and supports a completely
-offline cold start. Platform authentication and cloud project synchronization are
-connected. Full Universal Link verification, native store signing, and release
-metadata remain before TestFlight and Google Play testing.
+The core workspace runs from the installed bundle and supports a completely
+offline cold start. Platform authentication, cloud synchronization, release
+signing hooks, Universal/App Link files, and automated release checks are in
+place. Store accounts, signing secrets, listing metadata, privacy declarations,
+and tester distribution are completed manually using STORE_RELEASE.md.

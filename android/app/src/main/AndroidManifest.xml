@@ -37,6 +37,10 @@
                     android:scheme="https"
                     android:host="stringartdnipro.com"
                     android:pathPrefix="/s/" />
+                <data
+                    android:scheme="https"
+                    android:host="www.stringartdnipro.com"
+                    android:pathPrefix="/s/" />
             </intent-filter>
 
         </activity>
