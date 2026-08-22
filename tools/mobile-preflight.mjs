@@ -59,7 +59,7 @@ if (platform === "android") {
   }
 }
 
-if (platform === "ios" || platform === "ios-release") {
+if (platform === "ios" || platform === "ios-device" || platform === "ios-release") {
   if (process.platform !== "darwin") {
     fail("iOS builds require macOS and Xcode.");
   }
@@ -82,7 +82,7 @@ if (platform === "ios" || platform === "ios-release") {
     );
   }
 
-  if (platform === "ios-release") process.exit(0);
+  if (platform === "ios-device" || platform === "ios-release") process.exit(0);
 
   let output;
   try {
@@ -113,6 +113,6 @@ if (platform === "ios" || platform === "ios-release") {
   }
 }
 
-if (!new Set(["android", "ios", "ios-release"]).has(platform)) {
-  fail("Choose a supported platform: android, ios, or ios-release.");
+if (!new Set(["android", "ios", "ios-device", "ios-release"]).has(platform)) {
+  fail("Choose a supported platform: android, ios, ios-device, or ios-release.");
 }

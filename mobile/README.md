@@ -42,6 +42,32 @@ pnpm mobile:dev:ios
 pnpm mobile:dev:android
 ```
 
+## Real devices
+
+Build an Android APK that can be installed directly on a test phone:
+
+```bash
+pnpm mobile:package:android:debug
+```
+
+The resulting file is
+`android/app/build/outputs/apk/debug/app-debug.apk`. Enable Developer options
+and USB debugging on the phone, connect it by USB, and either drag the APK to
+the device or run `pnpm mobile:device:android` to let Capacitor install and open
+the application.
+
+For an iPhone, connect the device to the Mac, trust the computer, and run:
+
+```bash
+pnpm mobile:device:ios
+```
+
+On the first run, open the generated Xcode project, select the App target under
+Signing & Capabilities, choose your Apple team, and select the connected iPhone.
+Xcode can install a development build directly. A distributable IPA requires an
+Apple Developer signing profile; TestFlight is the recommended tester delivery
+path and is documented in `STORE_RELEASE.md`.
+
 If the iOS command reports that no simulator runtime is installed, open
 Xcode > Settings > Components and install the latest iOS Simulator. The same
 download can be started from Terminal with:
