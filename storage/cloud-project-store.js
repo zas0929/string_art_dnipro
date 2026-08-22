@@ -8,6 +8,7 @@ import {
 const PREVIEW_BUCKET = "project-previews";
 const PROJECT_COLUMNS = [
   "id",
+  "user_id",
   "name",
   "sequence",
   "point_count",
@@ -108,9 +109,10 @@ export function createCloudProjectStore(supabase, userId) {
         artwork: existing?.artwork_preview_path || null,
       });
       const row = patternToCloudProject(effectivePattern, userId, previewPaths);
+      const { user_id: _ownerId, ...updateRow } = row;
       const { data, error } = await supabase
         .from("projects")
-        .update(row)
+        .update(updateRow)
         .eq("id", effectivePattern.id)
         .select(PROJECT_COLUMNS)
         .single();
@@ -143,9 +145,13 @@ export function createCloudProjectStore(supabase, userId) {
     },
 
     async saveProgress(progress) {
-      const { error } = await supabase
-        .from("build_progress")
-        .upsert(progressToCloudRow(progress, userId), { onConflict: "project_id" });
+      const row = progressToCloudRow(progress, userId);
+      const { error } = await supabase.rpc("save_project_progress", {
+        p_project_id: row.project_id,
+        p_step_index: row.step_index,
+        p_speed_ms: row.speed_ms,
+        p_voice_enabled: row.voice_enabled,
+      });
       if (error) throw error;
     },
 
@@ -172,7 +178,7 @@ export function createCloudProjectStore(supabase, userId) {
 async function findProjectRow(supabase, projectId) {
   const { data, error } = await supabase
     .from("projects")
-    .select("id,source_preview_path,artwork_preview_path")
+    .select("id,user_id,source_preview_path,artwork_preview_path")
     .eq("id", projectId)
     .maybeSingle();
   if (error) throw error;

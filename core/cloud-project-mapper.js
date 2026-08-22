@@ -20,6 +20,7 @@ export function patternToCloudProject(pattern, userId, previewPaths = {}) {
 export function cloudProjectToPattern(row, previewUrls = {}) {
   return {
     id: row.id,
+    ownerId: row.user_id,
     name: row.name,
     sequence: row.sequence,
     pointCount: row.point_count,

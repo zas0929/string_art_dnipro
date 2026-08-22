@@ -2690,6 +2690,53 @@ textarea {
   font-weight: 760;
 }
 
+.project-scope-filter {
+  display: flex;
+  width: fit-content;
+  max-width: calc(100% - 64px);
+  margin: -10px auto 24px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.project-scope-filter button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 8px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.project-scope-filter button:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text);
+}
+
+.project-scope-filter button.is-active {
+  background: var(--accent);
+  color: #091109;
+}
+
+.project-scope-filter strong {
+  min-width: 20px;
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.projects-filter-empty {
+  min-height: 220px;
+}
+
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -2738,6 +2785,27 @@ textarea {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.project-heading {
+  min-width: 0;
+}
+
+.project-shared-badge {
+  display: inline-flex;
+  margin-top: 6px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 56%, var(--line));
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.project-card.is-shared {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
 }
 
 .project-title-row h2 {
@@ -3796,6 +3864,19 @@ textarea {
 
   .projects-header-actions {
     justify-content: space-between;
+  }
+
+  .project-scope-filter {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 18px;
+  }
+
+  .project-scope-filter button {
+    min-width: 0;
+    flex: 1 1 0;
+    gap: 6px;
+    padding-inline: 8px;
   }
 
   .projects-grid {

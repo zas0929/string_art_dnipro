@@ -33,6 +33,7 @@ test("maps a local pattern to the cloud schema and back", () => {
     updated_at: "2026-07-28T11:00:00Z",
   }, { artwork: "signed-artwork" }), {
     ...pattern,
+    ownerId: "user-id",
     sourcePreviewDataUrl: null,
     artworkPreviewDataUrl: "signed-artwork",
     createdAt: "2026-07-28T10:00:00Z",

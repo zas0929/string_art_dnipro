@@ -22,7 +22,20 @@ export default function ProjectsPage() {
   const [editingId, setEditingId] = useState(null);
   const [draftName, setDraftName] = useState("");
   const [projectLimit, setProjectLimit] = useState(LOCAL_PROJECT_LIMIT);
+  const [projectScope, setProjectScope] = useState("all");
   const projectStoreRef = useRef(null);
+
+  const ownProjects = isAdmin
+    ? projects.filter((project) => !isSharedAdminProject(project, user))
+    : projects;
+  const sharedProjects = isAdmin
+    ? projects.filter((project) => isSharedAdminProject(project, user))
+    : [];
+  const visibleProjects = projectScope === "own"
+    ? ownProjects
+    : projectScope === "shared"
+      ? sharedProjects
+      : [...ownProjects, ...sharedProjects];
 
   useEffect(() => {
     let active = true;
@@ -97,11 +110,13 @@ export default function ProjectsPage() {
             {t("common.generator")}
           </a>
           <h1>{t("projects.title")}</h1>
-          <p>{t("projects.subtitle")}</p>
+          <p>{isAdmin ? t("projects.adminSubtitle") : t("projects.subtitle")}</p>
         </div>
         <div className="projects-header-actions">
           <span className="project-limit">
-            {projectLimit === null
+            {isAdmin
+              ? t("projects.adminSlots", { count: projects.length })
+              : projectLimit === null
               ? t("projects.unlimitedSlots", { count: projects.length })
               : t("projects.slots", { count: projects.length, limit: projectLimit })}
           </span>
@@ -111,6 +126,31 @@ export default function ProjectsPage() {
           </a>
         </div>
       </header>
+
+      {isAdmin && projects.length > 0 && (
+        <div
+          className="project-scope-filter"
+          role="group"
+          aria-label={t("projects.filterAria")}
+        >
+          {[
+            ["all", t("projects.filterAll"), projects.length],
+            ["own", t("projects.filterOwn"), ownProjects.length],
+            ["shared", t("projects.filterShared"), sharedProjects.length],
+          ].map(([scope, label, count]) => (
+            <button
+              type="button"
+              key={scope}
+              className={projectScope === scope ? "is-active" : ""}
+              aria-pressed={projectScope === scope}
+              onClick={() => setProjectScope(scope)}
+            >
+              <span>{label}</span>
+              <strong>{count}</strong>
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <div className="projects-empty">{t("common.loading")}</div>
@@ -123,10 +163,19 @@ export default function ProjectsPage() {
             {t("projects.createFirst")}
           </a>
         </section>
+      ) : visibleProjects.length === 0 ? (
+        <section className="projects-empty projects-filter-empty">
+          <h2>{projectScope === "shared"
+            ? t("projects.noSharedProjects")
+            : t("projects.noOwnProjects")}</h2>
+        </section>
       ) : (
         <section className="projects-grid" aria-label={t("projects.listAria")}>
-          {projects.map((project) => (
-            <article className="project-card" key={project.id}>
+          {visibleProjects.map((project) => (
+            <article
+              className={`project-card${isSharedAdminProject(project, user) ? " is-shared" : ""}`}
+              key={project.id}
+            >
               <div className="project-preview">
                 {project.artworkPreviewDataUrl ? (
                   <img src={project.artworkPreviewDataUrl} alt="" />
@@ -148,7 +197,12 @@ export default function ProjectsPage() {
                       <button type="submit">{t("projects.save")}</button>
                     </form>
                   ) : (
-                    <h2>{project.name || t("projects.untitled")}</h2>
+                    <div className="project-heading">
+                      <h2>{project.name || t("projects.untitled")}</h2>
+                      {isSharedAdminProject(project, user) && (
+                        <span className="project-shared-badge">{t("projects.sharedAdmin")}</span>
+                      )}
+                    </div>
                   )}
                   <div className="project-title-actions">
                     {editingId !== project.id && (
@@ -165,15 +219,17 @@ export default function ProjectsPage() {
                         <Pencil aria-hidden="true" size={16} />
                       </button>
                     )}
-                    <button
-                      className="project-icon-button project-delete"
-                      type="button"
-                      title={t("projects.delete")}
-                      aria-label={t("projects.delete")}
-                      onClick={() => removeProject(project)}
-                    >
-                      <Trash2 aria-hidden="true" size={17} />
-                    </button>
+                    {!isSharedAdminProject(project, user) && (
+                      <button
+                        className="project-icon-button project-delete"
+                        type="button"
+                        title={t("projects.delete")}
+                        aria-label={t("projects.delete")}
+                        onClick={() => removeProject(project)}
+                      >
+                        <Trash2 aria-hidden="true" size={17} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="project-meta">
@@ -207,6 +263,10 @@ export default function ProjectsPage() {
       {error && <p className="projects-error" role="alert">{error}</p>}
     </main>
   );
+}
+
+function isSharedAdminProject(project, user) {
+  return user?.role === "admin" && Boolean(project.ownerId) && project.ownerId !== user.id;
 }
 
 function ProjectProgress({ project, t }) {

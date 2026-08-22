@@ -64,6 +64,34 @@ test("project migration assigns a new id when another account owns the local id"
   assert.equal(saved.id, insertedRows[1].id);
 });
 
+test("build progress is saved through the collaboration-safe RPC", async () => {
+  const calls = [];
+  const supabase = {
+    async rpc(name, params) {
+      calls.push({ name, params });
+      return { data: null, error: null };
+    },
+  };
+  const store = createCloudProjectStore(supabase, "admin-2");
+
+  await store.saveProgress({
+    patternId: "admin-project",
+    stepIndex: 840,
+    speedMs: 1250,
+    voiceEnabled: false,
+  });
+
+  assert.deepEqual(calls, [{
+    name: "save_project_progress",
+    params: {
+      p_project_id: "admin-project",
+      p_step_index: 840,
+      p_speed_ms: 1250,
+      p_voice_enabled: false,
+    },
+  }]);
+});
+
 function createSupabaseStub({
   uploads,
   insertedRows,
