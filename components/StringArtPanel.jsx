@@ -65,7 +65,7 @@ export default function StringArtPanel() {
             <FileText aria-hidden="true" size={17} strokeWidth={2} />
             TXT
           </button>
-          <button id="printButton" type="button" disabled>
+          <button id="printButton" className="print-desktop-only" type="button" disabled>
             <Printer aria-hidden="true" size={17} strokeWidth={2} />
             {t("panel.print")}
           </button>

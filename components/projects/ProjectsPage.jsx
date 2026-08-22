@@ -256,7 +256,11 @@ export default function ProjectsPage() {
                     {t("projects.build")}
                   </button>
                   {isAdmin && (
-                    <button type="button" onClick={() => openProject(project.id, "/print")}>
+                    <button
+                      className="print-desktop-only"
+                      type="button"
+                      onClick={() => openProject(project.id, "/print")}
+                    >
                       <Printer aria-hidden="true" size={17} />
                       {t("projects.print")}
                     </button>

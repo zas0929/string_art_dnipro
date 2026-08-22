@@ -211,8 +211,8 @@ export function mountStringArtApp(root = document) {
     });
   }
 
-  listen(pngButton, "click", () => {
-    exportPng();
+  listen(pngButton, "click", async () => {
+    await exportPng();
   });
   listen(txtButton, "click", () => {
     downloadText("string-art-scheme.txt", formatSchemeText(state.sequence));
@@ -1315,18 +1315,39 @@ export function mountStringArtApp(root = document) {
     downloadBlob(filename, blob);
   }
 
-  function exportPng() {
+  async function exportPng() {
     const frame = renderTransparentExportFrame();
     if (!frame) return;
 
     const filename = "string-art-preview.png";
-    const blob = dataUrlToBlob(
-      frame.toDataURL("image/png"),
-      "application/octet-stream",
-    );
+    const blob = dataUrlToBlob(frame.toDataURL("image/png"), "image/png");
     frame.width = 1;
     frame.height = 1;
+
+    const file = typeof File === "function"
+      ? new File([blob], filename, { type: "image/png" })
+      : null;
+    if (file && isAppleMobileDevice() && canShareFile(file)) {
+      try {
+        await navigator.share({ files: [file] });
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") return;
+        console.warn("Could not share PNG through the iOS share sheet", error);
+      }
+    }
+
     downloadBlob(filename, blob);
+  }
+
+  function isAppleMobileDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  }
+
+  function canShareFile(file) {
+    if (typeof navigator.share !== "function") return false;
+    return typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] });
   }
 
   function dataUrlToBlob(url, type) {
