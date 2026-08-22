@@ -2822,6 +2822,33 @@ textarea {
   font-size: 17px;
 }
 
+.project-title-link {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-title-link:hover {
+  border: 0;
+  background: transparent;
+  color: var(--accent-2);
+}
+
+.project-title-link:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 3px;
+}
+
 .project-icon-button,
 .project-delete {
   width: 34px;
@@ -3891,15 +3918,17 @@ textarea {
 
   .project-card {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
   }
 
   .project-preview {
+    align-self: start;
     height: auto;
     min-height: 0;
     aspect-ratio: 1;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
   }
 
   .workspace,
@@ -5106,16 +5135,17 @@ textarea {
     }
 
     .project-card {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       box-shadow: none;
     }
 
     .project-card-body {
-      padding: 14px;
+      min-width: 0;
+      padding: 12px;
     }
 
     .project-title-row h2 {
-      font-size: 19px;
+      font-size: 17px;
     }
 
     .project-actions {

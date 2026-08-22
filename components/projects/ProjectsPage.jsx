@@ -198,7 +198,15 @@ export default function ProjectsPage() {
                     </form>
                   ) : (
                     <div className="project-heading">
-                      <h2>{project.name || t("projects.untitled")}</h2>
+                      <h2>
+                        <button
+                          type="button"
+                          className="project-title-link"
+                          onClick={() => openProject(project.id, "/build")}
+                        >
+                          {project.name || t("projects.untitled")}
+                        </button>
+                      </h2>
                       {isSharedAdminProject(project, user) && (
                         <span className="project-shared-badge">{t("projects.sharedAdmin")}</span>
                       )}
