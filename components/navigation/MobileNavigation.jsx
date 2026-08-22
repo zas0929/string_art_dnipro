@@ -9,6 +9,7 @@ import Menu from "lucide-react/dist/esm/icons/menu.mjs";
 import UserRound from "lucide-react/dist/esm/icons/user-round.mjs";
 import WandSparkles from "lucide-react/dist/esm/icons/wand-sparkles.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
+import { Capacitor } from "@capacitor/core";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { signOut } from "../../app/login/actions.js";
@@ -22,8 +23,10 @@ export default function MobileNavigation() {
   const { user } = useAuthSession();
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(false);
 
   useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => setIsNativeApp(Capacitor.isNativePlatform()), []);
 
   if (pathname?.startsWith("/print")) return null;
 
@@ -31,15 +34,17 @@ export default function MobileNavigation() {
   const isLanding = pathname === "/";
 
   const links = [
-    { href: "/", label: t("common.home"), icon: Home },
+    ...(!isNativeApp ? [{ href: "/", label: t("common.home"), icon: Home }] : []),
     { href: "/create", label: t("common.generator"), icon: WandSparkles },
     { href: "/projects", label: t("landing.projects"), icon: FolderOpen },
     { href: "/build", label: t("landing.buildMode"), icon: ListChecks },
   ];
 
+  const brandHref = isNativeApp ? "/create" : "/";
+
   return (
     <header className={`mobile-site-header${isLanding ? " is-landing" : ""}`}>
-      <a className="mobile-site-brand" href="/" aria-label="String Art Dnipro">
+      <a className="mobile-site-brand" href={brandHref} aria-label={brandTitle}>
         <img src="/logo-white-compact.png" alt="" />
         <span>{brandTitle}</span>
       </a>

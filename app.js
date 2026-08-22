@@ -21,6 +21,10 @@ import {
   normalizeLanguage,
   translate,
 } from "./core/i18n.js";
+import {
+  isNativeFileShareAvailable,
+  shareNativeFile,
+} from "./core/native-file-share.js";
 
 const mountedApps = new WeakMap();
 const WORK_SIZE = 560;
@@ -212,7 +216,7 @@ export function mountStringArtApp(root = document) {
   }
 
   listen(pngButton, "click", () => {
-    exportPng();
+    void exportPng();
   });
   listen(txtButton, "click", () => {
     downloadText("string-art-scheme.txt", formatSchemeText(state.sequence));
@@ -1315,7 +1319,7 @@ export function mountStringArtApp(root = document) {
     downloadBlob(filename, blob);
   }
 
-  function exportPng() {
+  async function exportPng() {
     const frame = renderTransparentExportFrame();
     if (!frame) return;
 
@@ -1326,6 +1330,20 @@ export function mountStringArtApp(root = document) {
     );
     frame.width = 1;
     frame.height = 1;
+
+    if (isNativeFileShareAvailable()) {
+      try {
+        await shareNativeFile({
+          blob,
+          filename,
+          title: "String Art Dnipro",
+        });
+        return;
+      } catch (error) {
+        console.error("Could not share the exported PNG", error);
+      }
+    }
+
     downloadBlob(filename, blob);
   }
 

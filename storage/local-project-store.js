@@ -3,12 +3,18 @@ import {
   removeProjectFromIndex,
   updateProjectIndex,
 } from "../core/project-library.js";
+import {
+  dequeueCloudSync,
+  enqueueCloudSync,
+  normalizeCloudSyncQueue,
+} from "../core/cloud-sync.js";
 
 const DATABASE_NAME = "string-art-generator";
 const DATABASE_VERSION = 1;
 const STORE_NAME = "local-project";
 const LATEST_PATTERN_KEY = "latest-pattern";
 const PROJECT_INDEX_KEY = "project-index";
+const CLOUD_SYNC_QUEUE_KEY = "cloud-sync-queue";
 
 export { LOCAL_PROJECT_LIMIT };
 
@@ -44,6 +50,14 @@ export async function listLocalProjects() {
 export async function loadLocalProject(projectId) {
   if (!projectId) return null;
   return getRecord(projectKey(projectId));
+}
+
+export async function cacheLocalProject(pattern) {
+  if (!pattern?.id) return null;
+  await saveProjectRecord(pattern);
+  const latest = await loadLatestPattern();
+  if (latest?.id === pattern.id) await putRecord(LATEST_PATTERN_KEY, pattern);
+  return pattern;
 }
 
 export async function activateLocalProject(projectId) {
@@ -93,6 +107,22 @@ export async function loadBuildProgress(patternId) {
   return getRecord(`build-progress:${patternId}`);
 }
 
+export async function loadCloudSyncQueue(scope) {
+  return normalizeCloudSyncQueue(await getRecord(cloudSyncQueueKey(scope)));
+}
+
+export async function queueCloudSync(scope, type, id) {
+  return updateRecord(cloudSyncQueueKey(scope), (queue) => (
+    enqueueCloudSync(queue, type, id)
+  ));
+}
+
+export async function completeCloudSync(scope, type, id) {
+  return updateRecord(cloudSyncQueueKey(scope), (queue) => (
+    dequeueCloudSync(queue, type, id)
+  ));
+}
+
 async function saveProjectRecord(pattern) {
   const index = await getRecord(PROJECT_INDEX_KEY);
   const next = updateProjectIndex(index, pattern);
@@ -104,6 +134,10 @@ async function saveProjectRecord(pattern) {
 
 function projectKey(projectId) {
   return `project:${projectId}`;
+}
+
+function cloudSyncQueueKey(scope) {
+  return `${CLOUD_SYNC_QUEUE_KEY}:${scope || "default"}`;
 }
 
 function openDatabase() {
@@ -167,6 +201,38 @@ async function getRecord(key) {
       const request = transaction.objectStore(STORE_NAME).get(key);
       request.onsuccess = () => resolve(request.result || null);
       request.onerror = () => reject(request.error || new Error("Could not read data"));
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function updateRecord(key, updater) {
+  if (typeof indexedDB === "undefined") return updater(null);
+  const database = await openDatabase();
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(key);
+      let nextValue;
+      request.onsuccess = () => {
+        try {
+          nextValue = updater(request.result || null);
+          store.put(nextValue, key);
+        } catch (error) {
+          transaction.abort();
+          reject(error);
+        }
+      };
+      request.onerror = () => reject(request.error || new Error("Could not read data"));
+      transaction.oncomplete = () => resolve(nextValue);
+      transaction.onerror = () => reject(
+        transaction.error || new Error("Could not update data"),
+      );
+      transaction.onabort = () => reject(
+        transaction.error || new Error("Update was cancelled"),
+      );
     });
   } finally {
     database.close();

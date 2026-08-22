@@ -2,6 +2,7 @@ node_modules/
 .pnpm-store/
 .next/
 out/
+mobile-dist/
 package-lock.json
 playwright-report/
 test-results/
@@ -9,3 +10,9 @@ test-results/
 .DS_Store
 .env*
 !.env.example
+android/keystore.properties
+android/*.jks
+android/*.keystore
+android/app/*.jks
+android/app/*.keystore
+mobile-release/

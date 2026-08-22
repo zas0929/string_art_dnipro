@@ -26,6 +26,8 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError("");
     getProjectStore()
       .then(async (store) => {
         projectStoreRef.current = store;
@@ -49,7 +51,7 @@ export default function ProjectsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const openProject = async (projectId, destination) => {
     setError("");

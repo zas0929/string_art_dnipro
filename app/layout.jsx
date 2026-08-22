@@ -2,6 +2,7 @@ import "./globals.css";
 import { AuthSessionProvider } from "../components/auth/AuthSessionProvider.jsx";
 import { LanguageProvider } from "../components/i18n/LanguageProvider.jsx";
 import MobileNavigation from "../components/navigation/MobileNavigation.jsx";
+import NativeAppBridge from "../components/mobile/NativeAppBridge.jsx";
 import ServiceWorkerRegistration from "../components/pwa/ServiceWorkerRegistration.jsx";
 import { isSupabaseConfigured } from "../lib/supabase/config.js";
 import { createClient } from "../lib/supabase/server.js";
@@ -112,6 +113,7 @@ export default async function RootLayout({ children }) {
       <body>
         <LanguageProvider>
           <AuthSessionProvider user={user}>
+            <NativeAppBridge />
             <MobileNavigation />
             {children}
           </AuthSessionProvider>
