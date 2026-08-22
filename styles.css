@@ -2764,12 +2764,14 @@ textarea {
 .project-preview img {
   display: block;
   width: 88%;
-  height: 88%;
-  aspect-ratio: 1;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  box-sizing: border-box;
+  padding: 2px;
   border: 2px solid color-mix(in srgb, var(--accent) 45%, var(--line));
   border-radius: 50%;
-  background: #f4f0e6;
-  object-fit: cover;
+  background: #fffaf2;
+  object-fit: contain;
   box-shadow: 0 10px 28px rgb(0 0 0 / 16%);
   transition: transform 160ms ease;
 }
