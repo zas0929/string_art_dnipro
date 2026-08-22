@@ -1,6 +1,5 @@
 "use client";
 
-import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left.mjs";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right.mjs";
 import FolderOpen from "lucide-react/dist/esm/icons/folder-open.mjs";
@@ -657,12 +656,8 @@ export default function BuildMode({ sharedPattern = null }) {
       onKeyDownCapture={keepScreenAwake}
     >
       <section className="build-workspace">
-        <header className="build-header">
-          <a className="back-link" href="/create">
-            <ArrowLeft aria-hidden="true" size={18} />
-            {t("common.generator")}
-          </a>
-          <div className="build-header-actions">
+        {state.pattern && (
+          <div className="build-canvas-actions">
             <button
               className="voice-control-toggle"
               type="button"
@@ -729,7 +724,7 @@ export default function BuildMode({ sharedPattern = null }) {
               )}
             </button>
           </div>
-        </header>
+        )}
 
         {state.pattern ? (
           <>

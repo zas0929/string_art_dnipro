@@ -2196,23 +2196,13 @@ textarea {
   padding: 24px;
 }
 
-.build-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 42px;
-}
-
-.build-header .back-link {
-  margin-bottom: 0;
-}
-
-.build-header-actions {
+.build-canvas-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  width: min(100%, 720px);
   gap: 10px;
+  margin: 18px auto 0;
 }
 
 .voice-control-toggle,
@@ -2285,7 +2275,7 @@ textarea {
 .build-canvas-wrap {
   border-radius: 50%;
   width: min(100%, 520px);
-  margin: 24px auto 0;
+  margin: 8px auto 0;
 }
 
 .build-canvas {
@@ -2753,14 +2743,20 @@ textarea {
 }
 
 .project-preview {
+  appearance: none;
   display: grid;
   width: 100%;
+  min-height: 0;
   aspect-ratio: 1;
   place-items: center;
   overflow: hidden;
+  padding: 0;
+  border: 0;
   border-bottom: 1px solid var(--line);
+  border-radius: 0;
   background: #f4f0e6;
   color: #626872;
+  cursor: pointer;
 }
 
 .project-preview img {
@@ -2768,6 +2764,16 @@ textarea {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  transition: transform 160ms ease;
+}
+
+.project-preview:hover img {
+  transform: scale(1.015);
+}
+
+.project-preview:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -3px;
 }
 
 .project-card-body {
@@ -3885,15 +3891,15 @@ textarea {
 
   .project-card {
     display: grid;
-    grid-template-columns: 132px minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
 
   .project-preview {
-    height: 100%;
-    min-height: 190px;
-    aspect-ratio: auto;
-    border-right: 1px solid var(--line);
-    border-bottom: 0;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 1;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
 
   .workspace,
@@ -4499,12 +4505,6 @@ textarea {
     padding: 0 32px 36px;
   }
 
-  .build-header {
-    min-height: 60px;
-    padding: 38px 0 14px;
-    border-bottom: 1px solid var(--line);
-  }
-
   .voice-control-toggle,
   .voice-icon-toggle,
   .wake-lock-toggle {
@@ -5106,7 +5106,7 @@ textarea {
     }
 
     .project-card {
-      grid-template-columns: 112px minmax(0, 1fr);
+      grid-template-columns: 1fr;
       box-shadow: none;
     }
 

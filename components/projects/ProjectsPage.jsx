@@ -1,6 +1,5 @@
 "use client";
 
-import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left.mjs";
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
 import Pencil from "lucide-react/dist/esm/icons/pencil.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
@@ -105,10 +104,6 @@ export default function ProjectsPage() {
     <main className="projects-page">
       <header className="projects-header">
         <div>
-          <a className="back-link" href="/create">
-            <ArrowLeft aria-hidden="true" size={18} />
-            {t("common.generator")}
-          </a>
           <h1>{t("projects.title")}</h1>
           <p>{isAdmin ? t("projects.adminSubtitle") : t("projects.subtitle")}</p>
         </div>
@@ -176,13 +171,18 @@ export default function ProjectsPage() {
               className={`project-card${isSharedAdminProject(project, user) ? " is-shared" : ""}`}
               key={project.id}
             >
-              <div className="project-preview">
+              <button
+                type="button"
+                className="project-preview"
+                aria-label={`${t("projects.build")}: ${project.name || t("projects.untitled")}`}
+                onClick={() => openProject(project.id, "/build")}
+              >
                 {project.artworkPreviewDataUrl ? (
                   <img src={project.artworkPreviewDataUrl} alt="" />
                 ) : (
                   <Hammer aria-hidden="true" size={38} />
                 )}
-              </div>
+              </button>
               <div className="project-card-body">
                 <div className="project-title-row">
                   {editingId === project.id ? (
