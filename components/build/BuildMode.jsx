@@ -47,7 +47,10 @@ const ACTIVE_THREAD_COLOR = "#c79b67";
 
 export default function BuildMode({ sharedPattern = null }) {
   const { language, t } = useLanguage();
-  const [state, dispatch] = useReducer(buildSessionReducer, initialBuildSessionState);
+  const [state, dispatch] = useReducer(
+    buildSessionReducer,
+    initialBuildSessionState,
+  );
   const [message, setMessage] = useState("");
   const [wakeLockEnabled, setWakeLockEnabled] = useState(true);
   const [wakeLockNotice, setWakeLockNotice] = useState("");
@@ -100,7 +103,8 @@ export default function BuildMode({ sharedPattern = null }) {
   }, [speechControlNotice]);
 
   useEffect(() => {
-    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const Recognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!Recognition) {
       setSpeechControlSupported(false);
       return undefined;
@@ -116,7 +120,8 @@ export default function BuildMode({ sharedPattern = null }) {
 
     const restart = () => {
       window.clearTimeout(speechRestartTimerRef.current);
-      if (!keepListeningRef.current || document.visibilityState !== "visible") return;
+      if (!keepListeningRef.current || document.visibilityState !== "visible")
+        return;
       speechRestartTimerRef.current = window.setTimeout(() => {
         if (!keepListeningRef.current) return;
         recognition.lang = speechRecognitionLanguage(languageRef.current);
@@ -126,7 +131,9 @@ export default function BuildMode({ sharedPattern = null }) {
           if (error?.name !== "InvalidStateError") {
             keepListeningRef.current = false;
             setSpeechControlEnabled(false);
-            setSpeechControlNotice(translationRef.current("build.voiceControlStartError"));
+            setSpeechControlNotice(
+              translationRef.current("build.voiceControlStartError"),
+            );
           }
         }
       }, 240);
@@ -137,13 +144,25 @@ export default function BuildMode({ sharedPattern = null }) {
       setSpeechControlEnabled(true);
     };
     recognition.onresult = (event) => {
-      for (let index = event.resultIndex; index < event.results.length; index++) {
+      for (
+        let index = event.resultIndex;
+        index < event.results.length;
+        index++
+      ) {
         const result = event.results[index];
-        for (let alternativeIndex = 0; alternativeIndex < result.length; alternativeIndex++) {
+        for (
+          let alternativeIndex = 0;
+          alternativeIndex < result.length;
+          alternativeIndex++
+        ) {
           const transcript = result[alternativeIndex]?.transcript?.trim();
           if (!transcript) continue;
           const previous = lastSpeechCommandRef.current;
-          if (previous.resultIndex === index && previous.transcript === transcript) break;
+          if (
+            previous.resultIndex === index &&
+            previous.transcript === transcript
+          )
+            break;
           const handled = speechCommandHandlerRef.current?.(transcript);
           if (!handled) continue;
           lastSpeechCommandRef.current = { resultIndex: index, transcript };
@@ -153,16 +172,23 @@ export default function BuildMode({ sharedPattern = null }) {
     };
     recognition.onerror = (event) => {
       if (event.error === "aborted" || event.error === "no-speech") return;
-      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+      if (
+        event.error === "not-allowed" ||
+        event.error === "service-not-allowed"
+      ) {
         keepListeningRef.current = false;
         setSpeechControlEnabled(false);
-        setSpeechControlNotice(translationRef.current("build.voiceControlPermissionDenied"));
+        setSpeechControlNotice(
+          translationRef.current("build.voiceControlPermissionDenied"),
+        );
         return;
       }
       if (event.error === "audio-capture") {
         keepListeningRef.current = false;
         setSpeechControlEnabled(false);
-        setSpeechControlNotice(translationRef.current("build.voiceControlNoMicrophone"));
+        setSpeechControlNotice(
+          translationRef.current("build.voiceControlNoMicrophone"),
+        );
         return;
       }
       setSpeechControlNotice(translationRef.current("build.voiceControlError"));
@@ -197,7 +223,8 @@ export default function BuildMode({ sharedPattern = null }) {
 
   useEffect(() => {
     const restoreWakeLock = () => {
-      if (document.visibilityState !== "visible" || !keepScreenAwakeRef.current) return;
+      if (document.visibilityState !== "visible" || !keepScreenAwakeRef.current)
+        return;
       void acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef);
     };
 
@@ -218,12 +245,21 @@ export default function BuildMode({ sharedPattern = null }) {
       };
       loadBuildProgress(sharedPattern.id)
         .then((progress) => {
-          if (active) dispatch({ type: "LOAD_PATTERN", pattern: sharedPattern, progress });
+          if (active)
+            dispatch({
+              type: "LOAD_PATTERN",
+              pattern: sharedPattern,
+              progress,
+            });
         })
         .catch((error) => {
           if (!active) return;
           setMessage(t("build.restoreError", { error: error.message }));
-          dispatch({ type: "LOAD_PATTERN", pattern: sharedPattern, progress: null });
+          dispatch({
+            type: "LOAD_PATTERN",
+            pattern: sharedPattern,
+            progress: null,
+          });
         });
       return () => {
         active = false;
@@ -300,16 +336,26 @@ export default function BuildMode({ sharedPattern = null }) {
     const timeout = window.setTimeout(() => {
       const projectStore = projectStoreRef.current;
       if (!projectStore) return;
-      projectStore.saveProgress({
-        patternId: state.pattern.id,
-        stepIndex: state.stepIndex,
-        speedMs: state.speedMs,
-        voiceEnabled: state.voiceEnabled,
-        updatedAt: new Date().toISOString(),
-      }).catch((error) => setMessage(t("build.saveError", { error: error.message })));
+      projectStore
+        .saveProgress({
+          patternId: state.pattern.id,
+          stepIndex: state.stepIndex,
+          speedMs: state.speedMs,
+          voiceEnabled: state.voiceEnabled,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch((error) =>
+          setMessage(t("build.saveError", { error: error.message })),
+        );
     }, 250);
     return () => window.clearTimeout(timeout);
-  }, [state.hydrated, state.pattern, state.stepIndex, state.speedMs, state.voiceEnabled]);
+  }, [
+    state.hydrated,
+    state.pattern,
+    state.stepIndex,
+    state.speedMs,
+    state.voiceEnabled,
+  ]);
 
   useEffect(() => {
     keepScreenAwakeRef.current = wakeLockEnabled;
@@ -334,19 +380,23 @@ export default function BuildMode({ sharedPattern = null }) {
       if (cancelled || advanceTimeout) return;
       window.clearTimeout(speechWatchdog);
       const durationMs = Math.max(0, Number(delay) || 0);
-      advanceTimeout = window.setTimeout(() => dispatch({ type: "ADVANCE" }), durationMs);
+      advanceTimeout = window.setTimeout(
+        () => dispatch({ type: "ADVANCE" }),
+        durationMs,
+      );
     };
 
     if (state.voiceEnabled) {
-      const primedSpeech = primedSpeechRef.current?.stepIndex === state.stepIndex
-        ? primedSpeechRef.current.run
-        : playBuildPoint(
-          voicePlayerRef.current,
-          nextPoint,
-          language,
-          setMessage,
-          t,
-        );
+      const primedSpeech =
+        primedSpeechRef.current?.stepIndex === state.stepIndex
+          ? primedSpeechRef.current.run
+          : playBuildPoint(
+              voicePlayerRef.current,
+              nextPoint,
+              language,
+              setMessage,
+              t,
+            );
       primedSpeechRef.current = null;
       const followingPoint = state.pattern.sequence[state.stepIndex + 2];
       if (followingPoint) {
@@ -433,7 +483,9 @@ export default function BuildMode({ sharedPattern = null }) {
     checkpointQueueRef.current = [];
     checkpointResumePlaybackRef.current = false;
     checkpointShownRef.current = new Set(
-      [...checkpointShownRef.current].filter((checkpoint) => checkpoint <= buildCheckpoint),
+      [...checkpointShownRef.current].filter(
+        (checkpoint) => checkpoint <= buildCheckpoint,
+      ),
     );
     checkpointPreviousStepRef.current = buildCheckpoint;
     dispatch({ type: "SEEK", stepIndex: buildCheckpoint });
@@ -463,9 +515,11 @@ export default function BuildMode({ sharedPattern = null }) {
     const acquired = state.pattern
       ? await acquireScreenWakeLock(wakeLockRef, wakeLockRequestRef)
       : true;
-    setWakeLockNotice(acquired
-      ? t("build.wakeLockEnabledNotice")
-      : t("build.wakeLockUnavailableNotice"));
+    setWakeLockNotice(
+      acquired
+        ? t("build.wakeLockEnabledNotice")
+        : t("build.wakeLockUnavailableNotice"),
+    );
   };
 
   const toggleSpeechControl = () => {
@@ -502,7 +556,9 @@ export default function BuildMode({ sharedPattern = null }) {
   speechCommandHandlerRef.current = (transcript) => {
     const command = parseBuildVoiceCommand(transcript, language);
     if (!command || !state.pattern) return false;
-    setSpeechControlNotice(t("build.voiceCommandAccepted", { command: transcript }));
+    setSpeechControlNotice(
+      t("build.voiceCommandAccepted", { command: transcript }),
+    );
 
     switch (command.type) {
       case "play":
@@ -524,13 +580,14 @@ export default function BuildMode({ sharedPattern = null }) {
       case "repeat": {
         const repeatPoint = state.pattern.sequence[state.stepIndex + 1];
         if (!repeatPoint) break;
-        const repeat = () => playBuildPoint(
-          voicePlayerRef.current,
-          repeatPoint,
-          language,
-          setMessage,
-          t,
-        );
+        const repeat = () =>
+          playBuildPoint(
+            voicePlayerRef.current,
+            repeatPoint,
+            language,
+            setMessage,
+            t,
+          );
         if (state.playback === "playing") {
           dispatch({ type: "PAUSE" });
           window.setTimeout(repeat, 0);
@@ -573,19 +630,25 @@ export default function BuildMode({ sharedPattern = null }) {
 
   const total = state.pattern ? state.pattern.sequence.length - 1 : 0;
   const complete = state.stepIndex >= total && total > 0;
-  const fromPoint = state.pattern?.sequence[Math.min(state.stepIndex, total)] ?? null;
-  const toPoint = complete ? null : state.pattern?.sequence[state.stepIndex + 1] ?? null;
-  const progressPercent = total ? Math.round((state.stepIndex / total) * 100) : 0;
-  const routeContext = complete || !state.pattern
-    ? []
-    : Array.from({ length: 7 }, (_, index) => {
-        const offset = index - 3;
-        const sequenceIndex = state.stepIndex + 1 + offset;
-        return {
-          offset,
-          point: state.pattern.sequence[sequenceIndex] ?? null,
-        };
-      });
+  const fromPoint =
+    state.pattern?.sequence[Math.min(state.stepIndex, total)] ?? null;
+  const toPoint = complete
+    ? null
+    : (state.pattern?.sequence[state.stepIndex + 1] ?? null);
+  const progressPercent = total
+    ? Math.round((state.stepIndex / total) * 100)
+    : 0;
+  const routeContext =
+    complete || !state.pattern
+      ? []
+      : Array.from({ length: 7 }, (_, index) => {
+          const offset = index - 3;
+          const sequenceIndex = state.stepIndex + 1 + offset;
+          return {
+            offset,
+            point: state.pattern.sequence[sequenceIndex] ?? null,
+          };
+        });
 
   return (
     <main
@@ -603,43 +666,67 @@ export default function BuildMode({ sharedPattern = null }) {
             <button
               className="voice-control-toggle"
               type="button"
-              title={speechControlEnabled
-                ? t("build.voiceControlOff")
-                : t("build.voiceControlOn")}
-              aria-label={speechControlEnabled
-                ? t("build.voiceControlOffAria")
-                : t("build.voiceControlOnAria")}
+              title={
+                speechControlEnabled
+                  ? t("build.voiceControlOff")
+                  : t("build.voiceControlOn")
+              }
+              aria-label={
+                speechControlEnabled
+                  ? t("build.voiceControlOffAria")
+                  : t("build.voiceControlOnAria")
+              }
               aria-pressed={speechControlEnabled}
               disabled={speechControlSupported === false || !state.pattern}
               onClick={toggleSpeechControl}
             >
-              {speechControlEnabled
-                ? <Mic aria-hidden="true" size={20} />
-                : <MicOff aria-hidden="true" size={20} />}
+              {speechControlEnabled ? (
+                <Mic aria-hidden="true" size={20} />
+              ) : (
+                <MicOff aria-hidden="true" size={20} />
+              )}
             </button>
             <button
               className="voice-icon-toggle"
               type="button"
-              title={state.voiceEnabled ? t("build.voiceOff") : t("build.voiceOn")}
-              aria-label={state.voiceEnabled ? t("build.voiceOffAria") : t("build.voiceOnAria")}
+              title={
+                state.voiceEnabled ? t("build.voiceOff") : t("build.voiceOn")
+              }
+              aria-label={
+                state.voiceEnabled
+                  ? t("build.voiceOffAria")
+                  : t("build.voiceOnAria")
+              }
               aria-pressed={state.voiceEnabled}
-              onClick={() => dispatch({ type: "SET_VOICE", enabled: !state.voiceEnabled })}
+              onClick={() =>
+                dispatch({ type: "SET_VOICE", enabled: !state.voiceEnabled })
+              }
             >
-              {state.voiceEnabled
-                ? <Volume2 aria-hidden="true" size={20} />
-                : <VolumeX aria-hidden="true" size={20} />}
+              {state.voiceEnabled ? (
+                <Volume2 aria-hidden="true" size={20} />
+              ) : (
+                <VolumeX aria-hidden="true" size={20} />
+              )}
             </button>
             <button
               className="wake-lock-toggle"
               type="button"
-              title={wakeLockEnabled ? t("build.wakeLockOff") : t("build.wakeLockOn")}
-              aria-label={wakeLockEnabled ? t("build.wakeLockOffAria") : t("build.wakeLockOnAria")}
+              title={
+                wakeLockEnabled ? t("build.wakeLockOff") : t("build.wakeLockOn")
+              }
+              aria-label={
+                wakeLockEnabled
+                  ? t("build.wakeLockOffAria")
+                  : t("build.wakeLockOnAria")
+              }
               aria-pressed={wakeLockEnabled}
               onClick={toggleWakeLock}
             >
-              {wakeLockEnabled
-                ? <MonitorCheck aria-hidden="true" size={20} />
-                : <MonitorOff aria-hidden="true" size={20} />}
+              {wakeLockEnabled ? (
+                <MonitorCheck aria-hidden="true" size={20} />
+              ) : (
+                <MonitorOff aria-hidden="true" size={20} />
+              )}
             </button>
           </div>
         </header>
@@ -654,10 +741,12 @@ export default function BuildMode({ sharedPattern = null }) {
             />
 
             <div className="build-progress-line">
-              <span>{t("build.stepOf", {
-                current: Math.min(state.stepIndex + 1, total),
-                total,
-              })}</span>
+              <span>
+                {t("build.stepOf", {
+                  current: Math.min(state.stepIndex + 1, total),
+                  total,
+                })}
+              </span>
               <strong>{progressPercent}%</strong>
             </div>
             <input
@@ -668,7 +757,9 @@ export default function BuildMode({ sharedPattern = null }) {
               step="1"
               value={state.stepIndex}
               aria-label={t("build.goToStep")}
-              onChange={(event) => dispatch({ type: "SEEK", stepIndex: event.target.value })}
+              onChange={(event) =>
+                dispatch({ type: "SEEK", stepIndex: event.target.value })
+              }
             />
 
             <div className="build-route" aria-live="polite">
@@ -680,11 +771,21 @@ export default function BuildMode({ sharedPattern = null }) {
                 </div>
               ) : (
                 <>
-                  <div className="nail-readout" aria-label={t("build.fromPin", { point: fromPoint })}>
+                  <div
+                    className="nail-readout"
+                    aria-label={t("build.fromPin", { point: fromPoint })}
+                  >
                     <strong>{fromPoint}</strong>
                   </div>
-                  <ChevronRight className="route-arrow" aria-hidden="true" size={52} />
-                  <div className="nail-readout is-next" aria-label={t("build.toPin", { point: toPoint })}>
+                  <ChevronRight
+                    className="route-arrow"
+                    aria-hidden="true"
+                    size={52}
+                  />
+                  <div
+                    className="nail-readout is-next"
+                    aria-label={t("build.toPin", { point: toPoint })}
+                  >
                     <strong>{toPoint}</strong>
                   </div>
                 </>
@@ -700,16 +801,18 @@ export default function BuildMode({ sharedPattern = null }) {
                       key={offset}
                       className={`${offset < 0 ? "is-past" : ""} ${offset === 0 ? "is-current" : ""} ${point === null ? "is-empty" : ""}`}
                       aria-current={offset === 0 ? "step" : undefined}
-                      aria-label={point === null
-                        ? undefined
-                        : t(
-                          offset < 0
-                            ? "build.previousPin"
-                            : offset === 0
-                              ? "build.currentPin"
-                              : "build.nextPin",
-                          { point },
-                        )}
+                      aria-label={
+                        point === null
+                          ? undefined
+                          : t(
+                              offset < 0
+                                ? "build.previousPin"
+                                : offset === 0
+                                  ? "build.currentPin"
+                                  : "build.nextPin",
+                              { point },
+                            )
+                      }
                     >
                       <span aria-hidden="true">{point ?? "·"}</span>
                     </li>
@@ -720,7 +823,11 @@ export default function BuildMode({ sharedPattern = null }) {
             )}
 
             <div className="build-transport">
-              <button type="button" onClick={() => dispatch({ type: "PREVIOUS" })} disabled={state.stepIndex === 0}>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "PREVIOUS" })}
+                disabled={state.stepIndex === 0}
+              >
                 <ChevronLeft aria-hidden="true" size={20} />
                 {t("build.back")}
               </button>
@@ -730,12 +837,20 @@ export default function BuildMode({ sharedPattern = null }) {
                 onClick={handlePlaybackToggle}
                 disabled={complete}
               >
+                {state.playback === "playing" ? (
+                  <Pause aria-hidden="true" size={20} fill="currentColor" />
+                ) : (
+                  <Play aria-hidden="true" size={20} fill="currentColor" />
+                )}
                 {state.playback === "playing"
-                  ? <Pause aria-hidden="true" size={20} fill="currentColor" />
-                  : <Play aria-hidden="true" size={20} fill="currentColor" />}
-                {state.playback === "playing" ? t("build.pause") : t("build.start")}
+                  ? t("build.pause")
+                  : t("build.start")}
               </button>
-              <button type="button" onClick={() => dispatch({ type: "NEXT" })} disabled={complete}>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "NEXT" })}
+                disabled={complete}
+              >
                 {t("build.next")}
                 <ChevronRight aria-hidden="true" size={20} />
               </button>
@@ -743,9 +858,13 @@ export default function BuildMode({ sharedPattern = null }) {
 
             <div className="build-speed-control">
               <div className="build-speed-heading">
-                <label htmlFor="buildSpeedInput">{t("build.pauseBetween")}</label>
+                <label htmlFor="buildSpeedInput">
+                  {t("build.pauseBetween")}
+                </label>
                 <output htmlFor="buildSpeedInput">
-                  {t("build.seconds", { value: (state.speedMs / 1000).toFixed(2) })}
+                  {t("build.seconds", {
+                    value: (state.speedMs / 1000).toFixed(2),
+                  })}
                 </output>
               </div>
               <div className="build-speed-row">
@@ -765,11 +884,15 @@ export default function BuildMode({ sharedPattern = null }) {
                   max="5000"
                   step="250"
                   value={state.speedMs}
-                  aria-label={t("build.seconds", { value: (state.speedMs / 1000).toFixed(2) })}
-                  onChange={(event) => dispatch({
-                    type: "SET_SPEED",
-                    speedMs: event.target.value,
+                  aria-label={t("build.seconds", {
+                    value: (state.speedMs / 1000).toFixed(2),
                   })}
+                  onChange={(event) =>
+                    dispatch({
+                      type: "SET_SPEED",
+                      speedMs: event.target.value,
+                    })
+                  }
                 />
                 <button
                   type="button"
@@ -783,7 +906,11 @@ export default function BuildMode({ sharedPattern = null }) {
               </div>
             </div>
 
-            <button className="lost-position-button" type="button" onClick={openLostDialog}>
+            <button
+              className="lost-position-button"
+              type="button"
+              onClick={openLostDialog}
+            >
               <MapPin aria-hidden="true" size={18} />
               {t("build.lost")}
             </button>
@@ -799,7 +926,11 @@ export default function BuildMode({ sharedPattern = null }) {
           </div>
         )}
 
-        {message && <p className="build-message" aria-live="polite">{message}</p>}
+        {message && (
+          <p className="build-message" aria-live="polite">
+            {message}
+          </p>
+        )}
       </section>
 
       <aside className="build-controls">
@@ -814,10 +945,22 @@ export default function BuildMode({ sharedPattern = null }) {
 
         {state.pattern && (
           <dl className="build-summary">
-            <div><dt>{t("build.name")}</dt><dd>{state.pattern.name}</dd></div>
-            <div><dt>{t("panel.pins")}</dt><dd>{state.pattern.pointCount}</dd></div>
-            <div><dt>{t("panel.lines")}</dt><dd>{total}</dd></div>
-            <div><dt>{t("build.saved")}</dt><dd>{t("build.steps", { count: state.stepIndex })}</dd></div>
+            <div>
+              <dt>{t("build.name")}</dt>
+              <dd>{state.pattern.name}</dd>
+            </div>
+            <div>
+              <dt>{t("panel.pins")}</dt>
+              <dd>{state.pattern.pointCount}</dd>
+            </div>
+            <div>
+              <dt>{t("panel.lines")}</dt>
+              <dd>{total}</dd>
+            </div>
+            <div>
+              <dt>{t("build.saved")}</dt>
+              <dd>{t("build.steps", { count: state.stepIndex })}</dd>
+            </div>
           </dl>
         )}
       </aside>
@@ -888,22 +1031,32 @@ function BuildCheckpointDialog({ checkpoint, onContinue, onStay, t }) {
           <X aria-hidden="true" size={20} strokeWidth={2} />
         </button>
         <p className="build-checkpoint-eyebrow">
-          {t(isLateCheckpoint
-            ? "build.checkpoint4000Eyebrow"
-            : "build.checkpoint3500Eyebrow")}
+          {t(
+            isLateCheckpoint
+              ? "build.checkpoint4000Eyebrow"
+              : "build.checkpoint3500Eyebrow",
+          )}
         </p>
         <h2 id="build-checkpoint-title">
-          {t(isLateCheckpoint
-            ? "build.checkpoint4000Title"
-            : "build.checkpoint3500Title")}
+          {t(
+            isLateCheckpoint
+              ? "build.checkpoint4000Title"
+              : "build.checkpoint3500Title",
+          )}
         </h2>
         <p className="build-checkpoint-message">
-          {t(isLateCheckpoint
-            ? "build.checkpoint4000Message"
-            : "build.checkpoint3500Message")}
+          {t(
+            isLateCheckpoint
+              ? "build.checkpoint4000Message"
+              : "build.checkpoint3500Message",
+          )}
         </p>
         <div className="build-checkpoint-actions">
-          <button className="build-checkpoint-stay" type="button" onClick={onStay}>
+          <button
+            className="build-checkpoint-stay"
+            type="button"
+            onClick={onStay}
+          >
             {t("build.checkpointStay")}
           </button>
           <button
@@ -936,9 +1089,11 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore, t }) {
   }, [onClose]);
 
   const updatePoint = (index, value) => {
-    setPoints((current) => current.map(
-      (point, pointIndex) => pointIndex === index ? value : point,
-    ));
+    setPoints((current) =>
+      current.map((point, pointIndex) =>
+        pointIndex === index ? value : point,
+      ),
+    );
     setMatches(null);
     setError("");
   };
@@ -1007,7 +1162,11 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore, t }) {
           </button>
         </form>
 
-        {error && <p className="lost-dialog-error" role="alert">{error}</p>}
+        {error && (
+          <p className="lost-dialog-error" role="alert">
+            {error}
+          </p>
+        )}
         {matches?.length === 0 && (
           <p className="lost-dialog-empty" role="status">
             {t("build.notFound")}
@@ -1029,14 +1188,20 @@ function LostPositionDialog({ sequence, pointCount, onClose, onRestore, t }) {
                   onClick={() => onRestore(match.stepIndex)}
                 >
                   <span>
-                    {t("build.completedConnections", { count: match.stepIndex })}
+                    {t("build.completedConnections", {
+                      count: match.stepIndex,
+                    })}
                   </span>
                   <small>
-                    {match.previousPoint === null ? t("build.routeStart") : match.previousPoint}
+                    {match.previousPoint === null
+                      ? t("build.routeStart")
+                      : match.previousPoint}
                     {" · "}
                     {points.join(" → ")}
                     {" · "}
-                    {match.nextPoint === null ? t("build.routeDone") : match.nextPoint}
+                    {match.nextPoint === null
+                      ? t("build.routeDone")
+                      : match.nextPoint}
                   </small>
                   <em>{t("build.continueHere")}</em>
                 </button>
@@ -1071,7 +1236,9 @@ function playBuildPoint(player, point, language, reportError, t) {
 function speechRecognitionLanguage(language) {
   if (language === "en") return "en-US";
   if (typeof navigator !== "undefined") {
-    const preferred = navigator.languages?.find((value) => /^(ru|uk)(-|$)/i.test(value));
+    const preferred = navigator.languages?.find((value) =>
+      /^(ru|uk)(-|$)/i.test(value),
+    );
     if (preferred) return preferred;
   }
   return "uk-UA";
@@ -1079,21 +1246,26 @@ function speechRecognitionLanguage(language) {
 
 async function acquireScreenWakeLock(wakeLockRef, requestRef) {
   if (
-    typeof navigator === "undefined"
-    || !("wakeLock" in navigator)
-    || document.visibilityState !== "visible"
-    || wakeLockRef.current
+    typeof navigator === "undefined" ||
+    !("wakeLock" in navigator) ||
+    document.visibilityState !== "visible" ||
+    wakeLockRef.current
   ) {
     return false;
   }
   if (requestRef.current) return requestRef.current;
 
-  const request = navigator.wakeLock.request("screen")
+  const request = navigator.wakeLock
+    .request("screen")
     .then((sentinel) => {
       wakeLockRef.current = sentinel;
-      sentinel.addEventListener("release", () => {
-        if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
-      }, { once: true });
+      sentinel.addEventListener(
+        "release",
+        () => {
+          if (wakeLockRef.current === sentinel) wakeLockRef.current = null;
+        },
+        { once: true },
+      );
       return true;
     })
     .catch(() => false)
@@ -1142,7 +1314,12 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         workCenter,
         workCenter,
       );
-      const displayPoints = createCirclePoints(pointCount, center - 20, center, center);
+      const displayPoints = createCirclePoints(
+        pointCount,
+        center - 20,
+        center,
+        center,
+      );
       const allLines = [];
       for (let index = 1; index < sequence.length; index++) {
         allLines.push([sequence[index - 1] - 1, sequence[index] - 1]);
@@ -1153,7 +1330,9 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       const base = baseCanvas.getContext("2d");
       if (!base) return undefined;
 
-      renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE, { outline: false });
+      renderStringArtBase(base, pointCount, BUILD_CANVAS_SIZE, {
+        outline: false,
+      });
       renderCache = {
         pattern,
         base,
@@ -1167,7 +1346,10 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
       renderCacheRef.current = renderCache;
     }
 
-    const completedLines = Math.max(0, Math.min(stepIndex, renderCache.allLines.length));
+    const completedLines = Math.max(
+      0,
+      Math.min(stepIndex, renderCache.allLines.length),
+    );
     const linesToAdd = completedLines - renderCache.renderedLines;
     const canExtendCurrentFrame = linesToAdd >= 0 && linesToAdd <= 120;
     if (canExtendCurrentFrame && linesToAdd > 0) {
@@ -1193,8 +1375,12 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
     }
 
     const { displayPoints } = renderCache;
-    const from = displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
-    const to = stepIndex < sequence.length - 1 ? displayPoints[sequence[stepIndex + 1] - 1] : null;
+    const from =
+      displayPoints[sequence[Math.min(stepIndex, sequence.length - 1)] - 1];
+    const to =
+      stepIndex < sequence.length - 1
+        ? displayPoints[sequence[stepIndex + 1] - 1]
+        : null;
     const activeBaseCanvas = renderCache.baseCanvas;
     let animationStartedAt = performance.now();
     let animationFrame = 0;
@@ -1205,9 +1391,10 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
 
       if (from && to) {
         const duration = Math.max(300, speedMs * 0.72);
-        const rawProgress = playback === "playing"
-          ? Math.min(1, (now - animationStartedAt) / duration)
-          : 1;
+        const rawProgress =
+          playback === "playing"
+            ? Math.min(1, (now - animationStartedAt) / duration)
+            : 1;
         const x = from.x + (to.x - from.x) * rawProgress;
         const y = from.y + (to.y - from.y) * rawProgress;
 
@@ -1232,7 +1419,8 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
         context.restore();
       }
 
-      if (playback === "playing" && to) animationFrame = requestAnimationFrame(render);
+      if (playback === "playing" && to)
+        animationFrame = requestAnimationFrame(render);
     };
 
     const restartAnimation = () => {
@@ -1262,7 +1450,10 @@ function BuildCanvas({ pattern, stepIndex, playback, speedMs }) {
 }
 
 function createExactSeekFrame(renderCache, completedLines, threadMm) {
-  const checkpointStep = findNearestCheckpoint(renderCache.checkpoints, completedLines);
+  const checkpointStep = findNearestCheckpoint(
+    renderCache.checkpoints,
+    completedLines,
+  );
   const canvas = cloneCanvas(renderCache.checkpoints.get(checkpointStep));
   const context = canvas.getContext("2d");
   return renderLinesWithCheckpoints(
@@ -1274,25 +1465,39 @@ function createExactSeekFrame(renderCache, completedLines, threadMm) {
   );
 }
 
-function renderLinesWithCheckpoints(renderCache, context, startIndex, endIndex, threadMm) {
+function renderLinesWithCheckpoints(
+  renderCache,
+  context,
+  startIndex,
+  endIndex,
+  threadMm,
+) {
   let cursor = startIndex;
   while (cursor < endIndex) {
-    const nextCheckpoint = (Math.floor(cursor / SEEK_CHECKPOINT_INTERVAL) + 1)
-      * SEEK_CHECKPOINT_INTERVAL;
+    const nextCheckpoint =
+      (Math.floor(cursor / SEEK_CHECKPOINT_INTERVAL) + 1) *
+      SEEK_CHECKPOINT_INTERVAL;
     const chunkEnd = Math.min(endIndex, nextCheckpoint);
-    renderStringArtLines(context, renderCache.allLines, renderCache.workPoints, {
-      canvasSize: BUILD_CANVAS_SIZE,
-      workSize: STRING_ART_WORK_SIZE,
-      threadMm,
-      startIndex: cursor,
-      endIndex: chunkEnd,
-    });
+    renderStringArtLines(
+      context,
+      renderCache.allLines,
+      renderCache.workPoints,
+      {
+        canvasSize: BUILD_CANVAS_SIZE,
+        workSize: STRING_ART_WORK_SIZE,
+        threadMm,
+        startIndex: cursor,
+        endIndex: chunkEnd,
+      },
+    );
     cursor = chunkEnd;
     if (cursor === nextCheckpoint) {
       if (!renderCache.checkpoints.has(cursor)) {
         renderCache.checkpoints.set(cursor, cloneCanvas(context.canvas));
       }
-      const continuationCanvas = cloneCanvas(renderCache.checkpoints.get(cursor));
+      const continuationCanvas = cloneCanvas(
+        renderCache.checkpoints.get(cursor),
+      );
       context = continuationCanvas.getContext("2d");
     }
   }
