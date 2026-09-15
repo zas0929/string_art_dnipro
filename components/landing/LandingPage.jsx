@@ -101,6 +101,14 @@ export default function LandingPage() {
           <p className="landing-eyebrow">String Art Dnipro</p>
           <h1>{t("landing.heroTitle")}</h1>
           <p>{t("landing.heroCopy")}</p>
+          <a className="landing-instagram-link landing-hero-instagram" href="https://www.instagram.com/string_art_dnipro/" target="_blank" rel="noopener noreferrer" aria-label="Instagram @string_art_dnipro">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <path d="M17.5 6.5h.01" />
+            </svg>
+            <span>@string_art_dnipro</span>
+          </a>
           <ul>
             <li><Check size={16} />{t("landing.heroBenefitPattern")}</li>
             <li><Check size={16} />{t("landing.heroBenefitGenerator")}</li>
@@ -301,7 +309,15 @@ export default function LandingPage() {
 
       <footer className="landing-footer">
         <a className="landing-brand" href="/"><span className="brand-logo" aria-hidden="true"><img src="/logo-white.png" alt="" /></span><span>String Art Dnipro</span></a>
-        <div>
+          <a className="landing-instagram-link landing-footer-instagram" href="https://www.instagram.com/string_art_dnipro/" target="_blank" rel="noopener noreferrer" aria-label="Instagram @string_art_dnipro">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="5" />
+              <circle cx="12" cy="12" r="4" />
+              <path d="M17.5 6.5h.01" />
+            </svg>
+            <span>@string_art_dnipro</span>
+          </a>
+        <div className="landing-footer-links">
           <a href="#process">{t("landing.howItWorks")}</a>
           <a href="/projects">{t("landing.projects")}</a>
           <a href={user ? "/projects" : "/login"}>{user ? t("common.signedIn") : t("auth.signIn")}</a>

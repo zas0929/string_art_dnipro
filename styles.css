@@ -6756,3 +6756,40 @@ textarea {
     display: none !important;
   }
 }
+
+/* Instagram contact placement */
+.landing-hero-instagram {
+  min-height: 44px;
+  margin: 8px 0 4px;
+  padding: 8px 14px;
+  border: 1px solid #bba88e;
+  border-radius: 8px;
+  gap: 9px;
+}
+.landing-instagram-link svg { flex-shrink: 0; }
+.landing-instagram-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+.landing-footer {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-items: center;
+  text-align: center;
+}
+.landing-footer .landing-footer-links {
+  align-items: center;
+  justify-content: center;
+}
+.landing-footer-instagram {
+  min-height: 44px;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+@media (min-width: 1040px) {
+  .landing-footer { grid-template-columns: 1fr auto 1fr; }
+  .landing-footer > .landing-brand { justify-self: start; }
+  .landing-footer .landing-footer-links { justify-self: end; }
+}
