@@ -3421,7 +3421,7 @@ input[type="range"] {
 }
 
 .print-toolbar {
-  position: sticky;
+  position: static;
   z-index: 10;
   top: 16px;
   display: grid;
