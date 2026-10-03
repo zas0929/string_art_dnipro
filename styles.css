@@ -3012,7 +3012,7 @@ textarea {
   justify-content: flex-end;
   gap: 16px;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .generator-brand {
@@ -4459,7 +4459,7 @@ textarea {
   }
 
   .canvas-column {
-    gap: 12px;
+    gap: 10px;
   }
 
   .app canvas {
