@@ -1,4 +1,6 @@
 import "./globals.css";
+import CookieNotice from "../components/legal/CookieNotice.jsx";
+import { CookiePolicyLink } from "../components/legal/CookiePolicy.jsx";
 import { AuthSessionProvider } from "../components/auth/AuthSessionProvider.jsx";
 import { LanguageProvider } from "../components/i18n/LanguageProvider.jsx";
 import MobileNavigation from "../components/navigation/MobileNavigation.jsx";
@@ -114,6 +116,7 @@ export default async function RootLayout({ children }) {
           <AuthSessionProvider user={user}>
             <MobileNavigation />
             {children}
+            <footer className="site-policy-footer"><CookiePolicyLink /><CookieNotice /></footer>
           </AuthSessionProvider>
         </LanguageProvider>
         <ServiceWorkerRegistration />

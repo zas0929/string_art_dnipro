@@ -8,6 +8,11 @@ export default function sitemap() {
       priority: 1,
     },
     {
+      url: `${SITE_URL}/cookie-policy`,
+      changeFrequency: "yearly",
+      priority: 0.3,
+    },
+    {
       url: `${SITE_URL}/create`,
       changeFrequency: "monthly",
       priority: 0.9,
