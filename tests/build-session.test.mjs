@@ -68,3 +68,18 @@ test("finds every route position matching the last entered points", () => {
   ]);
   assert.deepEqual(findRecentPointMatches([1, 2, 3], [8, 9, 10]), []);
 });
+
+
+test("caps legacy build patterns at 4500 connections without changing the saved pattern", () => {
+  const pattern = { id: "legacy", sequence: Array.from({ length: 5001 }, (_, i) => i % 240 + 1), lineCount: 5000 };
+  const state = buildSessionReducer(initialBuildSessionState, {
+    type: "LOAD_PATTERN", pattern, progress: { stepIndex: 4900 },
+  });
+  assert.equal(state.pattern.sequence.length, 4501);
+  assert.equal(state.pattern.lineCount, 4500);
+  assert.equal(state.stepIndex, 4500);
+  assert.equal(state.playback, "complete");
+  assert.equal(buildSessionReducer(state, { type: "SEEK", stepIndex: 5000 }).stepIndex, 4500);
+  assert.equal(pattern.sequence.length, 5001);
+  assert.equal(pattern.lineCount, 5000);
+});

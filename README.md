@@ -6,10 +6,10 @@ entirely in the browser, so source photos are not sent to a server.
 
 ## Current Features
 
-- Reference v7 portrait generation with `240` pins and up to `5000` lines.
+- Reference v7 portrait generation with `240` pins and up to `4500` lines.
 - Responsive desktop and mobile interface.
 - Photo crop, drag, mouse-wheel zoom, pinch zoom, sharpness, and clarity controls.
-- Selectable `3500`, `4000`, `4500`, and `5000` line previews.
+- Selectable `3500`, `4000`, and `4500` line previews.
 - Multiple thread thickness presets from `0.11 mm` to `0.30 mm`.
 - TXT pattern import and export, plus PNG artwork export.
 - Build Mode with animated progress, manual seeking, adjustable speed, voice
@@ -35,9 +35,9 @@ entirely in the browser, so source photos are not sent to a server.
 5. Excludes recently used pins and respects the configured minimum pin gap.
 6. Produces an artwork preview and a pin-by-pin assembly sequence.
 
-The defaults are `0.19 mm` thread, `240` pins, `5000` lines, and a `47 cm`
+The defaults are `0.19 mm` thread, `240` pins, `4500` lines, and a `47 cm`
 artwork diameter. The main completed preview defaults to `4000` lines, while
-`3500`, `4000`, `4500`, and `5000` line variants remain available for
+`3500`, `4000`, and `4500` line variants remain available for
 comparison.
 
 Route calculation runs in a Web Worker. The interface stays responsive while

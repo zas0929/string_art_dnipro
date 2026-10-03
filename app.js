@@ -1,6 +1,6 @@
 import { formatSchemeText, parseSchemeText } from "./core/scheme-format.js";
 import { applyImageEnhancements } from "./core/image-enhancements.js";
-import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "./core/limits.js";
+import { MAX_LINE_COUNT, MAX_POINT_COUNT, MIN_POINT_COUNT } from "./core/limits.js";
 import {
   REFERENCE_LINE_STRENGTH,
   REFERENCE_LINE_WIDTH,
@@ -515,7 +515,7 @@ export function mountStringArtApp(root = document) {
   function readSettings() {
     return {
       points: clampInt(pointsInput.value, MIN_POINT_COUNT, MAX_POINT_COUNT),
-      lines: clampInt(linesInput.value, 100, 8000),
+      lines: clampInt(linesInput.value, 100, MAX_LINE_COUNT),
       sizeCm: clampNumber(sizeInput.value, 10, 200),
       threadMm: clampNumber(threadInput.value, 0.05, 1),
       minSkip: clampInt(skipInput.value, 2, 80),
@@ -567,7 +567,7 @@ export function mountStringArtApp(root = document) {
   }
 
   async function importScheme(text) {
-    const sequence = parseSchemeText(text);
+    const sequence = parseSchemeText(text).slice(0, MAX_LINE_COUNT + 1);
     const maxPoint = Math.max(...sequence);
     const pointCount = Math.max(
       clampInt(pointsInput.value, MIN_POINT_COUNT, MAX_POINT_COUNT),
@@ -1000,7 +1000,7 @@ export function mountStringArtApp(root = document) {
   function configureResultVariants(lines, settings) {
     state.resultLines = lines;
     state.resultSettings = settings;
-    const availableLineCounts = [3500, 4000, 4500, 5000]
+    const availableLineCounts = [3500, 4000, 4500]
       .filter((lineCount) => lineCount <= lines.length);
     if (availableLineCounts.length === 0) return;
 

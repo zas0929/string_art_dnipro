@@ -133,7 +133,7 @@ export default function StringArtWorkspace() {
         <div className="canvas-column result-column">
           <canvas id="resultCanvas" width="760" height="760" aria-label={t("generator.resultCanvas")} />
           <div id="resultVariants" className="result-variants" aria-label={t("generator.lineVariants")} hidden>
-            {[3500, 4000, 4500, 5000].map((lineCount) => (
+            {[3500, 4000, 4500].map((lineCount) => (
               <button
                 key={lineCount}
                 className="result-variant"

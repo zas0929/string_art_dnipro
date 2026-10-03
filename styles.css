@@ -3359,8 +3359,8 @@ canvas {
 }
 
 .result-variants {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  justify-content: center;
   gap: 8px;
 }
 
@@ -3369,6 +3369,8 @@ canvas {
 }
 
 .result-variant {
+  flex: 0 1 calc(25% - 6px);
+  min-width: 0;
   display: grid;
   grid-template-columns: 1fr;
   gap: 6px;

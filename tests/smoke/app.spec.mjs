@@ -17,7 +17,7 @@ const printScheme = [
 const variantScheme = [
   "Points______Lines/n1____0/",
   ...Array.from(
-    { length: 5000 },
+    { length: 4500 },
     (_, index) => `${((index * 73) % 240) + 1}____  ${index + 1}`,
   ),
 ].join("\n");
@@ -297,7 +297,7 @@ test("the single reference core generates a route from a photo", async ({ page }
   expect(pageErrors).toEqual([]);
 });
 
-test("a 5000-line result keeps the source and exposes four clear variants", async ({ page }) => {
+test("a 4500-line result keeps the source and exposes three clear variants", async ({ page }) => {
   await page.goto("/create");
   await waitForGenerator(page);
   await page.locator("#schemeInput").setInputFiles({
@@ -314,13 +314,13 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
     .toHaveAttribute("aria-pressed", "true");
   await expect(page.locator('.result-variant[data-lines="4000"]'))
     .toHaveClass(/is-selected/);
-  await expect(page.locator(".result-variant:visible")).toHaveCount(4);
-  await expect(page.getByRole("button", { name: "Show 5000-line artwork" }))
+  await expect(page.locator(".result-variant:visible")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Show 4500-line artwork" }))
     .toBeVisible();
   await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4000");
   const defaultFrame = await canvasSignature(page, "#resultCanvas");
-  await page.getByRole("button", { name: "Show 5000-line artwork" }).click();
-  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "5000");
+  await page.getByRole("button", { name: "Show 4500-line artwork" }).click();
+  await expect(page.locator("#resultCanvas")).toHaveAttribute("data-lines", "4500");
   const fullFrame = await canvasSignature(page, "#resultCanvas");
   expect(fullFrame.darkSamples).toBeGreaterThan(defaultFrame.darkSamples);
   await page.getByRole("button", { name: "Show 4000-line artwork" }).click();
@@ -333,7 +333,7 @@ test("a 5000-line result keeps the source and exposes four clear variants", asyn
     { timeout: 15_000 },
   ).toMatchObject({
     pointCount: 240,
-    lineCount: 5000,
+    lineCount: 4500,
   });
 
   await page.getByRole("button", { name: "Show 3500-line artwork" }).click();

@@ -9,7 +9,7 @@ import LogOut from "lucide-react/dist/esm/icons/log-out.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
 import Save from "lucide-react/dist/esm/icons/save.mjs";
 import { signOut } from "../app/login/actions.js";
-import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "../core/limits.js";
+import { MAX_LINE_COUNT, MAX_POINT_COUNT, MIN_POINT_COUNT } from "../core/limits.js";
 import { useAuthSession } from "./auth/AuthSessionProvider.jsx";
 import { useLanguage } from "./i18n/LanguageProvider.jsx";
 
@@ -33,7 +33,7 @@ export default function StringArtPanel() {
             defaultValue="240"
           />
         </label>
-        <input id="linesInput" type="hidden" defaultValue="5000" />
+        <input id="linesInput" type="hidden" defaultValue={MAX_LINE_COUNT} />
         <label>
           {t("panel.artworkSize")}
           <input id="sizeInput" type="number" min="10" max="200" step="1" defaultValue="47" />

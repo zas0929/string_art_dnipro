@@ -1,3 +1,5 @@
+import { MAX_LINE_COUNT } from "./limits.js";
+
 export const initialBuildSessionState = {
   hydrated: false,
   pattern: null,
@@ -35,11 +37,14 @@ export function buildSessionReducer(state, action) {
     case "HYDRATE_EMPTY":
       return { ...initialBuildSessionState, hydrated: true };
     case "LOAD_PATTERN": {
-      const total = Math.max(0, action.pattern.sequence.length - 1);
+      const pattern = action.pattern.sequence.length - 1 > MAX_LINE_COUNT
+        ? { ...action.pattern, sequence: action.pattern.sequence.slice(0, MAX_LINE_COUNT + 1), lineCount: MAX_LINE_COUNT }
+        : action.pattern;
+      const total = Math.max(0, pattern.sequence.length - 1);
       const stepIndex = clampStep(action.progress?.stepIndex ?? 0, total);
       return {
         hydrated: true,
-        pattern: action.pattern,
+        pattern,
         stepIndex,
         playback: stepIndex >= total ? "complete" : "paused",
         speedMs: clampSpeed(action.progress?.speedMs ?? 3000),

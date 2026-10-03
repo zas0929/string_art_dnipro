@@ -9,8 +9,8 @@ test("translates UI copy and interpolates dynamic values", () => {
     "Крок 12 з 4500",
   );
   assert.equal(
-    translate("en", "generator.generated", { completed: 400, total: 5000 }),
-    "Generated lines: 400 / 5000",
+    translate("en", "generator.generated", { completed: 400, total: 4500 }),
+    "Generated lines: 400 / 4500",
   );
 });
 
