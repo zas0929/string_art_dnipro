@@ -2926,6 +2926,7 @@ textarea {
 }
 
 .project-rename {
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -3932,6 +3933,32 @@ textarea {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-items: start;
+  }
+
+  .project-title-row.is-editing {
+    align-items: start;
+  }
+
+  .project-title-row.is-editing .project-rename {
+    display: contents;
+  }
+
+  .project-title-row.is-editing .project-rename input {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .project-title-row.is-editing .project-rename button {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
+  .project-title-row.is-editing .project-title-actions {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
   }
 
   .project-preview {

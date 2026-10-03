@@ -184,7 +184,7 @@ export default function ProjectsPage() {
                 )}
               </button>
               <div className="project-card-body">
-                <div className="project-title-row">
+                <div className={`project-title-row${editingId === project.id ? " is-editing" : ""}`}>
                   {editingId === project.id ? (
                     <form className="project-rename" onSubmit={(event) => saveName(event, project.id)}>
                       <input
