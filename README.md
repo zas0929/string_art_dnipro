@@ -128,7 +128,10 @@ profiles marked as `admin` or using the `unlimited` plan bypass that limit.
 1. Create a Supabase project.
 2. Apply the SQL files in `supabase/migrations/` in filename order using the
    Supabase SQL editor or CLI. The second migration adds buyer QR links and the
-   restricted public pattern RPC.
+   restricted public pattern RPC. Apply `202609170001_admin_shared_patterns.sql`
+   to let admins create, refresh, view, and disable buyer QR links for other
+   admins' projects. This requires the admin collaboration migration first.
+   Existing QR tokens and project ownership are preserved.
 3. Copy `.env.example` to `.env.local` and set the project URL and publishable
    key. To enable first-party Google sign-in, also set
    `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to the Web OAuth client's public ID.
