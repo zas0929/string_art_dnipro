@@ -2768,6 +2768,7 @@ textarea {
 }
 
 .project-card {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2837,16 +2838,23 @@ textarea {
 }
 
 .project-shared-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
   display: inline-flex;
-  margin-top: 6px;
-  padding: 3px 7px;
-  border: 1px solid color-mix(in srgb, var(--accent) 56%, var(--line));
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 6px;
+  background: var(--panel);
   color: var(--accent);
-  font-size: 10px;
-  font-weight: 720;
-  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
   line-height: 1.2;
-  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .project-card.is-shared {
@@ -4857,6 +4865,7 @@ textarea {
   .project-preview {
     border-bottom-color: var(--line);
     background: #e7ded1;
+    padding: 10px 0;
   }
 
   .project-card-body {

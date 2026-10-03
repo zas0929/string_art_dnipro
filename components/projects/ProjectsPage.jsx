@@ -2,6 +2,7 @@
 
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
 import Spool from "lucide-react/dist/esm/icons/spool.mjs";
+import Users from "lucide-react/dist/esm/icons/users.mjs";
 import Pencil from "lucide-react/dist/esm/icons/pencil.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
@@ -172,6 +173,12 @@ export default function ProjectsPage() {
               className={`project-card${isSharedAdminProject(project, user) ? " is-shared" : ""}`}
               key={project.id}
             >
+              {isSharedAdminProject(project, user) && (
+                <span className="project-shared-badge">
+                  <Users aria-hidden="true" size={14} />
+                  {t("projects.sharedAdmin")}
+                </span>
+              )}
               <button
                 type="button"
                 className="project-preview"
@@ -208,9 +215,7 @@ export default function ProjectsPage() {
                           {project.name || t("projects.untitled")}
                         </button>
                       </h2>
-                      {isSharedAdminProject(project, user) && (
-                        <span className="project-shared-badge">{t("projects.sharedAdmin")}</span>
-                      )}
+
                     </div>
                   )}
                   <div className="project-title-actions">
