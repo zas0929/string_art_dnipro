@@ -1,6 +1,7 @@
 "use client";
 
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
+import Spool from "lucide-react/dist/esm/icons/spool.mjs";
 import Pencil from "lucide-react/dist/esm/icons/pencil.mjs";
 import Plus from "lucide-react/dist/esm/icons/plus.mjs";
 import Printer from "lucide-react/dist/esm/icons/printer.mjs";
@@ -252,7 +253,7 @@ export default function ProjectsPage() {
                 <ProjectProgress project={project} t={t} />
                 <div className="project-actions">
                   <button type="button" onClick={() => openProject(project.id, "/build")}>
-                    <Hammer aria-hidden="true" size={17} />
+                    <Spool aria-hidden="true" size={17} />
                     {t("projects.build")}
                   </button>
                   {isAdmin && (

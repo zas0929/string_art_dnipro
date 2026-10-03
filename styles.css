@@ -2745,6 +2745,7 @@ textarea {
 }
 
 .project-preview {
+  padding: 10px 0;
   appearance: none;
   display: grid;
   width: 100%;
@@ -3962,10 +3963,10 @@ textarea {
   }
 
   .project-preview {
-    align-self: start;
+    align-self: stretch;
     height: auto;
     min-height: 0;
-    aspect-ratio: 1;
+    aspect-ratio: auto;
     border-right: 1px solid var(--line);
     border-bottom: 0;
   }
