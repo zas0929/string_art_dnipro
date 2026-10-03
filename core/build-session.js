@@ -3,7 +3,7 @@ export const initialBuildSessionState = {
   pattern: null,
   stepIndex: 0,
   playback: "paused",
-  speedMs: 1500,
+  speedMs: 3000,
   voiceEnabled: true,
 };
 
@@ -42,7 +42,7 @@ export function buildSessionReducer(state, action) {
         pattern: action.pattern,
         stepIndex,
         playback: stepIndex >= total ? "complete" : "paused",
-        speedMs: clampSpeed(action.progress?.speedMs ?? 1500),
+        speedMs: clampSpeed(action.progress?.speedMs ?? 3000),
         voiceEnabled: action.progress?.voiceEnabled ?? true,
       };
     }
@@ -85,7 +85,7 @@ function clampStep(value, total) {
 }
 
 function clampSpeed(value) {
-  return Math.max(500, Math.min(5000, Number.parseInt(value, 10) || 1500));
+  return Math.max(500, Math.min(5000, Number.parseInt(value, 10) || 3000));
 }
 
 function moveToStep(state, value, total) {

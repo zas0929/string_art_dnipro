@@ -16,7 +16,7 @@ import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw.mjs";
 import Volume2 from "lucide-react/dist/esm/icons/volume-2.mjs";
 import VolumeX from "lucide-react/dist/esm/icons/volume-x.mjs";
 import X from "lucide-react/dist/esm/icons/x.mjs";
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useLanguage } from "../i18n/LanguageProvider.jsx";
 
 import {
@@ -74,6 +74,36 @@ export default function BuildMode({ sharedPattern = null }) {
   const checkpointShownRef = useRef(new Set());
   const checkpointQueueRef = useRef([]);
   const checkpointResumePlaybackRef = useRef(false);
+  const routeHistoryRef = useRef(null);
+  const previousRouteRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const previous = previousRouteRef.current;
+    previousRouteRef.current = { pattern: state.pattern, stepIndex: state.stepIndex };
+    const list = routeHistoryRef.current;
+    if (!list || !previous || previous.pattern !== state.pattern ||
+        previous.stepIndex === state.stepIndex ||
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const items = Array.from(list.children);
+    const pitch = items[1].offsetLeft - items[0].offsetLeft;
+    const delta = state.stepIndex - previous.stepIndex;
+    const distance = Math.max(-3, Math.min(3, delta)) * pitch;
+    const animations = items.map((item) => {
+      const index = Number(item.dataset.sequenceIndex);
+      const entering = index < previous.stepIndex - 2 || index > previous.stepIndex + 4;
+      const opacity = Number(window.getComputedStyle(item).opacity);
+      return item.animate(
+        [
+          { translate: `${distance}px 0`, opacity: entering ? 0 : opacity },
+          { translate: "0px 0", opacity },
+        ],
+        { duration: 260, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+      );
+    });
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [state.pattern, state.stepIndex]);
+
   const languageRef = useRef(language);
   const translationRef = useRef(t);
   languageRef.current = language;
@@ -645,6 +675,7 @@ export default function BuildMode({ sharedPattern = null }) {
           const sequenceIndex = state.stepIndex + 1 + offset;
           return {
             offset,
+            sequenceIndex,
             point: state.pattern.sequence[sequenceIndex] ?? null,
           };
         });
@@ -790,12 +821,18 @@ export default function BuildMode({ sharedPattern = null }) {
             {!complete && (
               <div className="route-history" aria-label={t("build.routeAria")}>
                 <span className="route-history-label">{t("build.recent")}</span>
-                <ol>
-                  {routeContext.map(({ offset, point }) => (
+                <ol ref={routeHistoryRef}>
+                  {routeContext.map(({ offset, sequenceIndex, point }) => (
                     <li
-                      key={offset}
+                      key={sequenceIndex}
+                      data-sequence-index={sequenceIndex}
                       className={`${offset < 0 ? "is-past" : ""} ${offset === 0 ? "is-current" : ""} ${point === null ? "is-empty" : ""}`}
-                      aria-current={offset === 0 ? "step" : undefined}
+                    >
+                      <button
+                        type="button"
+                        disabled={point === null}
+                        onClick={() => dispatch({ type: "SEEK", stepIndex: sequenceIndex - 1 })}
+                        aria-current={offset === 0 ? "step" : undefined}
                       aria-label={
                         point === null
                           ? undefined
@@ -809,7 +846,8 @@ export default function BuildMode({ sharedPattern = null }) {
                             )
                       }
                     >
-                      <span aria-hidden="true">{point ?? "·"}</span>
+                        <span aria-hidden="true">{point ?? "·"}</span>
+                      </button>
                     </li>
                   ))}
                 </ol>

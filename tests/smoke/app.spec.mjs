@@ -395,7 +395,7 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await expect(page.getByText("Step 1 of 3")).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".nail-readout strong").first()).toHaveText("1");
   await expect(page.locator(".nail-readout.is-next strong")).toHaveText("50");
-  await expect(page.locator("#buildSpeedInput")).toHaveValue("1500");
+  await expect(page.locator("#buildSpeedInput")).toHaveValue("3000");
 
   const voiceControl = page.getByRole("button", { name: "Turn voice commands on" });
   await voiceControl.click();
@@ -415,8 +415,8 @@ test("TXT import reaches build mode and restores saved progress", async ({ page 
   await page.getByRole("button", { name: "Pause", exact: true }).click();
 
   await page.getByRole("button", { name: "Shorten pause" }).click();
-  await expect(page.locator("#buildSpeedInput")).toHaveValue("1250");
-  await expect(page.locator(".build-speed-heading output")).toHaveText("1.25 sec");
+  await expect(page.locator("#buildSpeedInput")).toHaveValue("2750");
+  await expect(page.locator(".build-speed-heading output")).toHaveText("2.75 sec");
 
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByText("Step 2 of 3")).toBeVisible();
