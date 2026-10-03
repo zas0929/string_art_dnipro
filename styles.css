@@ -2340,6 +2340,8 @@ textarea {
 }
 
 .route-history ol {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
   position: relative;
   overflow: clip;
   overflow-clip-margin: 8px;

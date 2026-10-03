@@ -76,6 +76,48 @@ export default function BuildMode({ sharedPattern = null }) {
   const checkpointResumePlaybackRef = useRef(false);
   const routeHistoryRef = useRef(null);
   const previousRouteRef = useRef(null);
+  const routeSwipeRef = useRef(null);
+  const routeSuppressClickRef = useRef(0);
+
+  function startRouteSwipe(event) {
+    if (!event.isPrimary || event.button !== 0) return;
+    routeSuppressClickRef.current = 0;
+    routeSwipeRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+  }
+
+  function moveRouteSwipe(event) {
+    const gesture = routeSwipeRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = Math.abs(event.clientX - gesture.x);
+    const dy = Math.abs(event.clientY - gesture.y);
+    if (dy > 12 && dy > dx) {
+      routeSwipeRef.current = null;
+      return;
+    }
+    if (dx > 12 && dx > dy * 1.25) {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      routeSuppressClickRef.current = performance.now() + 500;
+    }
+  }
+
+  function finishRouteSwipe(event) {
+    const gesture = routeSwipeRef.current;
+    routeSwipeRef.current = null;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const dx = event.clientX - gesture.x;
+    const dy = event.clientY - gesture.y;
+    if (Math.abs(dx) < 32 || Math.abs(dx) <= Math.abs(dy) * 1.25) return;
+    routeSuppressClickRef.current = performance.now() + 500;
+    dispatch({ type: dx < 0 ? "NEXT" : "PREVIOUS" });
+  }
+
+  function suppressRouteSwipeClick(event) {
+    if (event.detail !== 0 && performance.now() < routeSuppressClickRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }
+
 
   useLayoutEffect(() => {
     const previous = previousRouteRef.current;
@@ -821,7 +863,14 @@ export default function BuildMode({ sharedPattern = null }) {
             {!complete && (
               <div className="route-history" aria-label={t("build.routeAria")}>
                 <span className="route-history-label">{t("build.recent")}</span>
-                <ol ref={routeHistoryRef}>
+                <ol
+                  ref={routeHistoryRef}
+                  onPointerDown={startRouteSwipe}
+                  onPointerMove={moveRouteSwipe}
+                  onPointerUp={finishRouteSwipe}
+                  onPointerCancel={() => { routeSwipeRef.current = null; }}
+                  onClickCapture={suppressRouteSwipeClick}
+                >
                   {routeContext.map(({ offset, sequenceIndex, point }) => (
                     <li
                       key={sequenceIndex}
