@@ -174,9 +174,13 @@ export default function ProjectsPage() {
               key={project.id}
             >
               {isSharedAdminProject(project, user) && (
-                <span className="project-shared-badge">
+                <span
+                  className="project-shared-badge"
+                  title={t("projects.sharedAdmin")}
+                  role="img"
+                  aria-label={t("projects.sharedAdmin")}
+                >
                   <Users aria-hidden="true" size={14} />
-                  {t("projects.sharedAdmin")}
                 </span>
               )}
               <button
