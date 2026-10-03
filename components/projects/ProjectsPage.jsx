@@ -172,6 +172,9 @@ export default function ProjectsPage() {
               className={`project-card${isSharedAdminProject(project, user) ? " is-shared" : ""}`}
               key={project.id}
             >
+              {project.sourcePreviewDataUrl && project.artworkPreviewDataUrl ? (
+                <ProjectComparison project={project} t={t} />
+              ) : (
               <button
                 type="button"
                 className="project-preview"
@@ -184,6 +187,7 @@ export default function ProjectsPage() {
                   <Hammer aria-hidden="true" size={38} />
                 )}
               </button>
+              )}
               <div className="project-card-body">
                 <div className={`project-title-row${editingId === project.id ? " is-editing" : ""}`}>
                   {editingId === project.id ? (
@@ -318,4 +322,26 @@ function formatProjectDate(value, language) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+
+function ProjectComparison({ project, t }) {
+  const [position, setPosition] = useState(50);
+  return (
+    <div className="project-preview project-comparison" role="group" aria-label={t("landing.comparison")}>
+      <div className="project-comparison-frame" style={{ "--comparison-position": `${position}%` }}>
+        <img className="project-comparison-source" src={project.sourcePreviewDataUrl} alt={t("landing.yourPhoto")} />
+        <img className="project-comparison-artwork" src={project.artworkPreviewDataUrl} alt={t("landing.yourArtwork")} />
+        <div className="project-comparison-divider" aria-hidden="true"><span>↔</span></div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={position}
+          aria-label={t("landing.comparisonSlider")}
+          onChange={(event) => setPosition(Number(event.target.value))}
+        />
+      </div>
+    </div>
+  );
 }
