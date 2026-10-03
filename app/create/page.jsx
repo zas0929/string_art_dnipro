@@ -2,16 +2,22 @@ import StringArtGenerator from "../../components/StringArtGenerator.jsx";
 import { SITE_NAME, SITE_URL, SOCIAL_IMAGE } from "../../lib/site.js";
 
 export const metadata = {
-  title: "Генератор String Art за фото онлайн",
+  title: "Безкоштовний генератор String Art — схема за фото",
   description:
     "Безкоштовний генератор String Art: створіть схему картини ниткою зі свого фото, перегляньте макет і отримайте послідовність з'єднання точок.",
   alternates: {
     canonical: "/create",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Безкоштовний генератор String Art — схема за фото",
+    description: "Завантажте фото, створіть макет картини ниткою та складайте її за покроковою інструкцією.",
+    images: [SOCIAL_IMAGE],
+  },
   openGraph: {
     type: "website",
     url: "/create",
-    title: "Генератор String Art за фото онлайн",
+    title: "Безкоштовний генератор String Art — схема за фото",
     description: "Створіть безкоштовний макет картини ниткою зі свого фото онлайн.",
     images: [
       {
@@ -62,7 +68,17 @@ export default function CreatePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify([
+          structuredData,
+          {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "String Art Dnipro", item: SITE_URL },
+              { "@type": "ListItem", position: 2, name: "Генератор String Art", item: `${SITE_URL}/create` },
+            ],
+          },
+        ]).replace(/</g, "\\u003c") }}
       />
       <StringArtGenerator />
       <section className="generator-seo" aria-labelledby="generator-seo-title">
@@ -92,6 +108,19 @@ export default function CreatePage() {
               <p>Збережіть макет і послідовність точок або відкрийте інтерактивний режим складання.</p>
             </article>
           </div>
+
+          <section className="generator-seo-questions" aria-labelledby="generator-questions-title">
+            <h2 id="generator-questions-title">Як створити картину ниткою за фото</h2>
+            <h3>Яке фото обрати для String Art?</h3>
+            <p>Оберіть чіткий портрет з добре видимими очима, носом і контуром обличчя. Уникайте розмитих знімків, глибоких тіней та великої кількості дрібних деталей на фоні. Після завантаження наблизьте обличчя й перевірте кадр у попередньому перегляді.</p>
+            <h3>Скільки точок і ліній потрібно?</h3>
+            <p>Типовий макет використовує 240 точок на круглій основі. Генератор підтримує до 4500 ліній нитки. Порівняйте варіанти на 3500, 4000 і 4500 ліній: більша кількість ліній робить зображення щільнішим, але найкращий результат залежить від фотографії.</p>
+            <h3>Як складати картину за готовою схемою?</h3>
+            <p>Збережіть проєкт і відкрийте режим складання. Він показує, між якими точками натягувати нитку, озвучує наступну точку та дозволяє регулювати паузу, перемотувати кроки й зберігати прогрес. Також можна надрукувати інструкцію.</p>
+            <h3>Чи потрібен акаунт для генерації?</h3>
+            <p>Створити макет можна без реєстрації. Локальні проєкти зберігаються у вашому браузері, а після входу в акаунт доступне хмарне збереження.</p>
+            <p><a href="/#kit">Переглянути набори String Art з основою та ниткою</a> або <a href="/#faq">дізнатися більше про вибір фото</a>.</p>
+          </section>
         </div>
       </section>
     </>

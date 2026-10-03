@@ -2,14 +2,20 @@ import LandingPage from "../components/landing/LandingPage.jsx";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL, SOCIAL_IMAGE } from "../lib/site.js";
 
 export const metadata = {
-  title: "Картини ниткою за фото та String Art набори",
+  title: "Картини ниткою за фото — персональні набори String Art",
   description: SITE_DESCRIPTION,
   alternates: {
     canonical: "/",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "Картини ниткою за фото — персональні набори String Art",
+    description: SITE_DESCRIPTION,
+    images: [SOCIAL_IMAGE],
+  },
   openGraph: {
     url: "/",
-    title: "Картини ниткою за фото та String Art набори",
+    title: "Картини ниткою за фото — персональні набори String Art",
     description: SITE_DESCRIPTION,
     images: [SOCIAL_IMAGE],
   },

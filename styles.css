@@ -7018,3 +7018,9 @@ textarea {
   background: transparent;
   color: #e3c59c;
 }
+
+
+.generator-seo-questions { margin-top: 36px; max-width: 820px; }
+.generator-seo-questions h3 { margin: 24px 0 8px; font-size: 19px; }
+.generator-seo-questions p { line-height: 1.7; color: var(--muted); }
+.generator-seo-questions a { color: #d0ad7d; text-underline-offset: 3px; }
