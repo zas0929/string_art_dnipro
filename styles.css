@@ -2202,7 +2202,7 @@ textarea {
   justify-content: flex-end;
   width: min(100%, 720px);
   gap: 10px;
-  margin: 18px auto 0;
+  margin: 10px auto 0;
 }
 
 .voice-control-toggle,
@@ -2264,7 +2264,6 @@ textarea {
   display: flex;
   justify-content: space-between;
   width: min(100%, 720px);
-  margin: 12px auto 0;
   color: var(--muted);
 }
 
@@ -4155,7 +4154,7 @@ textarea {
 
   .build-canvas-wrap {
     width: clamp(210px, 68vw, 260px);
-    margin-top: 16px;
+    margin-top: 0;
   }
 
   .nail-readout strong {
