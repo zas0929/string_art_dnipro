@@ -3012,7 +3012,7 @@ textarea {
   justify-content: flex-end;
   gap: 16px;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .generator-brand {
@@ -4393,9 +4393,6 @@ textarea {
 
   .topbar {
     min-height: 76px;
-    margin-bottom: 22px;
-    padding: 0 0 18px;
-    border-bottom: 1px solid var(--line);
   }
 
   .generator-brand {
@@ -4474,11 +4471,6 @@ textarea {
   .result-column > #resultCanvas,
   .source-column > #sourceCanvas {
     box-shadow: 0 10px 28px rgb(57 45 31 / 10%);
-  }
-
-  .crop-controls,
-  .enhancement-controls {
-    padding-top: 6px;
   }
 
   .crop-control-heading,
@@ -5128,7 +5120,6 @@ textarea {
       gap: 14px;
       min-height: 0;
       padding-top: 42px;
-      padding-bottom: 16px;
     }
 
     .generator-brand .brand-logo {
