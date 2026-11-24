@@ -1,6 +1,8 @@
 "use client";
 
 import Hammer from "lucide-react/dist/esm/icons/hammer.mjs";
+import Link from "lucide-react/dist/esm/icons/link.mjs";
+import { publishSharedPattern, createSharedPatternUrl } from "../../storage/shared-pattern-store.js";
 import Spool from "lucide-react/dist/esm/icons/spool.mjs";
 import Users from "lucide-react/dist/esm/icons/users.mjs";
 import Pencil from "lucide-react/dist/esm/icons/pencil.mjs";
@@ -276,6 +278,7 @@ export default function ProjectsPage() {
                     </button>
                   )}
                 </div>
+                {isAdmin && <ProjectInstructionLink projectId={project.id} t={t} />}
               </div>
             </article>
           ))}
@@ -327,4 +330,54 @@ function formatProjectDate(value, language) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
+}
+
+
+function ProjectInstructionLink({ projectId, t }) {
+  const [busy, setBusy] = useState(false);
+  const [url, setUrl] = useState("");
+  const [message, setMessage] = useState("");
+  const inputRef = useRef(null);
+
+  async function createLink() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const store = await getProjectStore();
+      const account = await store.getAccount();
+      if (account.mode !== "cloud") throw new Error(t("print.qrLoginRequired"));
+      const token = await publishSharedPattern(projectId);
+      setUrl(createSharedPatternUrl(token, window.location.origin));
+    } catch (error) {
+      setMessage(error?.message || t("print.qrCreateError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setMessage(t("print.buyerLinkCopied"));
+    } catch {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }
+
+  return (
+    <div className="project-instruction-share">
+      <button type="button" disabled={busy} onClick={createLink}>
+        <Link aria-hidden="true" size={17} />
+        {busy ? t("print.qrWorking") : t("panel.createInstructionLink")}
+      </button>
+      {url && (
+        <div className="project-instruction-link">
+          <input ref={inputRef} type="url" value={url} readOnly aria-label={t("print.buyerLink")} onFocus={(event) => event.currentTarget.select()} />
+          <button type="button" onClick={copyLink}>{t("print.copyBuyerLink")}</button>
+        </div>
+      )}
+      {message && <p role="status">{message}</p>}
+    </div>
+  );
 }

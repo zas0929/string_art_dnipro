@@ -7024,3 +7024,23 @@ textarea {
 .generator-seo-questions h3 { margin: 24px 0 8px; font-size: 19px; }
 .generator-seo-questions p { line-height: 1.7; color: var(--muted); }
 .generator-seo-questions a { color: #d0ad7d; text-underline-offset: 3px; }
+
+
+.panel #buildModeLink {
+  border-color: #eee7dc;
+  background: #eee7dc;
+  color: #171a17;
+}
+
+.panel #buildModeLink:hover {
+  border-color: #d8c5aa;
+  background: #d8c5aa;
+  color: #171a17;
+}
+
+
+
+.project-instruction-share { display: grid; gap: 8px; margin-top: 8px; }
+.project-instruction-share button { width: 100%; min-height: 44px; padding: 8px 10px; white-space: normal; }
+.project-instruction-link { display: grid; gap: 8px; min-width: 0; }
+.project-instruction-share p { margin: 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
